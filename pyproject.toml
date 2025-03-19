@@ -8,3 +8,8 @@ dependencies = [
     "bioblend>=1.5.0",
     "mcp[cli]>=1.6.0",
 ]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.11.2",
+]
