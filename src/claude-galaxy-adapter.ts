@@ -1,7 +1,7 @@
 // claude-galaxy-adapter.ts
 // Adapter for Claude to interact with Galaxy via MCP
 
-import GalaxyMCPClient from './galaxy-mcp-client';
+import GalaxyMCPClient from './galaxy-mcp-client.js';
 
 /**
  * Claude Galaxy Adapter provides a high-level interface for Claude to interact with Galaxy

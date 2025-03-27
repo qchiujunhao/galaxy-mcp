@@ -1,7 +1,7 @@
 // claude-galaxy-example.ts
 // Example of using Claude with Galaxy MCP
 
-import ClaudeGalaxyAdapter from './claude-galaxy-adapter';
+import ClaudeGalaxyAdapter from './claude-galaxy-adapter.js';
 
 // Example of a Claude function to analyze Galaxy data
 async function claudeAnalyzeGalaxyData(adapter: ClaudeGalaxyAdapter, message: string): Promise<string> {
