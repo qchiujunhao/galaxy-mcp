@@ -3,6 +3,15 @@ import os
 from typing import Any
 from mcp.server.fastmcp import FastMCP
 from bioblend.galaxy import GalaxyInstance
+import requests
+import tempfile
+from dotenv import load_dotenv, find_dotenv
+
+# Try to load environment variables from .env file
+dotenv_path = find_dotenv(usecwd=True)
+if dotenv_path:
+    load_dotenv(dotenv_path)
+    print(f"Loaded environment variables from {dotenv_path}")
 
 # Create an MCP server
 mcp = FastMCP("Galaxy")
@@ -54,15 +63,26 @@ def connect(url: str | None = None, api_key: str | None = None) -> dict[str, Any
 
         # Check if we have the necessary credentials
         if not use_url or not use_api_key:
-            missing = []
-            if not use_url:
-                missing.append("URL")
-            if not use_api_key:
-                missing.append("API key")
-            missing_str = " and ".join(missing)
-            raise ValueError(
-                f"Missing Galaxy {missing_str}. Please provide as arguments or set environment variables."
-            )
+            # Try to reload from .env file in case it was added after startup
+            dotenv_path = find_dotenv(usecwd=True)
+            if dotenv_path:
+                load_dotenv(dotenv_path, override=True)
+                # Check again after loading .env
+                use_url = url or os.environ.get("GALAXY_URL")
+                use_api_key = api_key or os.environ.get("GALAXY_API_KEY")
+
+            # If still missing credentials, report error
+            if not use_url or not use_api_key:
+                missing = []
+                if not use_url:
+                    missing.append("URL")
+                if not use_api_key:
+                    missing.append("API key")
+                missing_str = " and ".join(missing)
+                raise ValueError(
+                    f"Missing Galaxy {missing_str}. Please provide as arguments, set environment variables, "
+                    f"or create a .env file with GALAXY_URL and GALAXY_API_KEY."
+                )
 
         galaxy_url = use_url if use_url.endswith("/") else f"{use_url}/"
 
