@@ -1,89 +1,50 @@
 # Galaxy MCP Server
 
-This project is a Model Context Protocol (MCP) server that provides tools for interacting with Galaxy instances and other things in the Galaxy ecosystem (IWC). It allows users to connect to a Galaxy server, search for tools, get tool details, run tools, manage histories, and more.
+This project provides Model Context Protocol (MCP) servers for interacting with the Galaxy bioinformatics platform. It enables AI assistants and other clients to connect to Galaxy instances, search and execute tools, manage workflows, and access other features of the Galaxy ecosystem.
 
-## Features
+## Project Structure
 
-*   **Connect to Galaxy:** Connect to a Galaxy server using a URL and API key.
-*   **Search Tools:** Search for tools in Galaxy by name.
-*   **Get Tool Details:** Get detailed information about a specific tool, including inputs and outputs.
-*   **Run Tools:** Run a tool in Galaxy with specified inputs.
-*   **Manage Histories:** Get a list of user histories.
-*   **Upload Files:** Upload a local file to Galaxy.
-*   **Workflow Invocations:** View workflow invocations in Galaxy.
-*   **IWC Integration:** Search and import workflows from the Interactive Workflow Composer (IWC).
+This repository contains two independent implementations:
 
-## Requirements
+- **[TypeScript Implementation](mcp-server-galaxy-ts/README.md)**: A Node.js-based MCP server
+- **[Python Implementation](mcp-server-galaxy-py/README.md)**: A Python-based MCP server
 
-*   Python 3.6+
-*   BioBlend
-*   Requests
-*   MCP SDK
+Both implementations provide similar functionality but may have slightly different feature sets or interfaces.
 
-## Required Variables
+## Key Features
 
-1.  Clone the repository:
+- **Galaxy Connection**: Connect to any Galaxy instance with a URL and API key
+- **Tools Management**: Search, view details, and execute Galaxy tools
+- **Workflow Integration**: Access and import workflows from the Interactive Workflow Composer (IWC)
+- **History Operations**: Manage Galaxy histories and datasets
+- **File Management**: Upload files to Galaxy from local storage
 
-    ```bash
-    git clone <repository_url>
-    cd galaxy-mcp
-    ```
+## Quick Start
 
-2.  Install the dependencies:
-
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-3.  Set the Galaxy URL and API key as environment variables:
-
-    ```bash
-    export GALAXY_URL=<galaxy_url>
-    export GALAXY_API_KEY=<galaxy_api_key>
-    ```
-
-    Alternatively, you can create a `.env` file with the following content:
-
-    ```
-    GALAXY_URL=<galaxy_url>
-    GALAXY_API_KEY=<galaxy_api_key>
-    ```
-
-    jj
-
-## Usage
-
-Run the server:
-
+For the TypeScript implementation:
 ```bash
+cd mcp-server-galaxy-ts
+npm install
+npm run build
+npm start
+```
+
+For the Python implementation:
+```bash
+cd mcp-server-galaxy-py
+pip install -r requirements.txt
 mcp run main.py
 ```
 
-Once the server is running, you can use the MCP client to interact with the Galaxy instance.
-
-
-Or, you can use a development server to explore available tools, resources, prompts, etc.
-
+For both implementations, you'll need to set up your Galaxy credentials via environment variables:
 ```bash
-mcp dev main.py
+export GALAXY_URL=<galaxy_url>
+export GALAXY_API_KEY=<galaxy_api_key>
 ```
 
-## MCP Tools
+## Development Guidelines
 
-The following tools are available:
-
-*   `connect(url: str | None = None, api_key: str | None = None) -> dict[str, Any]`: Connect to Galaxy server.
-*   `search_tools(query: str) -> dict[str, Any]`: Search for tools in Galaxy.
-*   `get_tool_details(tool_id: str, io_details: bool = False) -> dict[str, Any]`: Get detailed information about a specific tool.
-*   `run_tool(history_id: str, tool_id: str, inputs: dict[str, Any]) -> dict[str, Any]`: Run a tool in Galaxy.
-*   `get_tool_panel() -> dict[str, Any]`: Get the tool panel structure (toolbox).
-*   `get_user() -> dict[str, Any]`: Get current user information.
-*   `get_histories() -> dict[str, Any]`: Get list of user histories.
-*   `upload_file(path: str, history_id: str | None = None) -> dict[str, Any]`: Upload a local file to Galaxy.
-*   `get_invocations(invocation_id: str | None = None, workflow_id: str | None = None, history_id: str | None = None, limit: int | None = None, view: str = "collection", step_details: bool = False) -> dict[str, Any]`: View workflow invocations in Galaxy.
-*   `get_iwc_workflows() -> dict[str, Any]`: Fetch all workflows from the IWC (Interactive Workflow Composer).
-*   `search_iwc_workflows(query: str) -> dict[str, Any]`: Search for workflows in the IWC manifest.
-*   `import_workflow_from_iwc(workflow_id: str) -> dict[str, Any]`: Import a workflow from IWC to the user's Galaxy instance.
+Each implementation directory contains a README with more specific instructions and documentation.
 
 ## License
 
