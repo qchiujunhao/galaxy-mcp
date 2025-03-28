@@ -15,6 +15,7 @@ galaxy_state = {
     "connected": False,
 }
 
+
 # Initialize Galaxy client if environment variables are set
 if galaxy_state["url"] and galaxy_state["api_key"]:
     galaxy_url = (
@@ -102,7 +103,6 @@ def search_tools(query: str) -> dict[str, Any]:
     ensure_connected()
 
     try:
-        # Use BioBlend to search for tools by name
         # The get_tools method is used with name filter parameter
         tools = galaxy_state["gi"].tools.get_tools(name=query)
         return {"tools": tools}
@@ -273,6 +273,113 @@ def get_invocations(
         return {"invocations": invocations}
     except Exception as e:
         raise ValueError(f"Failed to get workflow invocations: {str(e)}")
+
+
+@mcp.tool()
+def get_iwc_workflows() -> dict[str, Any]:
+    """
+    Fetch all workflows from the IWC (Interactive Workflow Composer)
+
+    Returns:
+        Complete workflow manifest from IWC
+    """
+    try:
+        response = requests.get("https://iwc.galaxyproject.org/workflow_manifest.json")
+        response.raise_for_status()
+        workflows = response.json()
+        return {"workflows": workflows}
+    except Exception as e:
+        raise ValueError(f"Failed to fetch IWC workflows: {str(e)}")
+
+
+@mcp.tool()
+def search_iwc_workflows(query: str) -> dict[str, Any]:
+    """
+    Search for workflows in the IWC manifest
+
+    Args:
+        query: Search query (matches against name, description, and tags)
+
+    Returns:
+        List of matching workflows
+    """
+    try:
+        # Get the full manifest
+        manifest = get_iwc_workflows()["workflows"]
+
+        # Filter workflows based on the search query
+        results = []
+        query = query.lower()
+
+        for workflow in manifest:
+            # Check if query matches name, description or tags
+            name = workflow.get("name", "").lower()
+            description = workflow.get("description", "").lower()
+            tags = [tag.lower() for tag in workflow.get("tags", [])]
+
+            if (
+                query in name
+                or query in description
+                or any(query in tag for tag in tags)
+            ):
+                results.append(workflow)
+
+        return {"workflows": results, "count": len(results)}
+    except Exception as e:
+        raise ValueError(f"Failed to search IWC workflows: {str(e)}")
+
+
+@mcp.tool()
+def import_workflow_from_iwc(workflow_id: str) -> dict[str, Any]:
+    """
+    Import a workflow from IWC to the user's Galaxy instance
+
+    Args:
+        workflow_id: ID of the workflow in the IWC manifest
+
+    Returns:
+        Imported workflow information
+    """
+    ensure_connected()
+
+    try:
+        # Get the workflow manifest
+        manifest = get_iwc_workflows()["workflows"]
+
+        # Find the specified workflow
+        workflow = None
+        for wf in manifest:
+            if wf.get("id") == workflow_id:
+                workflow = wf
+                break
+
+        if not workflow:
+            raise ValueError(
+                f"Workflow with ID {workflow_id} not found in IWC manifest"
+            )
+
+        # Get the workflow download URL
+        download_url = workflow.get("download_url")
+        if not download_url:
+            raise ValueError(f"No download URL available for workflow {workflow_id}")
+
+        # Download the workflow
+        response = requests.get(download_url)
+        response.raise_for_status()
+        workflow_json = response.json()
+
+        # Import the workflow into Galaxy
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".ga") as temp:
+            json.dump(workflow_json, temp)
+            temp.flush()
+
+            imported_workflow = galaxy_state[
+                "gi"
+            ].workflows.import_workflow_from_local_path(temp.name)
+
+        return {"imported_workflow": imported_workflow}
+    except Exception as e:
+        raise ValueError(f"Failed to import workflow from IWC: {str(e)}")
 
 
 if __name__ == "__main__":
