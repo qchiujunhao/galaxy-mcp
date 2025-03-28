@@ -185,6 +185,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "bioblend" },
     { name = "mcp", extra = ["cli"] },
+    { name = "requests" },
 ]
 
 [package.dev-dependencies]
@@ -196,6 +197,7 @@ dev = [
 requires-dist = [
     { name = "bioblend", specifier = ">=1.5.0" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.6.0" },
+    { name = "requests", specifier = ">=2.32.3" },
 ]
 
 [package.metadata.requires-dev]
