@@ -14,7 +14,7 @@ if dotenv_path:
     print(f"Loaded environment variables from {dotenv_path}")
 
 # Create an MCP server
-mcp = FastMCP("Galaxy")
+mcp = FastMCP("Galaxy", dependencies=["bioblend", "requests"])
 
 # Galaxy client state
 galaxy_state = {
