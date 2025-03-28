@@ -14,3 +14,9 @@ dependencies = [
 dev = [
     "ruff>=0.11.2",
 ]
+
+[tool.ruff]
+line-length = 88
+indent-width = 4
+target-version = "py312"
+select = ["E", "F", "W", "I", "N", "B", "UP", "A", "C4", "SIM", "PT"]
