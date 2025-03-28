@@ -231,6 +231,49 @@ def upload_file(path: str, history_id: str | None = None) -> dict[str, Any]:
         raise ValueError(f"Failed to upload file: {str(e)}")
 
 
+@mcp.tool()
+def get_invocations(
+    invocation_id: str | None = None,
+    workflow_id: str | None = None,
+    history_id: str | None = None,
+    limit: int | None = None,
+    view: str = "collection",
+    step_details: bool = False,
+) -> dict[str, Any]:
+    """
+    View workflow invocations in Galaxy
+
+    Args:
+        invocation_id: Specific invocation ID to view details (optional)
+        workflow_id: Filter invocations by workflow ID (optional)
+        history_id: Filter invocations by history ID (optional)
+        limit: Maximum number of invocations to return (optional)
+        view: Level of detail to return, either 'element' or 'collection' (default: collection)
+        step_details: Include details on individual steps (only if view is 'element')
+
+    Returns:
+        Workflow invocation(s) information
+    """
+    ensure_connected()
+
+    try:
+        # If invocation_id is provided, get details of a specific invocation
+        if invocation_id:
+            invocation = galaxy_state["gi"].invocations.show_invocation(invocation_id)
+            return {"invocation": invocation}
+
+        # Otherwise get a list of invocations with optional filters
+        invocations = galaxy_state["gi"].invocations.get_invocations(
+            workflow_id=workflow_id,
+            history_id=history_id,
+            limit=limit,
+            view=view,
+            step_details=step_details,
+        )
+        return {"invocations": invocations}
+    except Exception as e:
+        raise ValueError(f"Failed to get workflow invocations: {str(e)}")
+
+
 if __name__ == "__main__":
-    # Start the server
     mcp.run()
