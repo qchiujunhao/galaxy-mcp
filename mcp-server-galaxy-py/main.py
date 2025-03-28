@@ -4,7 +4,6 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 from bioblend.galaxy import GalaxyInstance
 import requests
-import tempfile
 from dotenv import load_dotenv, find_dotenv
 
 # Try to load environment variables from .env file
@@ -80,8 +79,9 @@ def connect(url: str | None = None, api_key: str | None = None) -> dict[str, Any
                     missing.append("API key")
                 missing_str = " and ".join(missing)
                 raise ValueError(
-                    f"Missing Galaxy {missing_str}. Please provide as arguments, set environment variables, "
-                    f"or create a .env file with GALAXY_URL and GALAXY_API_KEY."
+                    f"Missing Galaxy {missing_str}. Please provide as arguments, "
+                    f"set environment variables, or create a .env file with "
+                    f"GALAXY_URL and GALAXY_API_KEY."
                 )
 
         galaxy_url = use_url if use_url.endswith("/") else f"{use_url}/"
@@ -306,7 +306,7 @@ def get_iwc_workflows() -> dict[str, Any]:
     try:
         response = requests.get("https://iwc.galaxyproject.org/workflow_manifest.json")
         response.raise_for_status()
-        workflows = response.json()
+        workflows = response.json()[0]["workflows"]
         return {"workflows": workflows}
     except Exception as e:
         raise ValueError(f"Failed to fetch IWC workflows: {str(e)}")
@@ -333,14 +333,16 @@ def search_iwc_workflows(query: str) -> dict[str, Any]:
 
         for workflow in manifest:
             # Check if query matches name, description or tags
-            name = workflow.get("name", "").lower()
-            description = workflow.get("description", "").lower()
-            tags = [tag.lower() for tag in workflow.get("tags", [])]
+            name = workflow.get("definition", {}).get("name", "").lower()
+            description = workflow.get("definition", {}).get("annotation", "").lower()
+            tags = [
+                tag.lower() for tag in workflow.get("definition", {}).get("tags", [])
+            ]
 
             if (
                 query in name
                 or query in description
-                or any(query in tag for tag in tags)
+                or (tags and any(query in tag for tag in tags))
             ):
                 results.append(workflow)
 
@@ -350,12 +352,12 @@ def search_iwc_workflows(query: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-def import_workflow_from_iwc(workflow_id: str) -> dict[str, Any]:
+def import_workflow_from_iwc(trs_id: str) -> dict[str, Any]:
     """
     Import a workflow from IWC to the user's Galaxy instance
 
     Args:
-        workflow_id: ID of the workflow in the IWC manifest
+        trs_id: TRS ID of the workflow in the IWC manifest
 
     Returns:
         Imported workflow information
@@ -369,34 +371,22 @@ def import_workflow_from_iwc(workflow_id: str) -> dict[str, Any]:
         # Find the specified workflow
         workflow = None
         for wf in manifest:
-            if wf.get("id") == workflow_id:
+            if wf.get("trsID") == trs_id:
                 workflow = wf
                 break
 
         if not workflow:
-            raise ValueError(
-                f"Workflow with ID {workflow_id} not found in IWC manifest"
-            )
+            raise ValueError(f"Workflow with trsID {trs_id} not found in IWC manifest")
 
-        # Get the workflow download URL
-        download_url = workflow.get("download_url")
-        if not download_url:
-            raise ValueError(f"No download URL available for workflow {workflow_id}")
-
-        # Download the workflow
-        response = requests.get(download_url)
-        response.raise_for_status()
-        workflow_json = response.json()
+        # Extract the workflow definition
+        workflow_definition = workflow.get("definition")
+        if not workflow_definition:
+            raise ValueError(f"No definition found for workflow with trsID {trs_id}")
 
         # Import the workflow into Galaxy
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".ga") as temp:
-            json.dump(workflow_json, temp)
-            temp.flush()
-
-            imported_workflow = galaxy_state[
-                "gi"
-            ].workflows.import_workflow_from_local_path(temp.name)
-
+        imported_workflow = galaxy_state["gi"].workflows.import_workflow_dict(
+            workflow_definition
+        )
         return {"imported_workflow": imported_workflow}
     except Exception as e:
         raise ValueError(f"Failed to import workflow from IWC: {str(e)}")
