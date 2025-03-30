@@ -193,7 +193,7 @@ def get_tool_panel() -> dict[str, Any]:
         raise ValueError(f"Failed to get tool panel: {str(e)}")
 
 @mcp.tool()
-def create_history(history_name: str):
+def create_history(history_name: str) -> dict[str, Any]:
     """
     Create a new history in Galaxy.
     :param history_name: Name for the new history.
