@@ -192,6 +192,66 @@ def get_tool_panel() -> dict[str, Any]:
     except Exception as e:
         raise ValueError(f"Failed to get tool panel: {str(e)}")
 
+@mcp.tool()
+def create_history(history_name: str) -> dict[str, Any]:
+    """
+    Create a new history in Galaxy.
+    :param history_name: Name for the new history.
+    :return: Created history ID.
+    """
+    ensure_connected()
+    return galaxy_state["gi"].histories.create_history(history_name)
+
+
+@mcp.tool()
+def filter_tools_by_dataset(dataset_type: str) -> dict[str, Any]:
+    """
+    Filter Galaxy tools that are potentially suitable 
+    for a given dataset type.
+
+    Args:
+        dataset_type: A keyword or file type
+        (e.g., "fasta", "csv", "vcf") that describes the dataset.
+
+    Returns:
+        A dictionary containing the list of 
+        recommended tools and the count.
+    """
+    ensure_connected()
+    try:
+        tool_panel = galaxy_state["gi"].tools.get_tool_panel()
+
+        def flatten_tools(panel):
+            tools = []
+            if isinstance(panel, list):
+                for item in panel:
+                    tools.extend(flatten_tools(item))
+            elif isinstance(panel, dict):
+                if "elems" in panel:
+                    for item in panel["elems"]:
+                        tools.extend(flatten_tools(item))
+                else:
+                    # If no sub-elements, assume 
+                    # this dict represents a tool.
+                    tools.append(panel)
+            return tools
+
+        all_tools = flatten_tools(tool_panel)
+
+        # Filter the tools by checking if the dataset_type 
+        # keyword appears in their name or description.
+        recommended_tools = []
+        keyword = dataset_type.lower()
+        for tool in all_tools:
+            name = (tool.get("name") or "").lower()
+            description = (tool.get("description") or "").lower()
+            if keyword in name or keyword in description:
+                recommended_tools.append(tool)
+
+        return {"recommended_tools": recommended_tools, "count": len(recommended_tools)}
+    except Exception as e:
+        raise ValueError(f"Failed to filter tools based on dataset: {str(e)}")
+
 
 @mcp.tool()
 def get_user() -> dict[str, Any]:
