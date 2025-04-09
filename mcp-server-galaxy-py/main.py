@@ -327,35 +327,6 @@ def get_datesets_by_history(history_id: str) -> dict[str, Any]:
         raise ValueError(f"Failed to get datasets by history: {str(e)}")
 
 
-def read_header_lines_from_file(file_path: str, nrows: int = 5) -> list[str]:
-    """
-    Helper function to read the first n rows from a local file.
-
-    Args:
-        file_path (str): Path to the file.
-        nrows (int): Number of lines to read.
-        
-    Returns:
-        List[str]: List of lines read from the file.
-    """
-    with open(file_path, "r") as file:
-        return list(islice(file, nrows))
-
-
-def read_header_lines_from_content(content: str, nrows: int = 5) -> list[str]:
-    """
-    Helper function to read the first n rows from file content.
-
-    Args:
-        content (str): The file content as a string.
-        nrows (int): Number of lines to read.
-
-    Returns:
-        List[str]: List of the first nrows lines from the content.
-    """
-    lines = content.splitlines()
-    return lines[:nrows]
-
 @mcp.tool()
 def read_dataset_head(
     dataset_path: Optional[str] = None,
@@ -387,7 +358,8 @@ def read_dataset_head(
 
     if dataset_path:
         try:
-            return read_header_lines_from_file(dataset_path, nrows)
+            with open(dataset_path, "r") as file:
+                return list(islice(file, nrows))
         except Exception as e:
             raise ValueError(f"Error reading local dataset at '{dataset_path}': {e}")
 
@@ -400,7 +372,7 @@ def read_dataset_head(
             
             # Download the dataset content from Galaxy.
             file_content = galaxy_state["gi"].datasets.download_dataset(dataset_id)
-            return read_header_lines_from_content(file_content, nrows)
+            return file_content.splitlines()[:nrows]
         except Exception as e:
             raise ValueError(f"Failed to read dataset from Galaxy for ID '{dataset_id}': {e}")
 
