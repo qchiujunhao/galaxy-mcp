@@ -1,12 +1,14 @@
 # Galaxy MCP Server
 import os
-from typing import Any
+from typing import Any, Optional
 from mcp.server.fastmcp import FastMCP
 from bioblend.galaxy import GalaxyInstance
 import requests
 from dotenv import load_dotenv, find_dotenv
 import concurrent.futures
 import threading
+from itertools import islice
+
 
 # Try to load environment variables from .env file
 dotenv_path = find_dotenv(usecwd=True)
@@ -303,6 +305,104 @@ def filter_tools_by_dataset(dataset_type: list[str]) -> dict[str, Any]:
         return {"recommended_tools": slim_tools, "count": len(slim_tools)}
     except Exception as e:
         return {"error": str(e)}
+
+
+@mcp.tool()
+def get_datesets_by_history(history_id: str) -> dict[str, Any]:
+    """
+    Get datasets from a specific history
+
+    Args:
+        history_id: ID of the history to fetch datasets from
+
+    Returns:
+        List of datasets in the specified history
+    """
+    ensure_connected()
+
+    try:
+        datasets = galaxy_state["gi"].histories.show_history(history_id, contents=True)
+        return datasets
+    except Exception as e:
+        raise ValueError(f"Failed to get datasets by history: {str(e)}")
+
+
+def read_header_lines_from_file(file_path: str, nrows: int = 5) -> list[str]:
+    """
+    Helper function to read the first n rows from a local file.
+
+    Args:
+        file_path (str): Path to the file.
+        nrows (int): Number of lines to read.
+        
+    Returns:
+        List[str]: List of lines read from the file.
+    """
+    with open(file_path, "r") as file:
+        return list(islice(file, nrows))
+
+
+def read_header_lines_from_content(content: str, nrows: int = 5) -> list[str]:
+    """
+    Helper function to read the first n rows from file content.
+
+    Args:
+        content (str): The file content as a string.
+        nrows (int): Number of lines to read.
+
+    Returns:
+        List[str]: List of the first nrows lines from the content.
+    """
+    lines = content.splitlines()
+    return lines[:nrows]
+
+@mcp.tool()
+def read_dataset_head(
+    dataset_path: Optional[str] = None,
+    dataset_id: Optional[str] = None,
+    nrows: int = 5,
+) -> list[str]:
+    """
+    Read the header (first few lines) of a dataset in Galaxy.
+
+    Either 'dataset_path' or 'dataset_id' must be provided.
+
+    Args:
+        dataset_path (Optional[str]): Local path to the dataset file.
+        dataset_id (Optional[str]): The ID of the dataset to read from Galaxy.
+        nrows (int): Number of lines to read from the top of the dataset.
+
+    Returns:
+        List[str]: List of the first nrows lines from the dataset.
+
+    Raises:
+        ValueError: If neither dataset_path nor dataset_id is provided, or if an error 
+                    occurs during dataset retrieval or file reading.
+    """
+    if nrows < 1:
+        raise ValueError("nrows must be greater than 0.")
+
+    if not dataset_path and not dataset_id:
+        raise ValueError("Either dataset_path or dataset_id must be provided.")
+
+    if dataset_path:
+        try:
+            return read_header_lines_from_file(dataset_path, nrows)
+        except Exception as e:
+            raise ValueError(f"Error reading local dataset at '{dataset_path}': {e}")
+
+    if dataset_id:
+        ensure_connected()
+        try:
+            dataset = galaxy_state["gi"].datasets.show_dataset(dataset_id=dataset_id)
+            if not dataset:
+                raise ValueError(f"Dataset with ID '{dataset_id}' not found in Galaxy.")
+            
+            # Download the dataset content from Galaxy.
+            file_content = galaxy_state["gi"].datasets.download_dataset(dataset_id)
+            return read_header_lines_from_content(file_content, nrows)
+        except Exception as e:
+            raise ValueError(f"Failed to read dataset from Galaxy for ID '{dataset_id}': {e}")
 
 
 @mcp.tool()
