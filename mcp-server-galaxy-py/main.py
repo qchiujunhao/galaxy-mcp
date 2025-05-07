@@ -1,6 +1,6 @@
 # Galaxy MCP Server
 import os
-from typing import Any
+from typing import Any, Dict, List, Optional
 from mcp.server.fastmcp import FastMCP
 from bioblend.galaxy import GalaxyInstance
 import requests
@@ -153,6 +153,35 @@ def get_tool_details(tool_id: str, io_details: bool = False) -> dict[str, Any]:
 
 
 @mcp.tool()
+def get_tool_citations(tool_id: str) -> dict[str, Any]:
+    """
+    Get citation information for a specific tool
+
+    Args:
+        tool_id: ID of the tool
+
+    Returns:
+        Tool citation information
+    """
+    ensure_connected()
+
+    try:
+        # Get the tool information which includes citations
+        tool_info = galaxy_state["gi"].tools.show_tool(tool_id)
+        
+        # Extract citation information
+        citations = tool_info.get("citations", [])
+        
+        return {
+            "tool_name": tool_info.get("name", tool_id),
+            "tool_version": tool_info.get("version", "unknown"),
+            "citations": citations
+        }
+    except Exception as e:
+        raise ValueError(f"Failed to get tool citations: {str(e)}")
+
+
+@mcp.tool()
 def run_tool(history_id: str, tool_id: str, inputs: dict[str, Any]) -> dict[str, Any]:
     """
     Run a tool in Galaxy
@@ -285,6 +314,61 @@ def get_histories() -> dict[str, Any]:
         return histories
     except Exception as e:
         raise ValueError(f"Failed to get histories: {str(e)}")
+
+
+@mcp.tool()
+def get_history_details(history_id: str) -> dict[str, Any]:
+    """
+    Get detailed information about a specific history, including datasets
+
+    Args:
+        history_id: ID of the history
+
+    Returns:
+        History details with datasets
+    """
+    ensure_connected()
+
+    try:
+        # Get history details
+        history_info = galaxy_state["gi"].histories.show_history(history_id, contents=False, details=True)
+        
+        # Get history contents (datasets)
+        contents = galaxy_state["gi"].histories.show_history(history_id, contents=True, details=True)
+        
+        return {
+            "history": history_info,
+            "contents": contents
+        }
+    except Exception as e:
+        raise ValueError(f"Failed to get history details: {str(e)}")
+
+
+@mcp.tool()
+def get_job_details(job_id: str) -> dict[str, Any]:
+    """
+    Get detailed information about a specific job
+
+    Args:
+        job_id: ID of the job
+
+    Returns:
+        Job details with tool information
+    """
+    ensure_connected()
+
+    try:
+        # Get job details using the Galaxy API directly
+        # (Bioblend doesn't have a direct method for this)
+        url = f"{galaxy_state['url']}api/jobs/{job_id}"
+        headers = {"x-api-key": galaxy_state["api_key"]}
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        job_info = response.json()
+        
+        return {"job": job_info}
+    except Exception as e:
+        raise ValueError(f"Failed to get job details: {str(e)}")
 
 
 @mcp.tool()
