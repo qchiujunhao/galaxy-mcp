@@ -168,14 +168,14 @@ def get_tool_citations(tool_id: str) -> dict[str, Any]:
     try:
         # Get the tool information which includes citations
         tool_info = galaxy_state["gi"].tools.show_tool(tool_id)
-        
+
         # Extract citation information
         citations = tool_info.get("citations", [])
-        
+
         return {
             "tool_name": tool_info.get("name", tool_id),
             "tool_version": tool_info.get("version", "unknown"),
-            "citations": citations
+            "citations": citations,
         }
     except Exception as e:
         raise ValueError(f"Failed to get tool citations: {str(e)}")
@@ -221,6 +221,7 @@ def get_tool_panel() -> dict[str, Any]:
     except Exception as e:
         raise ValueError(f"Failed to get tool panel: {str(e)}")
 
+
 @mcp.tool()
 def create_history(history_name: str) -> dict[str, Any]:
     """
@@ -235,7 +236,7 @@ def create_history(history_name: str) -> dict[str, Any]:
 @mcp.tool()
 def filter_tools_by_dataset(dataset_type: str) -> dict[str, Any]:
     """
-    Filter Galaxy tools that are potentially suitable 
+    Filter Galaxy tools that are potentially suitable
     for a given dataset type.
 
     Args:
@@ -243,7 +244,7 @@ def filter_tools_by_dataset(dataset_type: str) -> dict[str, Any]:
         (e.g., "fasta", "csv", "vcf") that describes the dataset.
 
     Returns:
-        A dictionary containing the list of 
+        A dictionary containing the list of
         recommended tools and the count.
     """
     ensure_connected()
@@ -260,14 +261,14 @@ def filter_tools_by_dataset(dataset_type: str) -> dict[str, Any]:
                     for item in panel["elems"]:
                         tools.extend(flatten_tools(item))
                 else:
-                    # If no sub-elements, assume 
+                    # If no sub-elements, assume
                     # this dict represents a tool.
                     tools.append(panel)
             return tools
 
         all_tools = flatten_tools(tool_panel)
 
-        # Filter the tools by checking if the dataset_type 
+        # Filter the tools by checking if the dataset_type
         # keyword appears in their name or description.
         recommended_tools = []
         keyword = dataset_type.lower()
@@ -331,15 +332,16 @@ def get_history_details(history_id: str) -> dict[str, Any]:
 
     try:
         # Get history details
-        history_info = galaxy_state["gi"].histories.show_history(history_id, contents=False, details=True)
-        
+        history_info = galaxy_state["gi"].histories.show_history(
+            history_id, contents=False, details=True
+        )
+
         # Get history contents (datasets)
-        contents = galaxy_state["gi"].histories.show_history(history_id, contents=True, details=True)
-        
-        return {
-            "history": history_info,
-            "contents": contents
-        }
+        contents = galaxy_state["gi"].histories.show_history(
+            history_id, contents=True, details=True
+        )
+
+        return {"history": history_info, "contents": contents}
     except Exception as e:
         raise ValueError(f"Failed to get history details: {str(e)}")
 
@@ -365,7 +367,7 @@ def get_job_details(job_id: str) -> dict[str, Any]:
         response = requests.get(url, headers=headers)
         response.raise_for_status()
         job_info = response.json()
-        
+
         return {"job": job_info}
     except Exception as e:
         raise ValueError(f"Failed to get job details: {str(e)}")
