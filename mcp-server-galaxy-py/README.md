@@ -32,7 +32,7 @@ uv pip install galaxy-mcp
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/galaxy-mcp.git
+git clone https://github.com/galaxyproject/galaxy-mcp.git
 cd galaxy-mcp/mcp-server-galaxy-py
 
 # Install in development mode
