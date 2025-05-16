@@ -43,8 +43,9 @@ The project includes a Makefile with all common development commands:
 make help          # Show all available commands
 make install       # Install runtime dependencies
 make install-dev   # Install development dependencies
-make lint          # Run linting checks
-make format        # Auto-format code
+make lint          # Run linting checks (via pre-commit)
+make format        # Auto-format code (via pre-commit)
+make format-quick  # Quick format (ruff + prettier only)
 make test          # Run tests
 make test-cov      # Run tests with coverage
 make test-watch    # Run tests in watch mode

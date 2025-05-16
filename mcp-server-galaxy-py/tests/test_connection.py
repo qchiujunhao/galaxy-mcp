@@ -5,10 +5,10 @@ Test Galaxy connection and authentication
 from unittest.mock import patch
 
 import pytest
-
 from galaxy_mcp.server import ensure_connected, galaxy_state
 
 
+@pytest.mark.usefixtures("_test_env")
 class TestConnection:
     """Test connection functionality"""
 
@@ -18,7 +18,7 @@ class TestConnection:
             assert not galaxy_state["connected"]
             assert galaxy_state["gi"] is None
 
-    def test_connection_success(self, mock_galaxy_instance, test_env):
+    def test_connection_success(self, mock_galaxy_instance):
         """Test successful connection to Galaxy"""
         with patch.dict(galaxy_state, {"connected": False, "gi": None}):
             with patch("galaxy_mcp.server.GalaxyInstance", return_value=mock_galaxy_instance):
@@ -44,7 +44,7 @@ class TestConnection:
             # Should not raise
             ensure_connected()
 
-    def test_connection_with_invalid_url(self, test_env):
+    def test_connection_with_invalid_url(self):
         """Test connection fails gracefully with invalid URL"""
         with patch.dict(galaxy_state, {"connected": False}):
             with patch("galaxy_mcp.server.GalaxyInstance", side_effect=Exception("Invalid URL")):

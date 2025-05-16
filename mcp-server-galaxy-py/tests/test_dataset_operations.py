@@ -5,7 +5,6 @@ Test dataset-related operations
 from unittest.mock import patch
 
 import pytest
-
 from galaxy_mcp.server import galaxy_state, upload_file
 
 

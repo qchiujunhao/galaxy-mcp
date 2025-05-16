@@ -183,8 +183,9 @@ make install        # Install runtime dependencies
 make install-dev    # Install development dependencies
 
 # Code quality
-make lint          # Run linting checks
-make format        # Auto-format code
+make lint          # Run linting checks (via pre-commit)
+make format        # Auto-format code (via pre-commit)
+make format-quick  # Quick format (ruff + prettier only)
 make check         # Run all checks (lint + test)
 
 # Testing

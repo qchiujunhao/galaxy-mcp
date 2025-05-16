@@ -10,7 +10,7 @@ import pytest
 from bioblend.galaxy import GalaxyInstance
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_galaxy_instance():
     """Mock GalaxyInstance for tests"""
     mock_gi = Mock(spec=GalaxyInstance)
@@ -57,7 +57,7 @@ def mock_galaxy_instance():
 
 
 @pytest.fixture(autouse=True)
-def reset_galaxy_state():
+def _reset_galaxy_state():
     """Reset galaxy state for each test"""
     from galaxy_mcp.server import galaxy_state
 
@@ -75,8 +75,8 @@ def reset_galaxy_state():
     galaxy_state.update(original_state)
 
 
-@pytest.fixture
-def test_env():
+@pytest.fixture()
+def _test_env():
     """Set up test environment variables"""
     original_env = os.environ.copy()
 
@@ -95,8 +95,8 @@ def test_env():
     os.environ.update(original_env)
 
 
-@pytest.fixture
-def mcp_server_instance(mock_galaxy_instance, test_env):
+@pytest.fixture()
+def mcp_server_instance(mock_galaxy_instance, _test_env):
     """Create MCP server instance with mocked Galaxy"""
     # Import and reset galaxy state
     from galaxy_mcp.server import galaxy_state
@@ -121,7 +121,7 @@ def mcp_server_instance(mock_galaxy_instance, test_env):
         galaxy_state.update(original_state)
 
 
-@pytest.fixture
+@pytest.fixture()
 def event_loop():
     """Create event loop for async tests"""
     loop = asyncio.new_event_loop()

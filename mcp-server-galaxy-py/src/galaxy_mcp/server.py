@@ -13,8 +13,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def format_error(action: str, error: Exception, context: dict = None) -> str:
+def format_error(action: str, error: Exception, context: dict | None = None) -> str:
     """Format error messages consistently"""
+    if context is None:
+        context = {}
     msg = f"{action} failed: {str(error)}"
 
     # Add HTTP status code interpretations
@@ -46,7 +48,7 @@ if dotenv_path:
 mcp = FastMCP("Galaxy", dependencies=["bioblend", "requests"])
 
 # Galaxy client state
-galaxy_state = {
+galaxy_state: dict[str, Any] = {
     "url": os.environ.get("GALAXY_URL"),
     "api_key": os.environ.get("GALAXY_API_KEY"),
     "gi": None,
