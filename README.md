@@ -15,6 +15,7 @@ Note: There is also a work-in-progress TypeScript implementation available in a 
 - **Workflow Integration**: Access and import workflows from the Interactive Workflow Composer (IWC)
 - **History Operations**: Manage Galaxy histories and datasets
 - **File Management**: Upload files to Galaxy from local storage
+- **Comprehensive Testing**: Full test suite with mock-based testing for reliability
 
 ## Quick Start
 

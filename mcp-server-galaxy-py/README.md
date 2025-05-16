@@ -68,6 +68,41 @@ The Python implementation provides the following MCP tools:
 - `search_iwc_workflows`: Search IWC workflows by keywords
 - `import_workflow_from_iwc`: Import an IWC workflow to Galaxy
 
+## Testing
+
+The project includes a comprehensive test suite using pytest with mock-based testing.
+
+### Running Tests
+
+```bash
+# Install test dependencies
+uv pip install -r requirements-test.txt
+
+# Run all tests
+uv run pytest
+
+# Run with coverage report
+uv run pytest --cov=main --cov-report=html
+
+# Run specific test file
+uv run pytest tests/test_history_operations.py
+
+# Run tests with verbose output
+uv run pytest -v
+```
+
+### Test Structure
+
+Tests are organized by functionality:
+- `test_connection.py` - Galaxy connection and authentication
+- `test_history_operations.py` - History-related operations
+- `test_dataset_operations.py` - Dataset upload/download
+- `test_tool_operations.py` - Tool search and execution
+- `test_workflow_operations.py` - Workflow import and invocation
+- `test_integration.py` - End-to-end scenarios
+
+See [tests/README.md](tests/README.md) for more details on the testing strategy.
+
 ## Development
 
 ### Code Style Guidelines
@@ -77,7 +112,8 @@ The Python implementation provides the following MCP tools:
 
 ### Development Commands
 - Lint the code: `ruff check .`
-- Start the development server: `mcp dev main.py
+- Format the code: `ruff format .`
+- Start the development server: `mcp dev main.py`
 
 ## License
 

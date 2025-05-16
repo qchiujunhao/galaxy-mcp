@@ -434,12 +434,12 @@ def get_history_details(history_id: str) -> dict[str, Any]:
                 history_dict = json.loads(history_id)
                 history_id = history_dict.get("id")
                 logger.warning(f"Received full history object instead of ID, extracting ID: {history_id}")
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as json_error:
                 logger.error(f"Invalid history_id format: {history_id}")
                 raise ValueError(
                     "Invalid history_id: expected a history ID string, "
                     "got what looks like a malformed dictionary"
-                ) from e
+                ) from json_error
 
         logger.info(f"Getting details for history ID: {history_id}")
 
