@@ -4,10 +4,8 @@ Test history-related operations
 
 import pytest
 from unittest.mock import patch, Mock
-import sys
-sys.path.insert(0, '..')
 
-from main import (
+from galaxy_mcp.server import (
     get_histories, 
     list_history_ids, 
     get_history_details,

@@ -4,10 +4,8 @@ Integration tests for complete workflows
 
 import pytest
 from unittest.mock import patch, Mock
-import sys
-sys.path.insert(0, '..')
 
-from main import galaxy_state
+from galaxy_mcp.server import galaxy_state
 
 
 class TestIntegration:
@@ -17,7 +15,7 @@ class TestIntegration:
         """Test a complete analysis workflow from upload to results"""
         with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
             # 1. Create a new history
-            from main import create_history
+            from galaxy_mcp.server import create_history
             mock_galaxy_instance.histories.create_history.return_value = {
                 "id": "new_history_1",
                 "name": "Analysis History"
@@ -27,7 +25,7 @@ class TestIntegration:
             assert history["id"] == "new_history_1"
             
             # 2. Upload a file
-            from main import upload_file
+            from galaxy_mcp.server import upload_file
             mock_galaxy_instance.tools.upload_file.return_value = {
                 "outputs": [{"id": "uploaded_dataset_1", "name": "input.fasta"}]
             }
@@ -37,7 +35,7 @@ class TestIntegration:
                 assert dataset["outputs"][0]["id"] == "uploaded_dataset_1"
             
             # 3. Run a tool on the uploaded file
-            from main import run_tool
+            from galaxy_mcp.server import run_tool
             mock_galaxy_instance.tools.run_tool.return_value = {
                 "jobs": [{"id": "job_1", "state": "ok"}],
                 "outputs": [{"id": "output_dataset_1", "name": "aligned.bam"}]
@@ -57,7 +55,7 @@ class TestIntegration:
         """Test running a complete workflow pipeline"""
         with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
             # 1. Import a workflow
-            from main import import_workflow_from_iwc
+            from galaxy_mcp.server import import_workflow_from_iwc
             
             mock_response = Mock()
             mock_response.json.return_value = {
@@ -89,7 +87,7 @@ class TestIntegration:
                 assert result["imported_workflow"]["id"] == "imported_workflow_1"
             
             # 2. Prepare input datasets
-            from main import list_history_ids
+            from galaxy_mcp.server import list_history_ids
             mock_galaxy_instance.histories.get_histories.return_value = [
                 {"id": "history_1", "name": "RNA-seq Data"}
             ]
@@ -104,7 +102,7 @@ class TestIntegration:
         """Test proper error handling throughout the stack"""
         with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
             # Test error in tool execution cascades properly
-            from main import run_tool
+            from galaxy_mcp.server import run_tool
             
             mock_galaxy_instance.tools.run_tool.side_effect = Exception("Tool not found")
             
@@ -112,7 +110,7 @@ class TestIntegration:
                 run_tool("history_1", "nonexistent_tool", {})
             
             # Test error in workflow import
-            from main import import_workflow_from_iwc
+            from galaxy_mcp.server import import_workflow_from_iwc
             
             with patch('requests.get', side_effect=Exception("Network error")):
                 with pytest.raises(ValueError, match="Failed to import workflow from IWC"):

@@ -18,12 +18,28 @@ This is the Python implementation of the Galaxy MCP server, providing a Model Co
 
 ## Installation
 
+### From PyPI (Recommended)
+
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+# Install from PyPI
+pip install galaxy-mcp
 
 # Or using uv package manager
-uv pip install -r requirements.txt
+uv pip install galaxy-mcp
+```
+
+### From Source
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/galaxy-mcp.git
+cd galaxy-mcp/mcp-server-galaxy-py
+
+# Install in development mode
+pip install -e .
+
+# Or using uv package manager
+uv pip install -e .
 ```
 
 ## Configuration
@@ -39,12 +55,26 @@ Alternatively, create a `.env` file in the project root with these variables.
 
 ## Usage
 
+### As a standalone MCP server
+
 ```bash
 # Run the MCP server
-mcp run main.py
+galaxy-mcp
 
-# Run in development mode with interactive explorer
-mcp dev main.py
+# The server will wait for MCP protocol messages on stdin
+```
+
+### With MCP clients
+
+```bash
+# Use with MCP CLI tools
+mcp connect galaxy-mcp
+
+# Use with MCP developer tools
+mcp dev galaxy-mcp
+
+# Use with other MCP-compatible clients
+your-mcp-client galaxy-mcp
 ```
 
 See [USAGE_EXAMPLES.md](USAGE_EXAMPLES.md) for detailed usage patterns and common examples.

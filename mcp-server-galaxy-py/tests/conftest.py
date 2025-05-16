@@ -61,7 +61,7 @@ def mock_galaxy_instance():
 @pytest.fixture(autouse=True)
 def reset_galaxy_state():
     """Reset galaxy state for each test"""
-    from main import galaxy_state
+    from galaxy_mcp.server import galaxy_state
     
     # Save original state
     original_state = galaxy_state.copy()
@@ -106,20 +106,20 @@ def test_env():
 def mcp_server_instance(mock_galaxy_instance, test_env):
     """Create MCP server instance with mocked Galaxy"""
     # Import and reset galaxy state
-    from main import galaxy_state
+    from galaxy_mcp.server import galaxy_state
     
     # Save original state
     original_state = galaxy_state.copy()
     
     try:
-        with patch('main.GalaxyInstance', return_value=mock_galaxy_instance):
+        with patch('galaxy_mcp.server.GalaxyInstance', return_value=mock_galaxy_instance):
             # Initialize galaxy state
             galaxy_state["gi"] = mock_galaxy_instance
             galaxy_state["connected"] = True
             galaxy_state["url"] = os.environ["GALAXY_URL"]
             galaxy_state["api_key"] = os.environ["GALAXY_API_KEY"]
             
-            from main import mcp
+            from galaxy_mcp.server import mcp
             yield mcp
     finally:
         # Restore original state

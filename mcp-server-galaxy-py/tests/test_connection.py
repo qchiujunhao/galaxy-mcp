@@ -4,10 +4,8 @@ Test Galaxy connection and authentication
 
 import pytest
 from unittest.mock import patch, Mock
-import sys
-sys.path.insert(0, '..')
 
-from main import galaxy_state, ensure_connected
+from galaxy_mcp.server import galaxy_state, ensure_connected
 
 
 class TestConnection:
