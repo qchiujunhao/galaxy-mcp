@@ -264,13 +264,20 @@ def run_tool(history_id: str, tool_id: str, inputs: dict[str, Any]) -> dict[str,
         result = galaxy_state["gi"].tools.run_tool(history_id, tool_id, inputs)
         return result
     except Exception as e:
-        error_msg = f"Failed to run tool '{tool_id}' in history '{history_id}': {str(e)}"
+        error_msg = (
+            f"Failed to run tool '{tool_id}' in history "
+            f"'{history_id}': {str(e)}"
+        )
         if "400" in str(e) or "bad request" in str(e).lower():
-            error_msg += " Check that all required tool parameters are provided correctly."
+            error_msg += (
+                " Check that all required tool parameters are provided correctly."
+            )
         elif "404" in str(e):
             error_msg += " Verify the tool ID and history ID are valid."
         else:
-            error_msg += " Check the tool inputs format matches the tool's requirements."
+            error_msg += (
+                " Check the tool inputs format matches the tool's requirements."
+            )
 
         raise ValueError(error_msg) from e
 
@@ -377,7 +384,8 @@ def get_histories() -> list[dict[str, Any]]:
     Get list of user histories
 
     Returns:
-        List of histories, where each history is a dictionary containing 'id', 'name', and other fields
+        List of histories, where each history is a dictionary containing
+        'id', 'name', and other fields
     """
     ensure_connected()
 
@@ -387,7 +395,8 @@ def get_histories() -> list[dict[str, Any]]:
     except Exception as e:
         raise ValueError(
             f"Failed to get histories: {str(e)}. "
-            "Check your connection to Galaxy and that you have permission to view histories."
+            "Check your connection to Galaxy and that you have "
+            "permission to view histories."
         )
 
 
@@ -406,7 +415,10 @@ def list_history_ids() -> list[dict[str, str]]:
         if not histories:
             return []
         # Extract just the id and name for convenience
-        simplified = [{"id": h["id"], "name": h.get("name", "Unnamed")} for h in histories]
+        simplified = [
+            {"id": h["id"], "name": h.get("name", "Unnamed")}
+            for h in histories
+        ]
         return simplified
     except Exception as e:
         raise ValueError(f"Failed to list history IDs: {str(e)}") from e
@@ -418,7 +430,8 @@ def get_history_details(history_id: str) -> dict[str, Any]:
     Get detailed information about a specific history, including datasets
 
     Args:
-        history_id: ID of the history (the 'id' field from get_histories(), not the entire history object)
+        history_id: ID of the history (the 'id' field from get_histories(),
+            not the entire history object)
 
     Returns:
         History details with datasets
@@ -433,7 +446,10 @@ def get_history_details(history_id: str) -> dict[str, Any]:
             try:
                 history_dict = json.loads(history_id)
                 history_id = history_dict.get("id")
-                logger.warning(f"Received full history object instead of ID, extracting ID: {history_id}")
+                logger.warning(
+                    f"Received full history object instead of ID, "
+                    f"extracting ID: {history_id}"
+                )
             except json.JSONDecodeError as json_error:
                 logger.error(f"Invalid history_id format: {history_id}")
                 raise ValueError(
@@ -447,7 +463,10 @@ def get_history_details(history_id: str) -> dict[str, Any]:
         history_info = galaxy_state["gi"].histories.show_history(
             history_id, contents=False
         )
-        logger.info(f"Successfully retrieved history info: {history_info.get('name', 'Unknown')}")
+        logger.info(
+            f"Successfully retrieved history info: "
+            f"{history_info.get('name', 'Unknown')}"
+        )
 
         # Get history contents (datasets)
         contents = galaxy_state["gi"].histories.show_history(
@@ -488,12 +507,15 @@ def get_job_details(job_id: str) -> dict[str, Any]:
             try:
                 job_dict = json.loads(job_id)
                 job_id = job_dict.get("id")
-                logger.warning(f"Received full job object instead of ID, extracting ID: {job_id}")
-            except json.JSONDecodeError:
+                logger.warning(
+                    f"Received full job object instead of ID, "
+                    f"extracting ID: {job_id}"
+                )
+            except json.JSONDecodeError as json_error:
                 raise ValueError(
                     "Invalid job_id: expected a job ID string, "
                     "got what looks like a malformed dictionary"
-                ) from e
+                ) from json_error
 
         # Get job details using the Galaxy API directly
         # (Bioblend doesn't have a direct method for this)
@@ -558,7 +580,8 @@ def get_invocations(
         workflow_id: Filter invocations by workflow ID (optional)
         history_id: Filter invocations by history ID (optional)
         limit: Maximum number of invocations to return (optional)
-        view: Level of detail to return, either 'element' or 'collection' (default: collection)
+        view: Level of detail to return, either 'element' or 'collection'
+            (default: collection)
         step_details: Include details on individual steps (only if view is 'element')
 
     Returns:

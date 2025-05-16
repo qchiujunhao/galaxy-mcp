@@ -2,19 +2,19 @@
 Pytest configuration and fixtures for Galaxy MCP server tests
 """
 
-import os
-import pytest
-from unittest.mock import Mock, patch
-from bioblend.galaxy import GalaxyInstance
-from mcp.server import FastMCP
 import asyncio
+import os
+from unittest.mock import Mock, patch
+
+import pytest
+from bioblend.galaxy import GalaxyInstance
 
 
 @pytest.fixture
 def mock_galaxy_instance():
     """Mock GalaxyInstance for tests"""
     mock_gi = Mock(spec=GalaxyInstance)
-    
+
     # Mock histories
     mock_histories = Mock()
     mock_histories.get_histories.return_value = [
@@ -27,7 +27,7 @@ def mock_galaxy_instance():
         "state": "ok"
     }
     mock_gi.histories = mock_histories
-    
+
     # Mock tools
     mock_tools = Mock()
     mock_tools.get_tools.return_value = [
@@ -35,26 +35,26 @@ def mock_galaxy_instance():
         {"id": "tool2", "name": "Test Tool 2"}
     ]
     mock_gi.tools = mock_tools
-    
+
     # Mock workflows
     mock_workflows = Mock()
     mock_workflows.get_workflows.return_value = [
         {"id": "workflow1", "name": "Test Workflow 1"}
     ]
     mock_gi.workflows = mock_workflows
-    
+
     # Mock invocations
     mock_invocations = Mock()
     mock_invocations.get_invocations.return_value = []
     mock_invocations.show_invocation.return_value = {"id": "inv1", "state": "ok"}
     mock_gi.invocations = mock_invocations
-    
+
     # Mock datasets
     mock_datasets = Mock()
     mock_datasets.show_dataset.return_value = {"id": "dataset1", "name": "test.txt"}
     mock_datasets.download_dataset.return_value = b"test content"
     mock_gi.datasets = mock_datasets
-    
+
     return mock_gi
 
 
@@ -62,10 +62,10 @@ def mock_galaxy_instance():
 def reset_galaxy_state():
     """Reset galaxy state for each test"""
     from galaxy_mcp.server import galaxy_state
-    
+
     # Save original state
     original_state = galaxy_state.copy()
-    
+
     # Clear state
     galaxy_state.clear()
     galaxy_state.update({
@@ -74,9 +74,9 @@ def reset_galaxy_state():
         "gi": None,
         "connected": False
     })
-    
+
     yield
-    
+
     # Restore original state
     galaxy_state.clear()
     galaxy_state.update(original_state)
@@ -86,17 +86,17 @@ def reset_galaxy_state():
 def test_env():
     """Set up test environment variables"""
     original_env = os.environ.copy()
-    
+
     # Clear Galaxy env variables first
     os.environ.pop("GALAXY_URL", None)
     os.environ.pop("GALAXY_API_KEY", None)
-    
+
     # Set test values
     os.environ["GALAXY_URL"] = "https://test.galaxy.com"
     os.environ["GALAXY_API_KEY"] = "test_api_key"
-    
+
     yield
-    
+
     # Restore original environment
     os.environ.clear()
     os.environ.update(original_env)
@@ -107,10 +107,10 @@ def mcp_server_instance(mock_galaxy_instance, test_env):
     """Create MCP server instance with mocked Galaxy"""
     # Import and reset galaxy state
     from galaxy_mcp.server import galaxy_state
-    
+
     # Save original state
     original_state = galaxy_state.copy()
-    
+
     try:
         with patch('galaxy_mcp.server.GalaxyInstance', return_value=mock_galaxy_instance):
             # Initialize galaxy state
@@ -118,7 +118,7 @@ def mcp_server_instance(mock_galaxy_instance, test_env):
             galaxy_state["connected"] = True
             galaxy_state["url"] = os.environ["GALAXY_URL"]
             galaxy_state["api_key"] = os.environ["GALAXY_API_KEY"]
-            
+
             from galaxy_mcp.server import mcp
             yield mcp
     finally:

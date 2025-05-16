@@ -1,8 +1,9 @@
 """Command-line entry point for Galaxy MCP server."""
 
 import asyncio
-import sys
+
 from . import server
+
 
 def run():
     """Run the MCP server."""
