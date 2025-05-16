@@ -21,15 +21,17 @@ class TestWorkflowOperations:
     def test_get_iwc_workflows(self):
         """Test getting IWC workflows"""
         mock_response = Mock()
-        mock_response.json.return_value = [{
-            "workflows": [
-                {"trs_id": "workflow1", "definition": {"name": "Test Workflow 1"}},
-                {"trs_id": "workflow2", "definition": {"name": "Test Workflow 2"}}
-            ]
-        }]
+        mock_response.json.return_value = [
+            {
+                "workflows": [
+                    {"trs_id": "workflow1", "definition": {"name": "Test Workflow 1"}},
+                    {"trs_id": "workflow2", "definition": {"name": "Test Workflow 2"}},
+                ]
+            }
+        ]
         mock_response.raise_for_status.return_value = None
 
-        with patch('requests.get', return_value=mock_response):
+        with patch("requests.get", return_value=mock_response):
             result = get_iwc_workflows()
 
             assert "workflows" in result
@@ -45,20 +47,20 @@ class TestWorkflowOperations:
                     "definition": {
                         "name": "RNA-seq Analysis",
                         "annotation": "Analysis pipeline for RNA sequencing",
-                        "tags": ["rna", "transcriptomics"]
+                        "tags": ["rna", "transcriptomics"],
                     }
                 },
                 {
                     "definition": {
                         "name": "DNA Variant Calling",
                         "annotation": "Pipeline for calling variants from DNA sequencing",
-                        "tags": ["dna", "variants"]
+                        "tags": ["dna", "variants"],
                     }
-                }
+                },
             ]
         }
 
-        with patch('main.get_iwc_workflows', return_value=mock_workflows):
+        with patch("galaxy_mcp.server.get_iwc_workflows", return_value=mock_workflows):
             result = search_iwc_workflows("rna")
 
             assert "workflows" in result
@@ -70,22 +72,20 @@ class TestWorkflowOperations:
         """Test importing workflow from IWC"""
         # Mock the IWC API response
         mock_response = Mock()
-        mock_response.json.return_value = [{
-            "workflows": [{
-                "trsID": "test-workflow",
-                "definition": {
-                    "name": "Test Workflow",
-                    "steps": []
-                }
-            }]
-        }]
+        mock_response.json.return_value = [
+            {
+                "workflows": [
+                    {"trsID": "test-workflow", "definition": {"name": "Test Workflow", "steps": []}}
+                ]
+            }
+        ]
         mock_response.raise_for_status.return_value = None
 
-        with patch('requests.get', return_value=mock_response):
+        with patch("requests.get", return_value=mock_response):
             with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
                 mock_galaxy_instance.workflows.import_workflow_dict.return_value = {
                     "id": "imported_workflow_1",
-                    "name": "Test Workflow"
+                    "name": "Test Workflow",
                 }
 
                 result = import_workflow_from_iwc("test-workflow")
@@ -97,7 +97,7 @@ class TestWorkflowOperations:
         """Test getting workflow invocations"""
         mock_galaxy_instance.invocations.get_invocations.return_value = [
             {"id": "invocation_1", "state": "scheduled"},
-            {"id": "invocation_2", "state": "running"}
+            {"id": "invocation_2", "state": "running"},
         ]
 
         with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):

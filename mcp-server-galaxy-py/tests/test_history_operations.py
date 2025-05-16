@@ -50,7 +50,7 @@ class TestHistoryOperations:
         """Test get_history_details with valid ID"""
         mock_galaxy_instance.histories.show_history.side_effect = [
             {"id": "test_history_1", "name": "Test History 1", "state": "ok"},
-            ["dataset1", "dataset2"]  # Contents
+            ["dataset1", "dataset2"],  # Contents
         ]
 
         with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):

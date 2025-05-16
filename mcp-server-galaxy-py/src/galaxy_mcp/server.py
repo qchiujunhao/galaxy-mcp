@@ -35,6 +35,7 @@ def format_error(action: str, error: Exception, context: dict = None) -> str:
 
     return msg
 
+
 # Try to load environment variables from .env file
 dotenv_path = find_dotenv(usecwd=True)
 if dotenv_path:
@@ -57,21 +58,14 @@ galaxy_state = {
 if galaxy_state["url"] and galaxy_state["api_key"]:
     try:
         galaxy_url = (
-            galaxy_state["url"]
-            if galaxy_state["url"].endswith("/")
-            else f"{galaxy_state['url']}/"
+            galaxy_state["url"] if galaxy_state["url"].endswith("/") else f"{galaxy_state['url']}/"
         )
         galaxy_state["url"] = galaxy_url
         galaxy_state["gi"] = GalaxyInstance(url=galaxy_url, key=galaxy_state["api_key"])
         galaxy_state["connected"] = True
-        logger.info(
-            f"Galaxy client initialized from environment variables "
-            f"(URL: {galaxy_url})"
-        )
+        logger.info(f"Galaxy client initialized from environment variables (URL: {galaxy_url})")
     except Exception as e:
-        logger.warning(
-            f"Failed to initialize Galaxy client from environment variables: {e}"
-        )
+        logger.warning(f"Failed to initialize Galaxy client from environment variables: {e}")
         logger.warning("You'll need to use connect() to establish a connection.")
 
 
@@ -150,15 +144,11 @@ def connect(url: str | None = None, api_key: str | None = None) -> dict[str, Any
 
         error_msg = f"Failed to connect to Galaxy at {galaxy_url}: {str(e)}"
         if "401" in str(e) or "authentication" in str(e).lower():
-            error_msg += (
-                " Check that your API key is valid and has the necessary permissions."
-            )
+            error_msg += " Check that your API key is valid and has the necessary permissions."
         elif "404" in str(e) or "not found" in str(e).lower():
             error_msg += " Check that the Galaxy URL is correct and accessible."
         elif "connection" in str(e).lower() or "timeout" in str(e).lower():
-            error_msg += (
-                " Check your network connection and that the Galaxy server is running."
-            )
+            error_msg += " Check your network connection and that the Galaxy server is running."
         else:
             error_msg += " Verify the URL format (should end with /) and API key."
 
@@ -264,20 +254,13 @@ def run_tool(history_id: str, tool_id: str, inputs: dict[str, Any]) -> dict[str,
         result = galaxy_state["gi"].tools.run_tool(history_id, tool_id, inputs)
         return result
     except Exception as e:
-        error_msg = (
-            f"Failed to run tool '{tool_id}' in history "
-            f"'{history_id}': {str(e)}"
-        )
+        error_msg = f"Failed to run tool '{tool_id}' in history '{history_id}': {str(e)}"
         if "400" in str(e) or "bad request" in str(e).lower():
-            error_msg += (
-                " Check that all required tool parameters are provided correctly."
-            )
+            error_msg += " Check that all required tool parameters are provided correctly."
         elif "404" in str(e):
             error_msg += " Verify the tool ID and history ID are valid."
         else:
-            error_msg += (
-                " Check the tool inputs format matches the tool's requirements."
-            )
+            error_msg += " Check the tool inputs format matches the tool's requirements."
 
         raise ValueError(error_msg) from e
 
@@ -415,10 +398,7 @@ def list_history_ids() -> list[dict[str, str]]:
         if not histories:
             return []
         # Extract just the id and name for convenience
-        simplified = [
-            {"id": h["id"], "name": h.get("name", "Unnamed")}
-            for h in histories
-        ]
+        simplified = [{"id": h["id"], "name": h.get("name", "Unnamed")} for h in histories]
         return simplified
     except Exception as e:
         raise ValueError(f"Failed to list history IDs: {str(e)}") from e
@@ -443,12 +423,12 @@ def get_history_details(history_id: str) -> dict[str, Any]:
         if history_id.startswith("{") and history_id.endswith("}"):
             # Try to parse it and extract the actual ID
             import json
+
             try:
                 history_dict = json.loads(history_id)
                 history_id = history_dict.get("id")
                 logger.warning(
-                    f"Received full history object instead of ID, "
-                    f"extracting ID: {history_id}"
+                    f"Received full history object instead of ID, extracting ID: {history_id}"
                 )
             except json.JSONDecodeError as json_error:
                 logger.error(f"Invalid history_id format: {history_id}")
@@ -460,18 +440,11 @@ def get_history_details(history_id: str) -> dict[str, Any]:
         logger.info(f"Getting details for history ID: {history_id}")
 
         # Get history details
-        history_info = galaxy_state["gi"].histories.show_history(
-            history_id, contents=False
-        )
-        logger.info(
-            f"Successfully retrieved history info: "
-            f"{history_info.get('name', 'Unknown')}"
-        )
+        history_info = galaxy_state["gi"].histories.show_history(history_id, contents=False)
+        logger.info(f"Successfully retrieved history info: {history_info.get('name', 'Unknown')}")
 
         # Get history contents (datasets)
-        contents = galaxy_state["gi"].histories.show_history(
-            history_id, contents=True
-        )
+        contents = galaxy_state["gi"].histories.show_history(history_id, contents=True)
         logger.info(f"Successfully retrieved {len(contents)} items from history")
 
         return {"history": history_info, "contents": contents}
@@ -482,9 +455,7 @@ def get_history_details(history_id: str) -> dict[str, Any]:
                 f"History ID '{history_id}' not found. Make sure to pass just "
                 "the ID string from get_histories(), not the entire history object."
             ) from e
-        raise ValueError(
-            f"Failed to get history details for ID '{history_id}': {str(e)}"
-        ) from e
+        raise ValueError(f"Failed to get history details for ID '{history_id}': {str(e)}") from e
 
 
 @mcp.tool()
@@ -504,13 +475,11 @@ def get_job_details(job_id: str) -> dict[str, Any]:
         # Check if job_id looks like a dictionary string and extract the ID
         if job_id.startswith("{") and job_id.endswith("}"):
             import json
+
             try:
                 job_dict = json.loads(job_id)
                 job_id = job_dict.get("id")
-                logger.warning(
-                    f"Received full job object instead of ID, "
-                    f"extracting ID: {job_id}"
-                )
+                logger.warning(f"Received full job object instead of ID, extracting ID: {job_id}")
             except json.JSONDecodeError as json_error:
                 raise ValueError(
                     "Invalid job_id: expected a job ID string, "
@@ -648,9 +617,7 @@ def search_iwc_workflows(query: str) -> dict[str, Any]:
             # Check if query matches name, description or tags
             name = workflow.get("definition", {}).get("name", "").lower()
             description = workflow.get("definition", {}).get("annotation", "").lower()
-            tags = [
-                tag.lower() for tag in workflow.get("definition", {}).get("tags", [])
-            ]
+            tags = [tag.lower() for tag in workflow.get("definition", {}).get("tags", [])]
 
             if (
                 query in name
@@ -705,9 +672,7 @@ def import_workflow_from_iwc(trs_id: str) -> dict[str, Any]:
             )
 
         # Import the workflow into Galaxy
-        imported_workflow = galaxy_state["gi"].workflows.import_workflow_dict(
-            workflow_definition
-        )
+        imported_workflow = galaxy_state["gi"].workflows.import_workflow_dict(workflow_definition)
         return {"imported_workflow": imported_workflow}
     except Exception as e:
         raise ValueError(f"Failed to import workflow from IWC: {str(e)}") from e

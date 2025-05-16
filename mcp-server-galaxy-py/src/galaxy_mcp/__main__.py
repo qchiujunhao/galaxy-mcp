@@ -10,5 +10,6 @@ def run():
     # Use the FastMCP's built-in stdio handler
     return asyncio.run(server.mcp.run_stdio_async())
 
+
 if __name__ == "__main__":
     run()

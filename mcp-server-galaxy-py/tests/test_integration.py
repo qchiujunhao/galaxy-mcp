@@ -17,9 +17,10 @@ class TestIntegration:
         with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
             # 1. Create a new history
             from galaxy_mcp.server import create_history
+
             mock_galaxy_instance.histories.create_history.return_value = {
                 "id": "new_history_1",
-                "name": "Analysis History"
+                "name": "Analysis History",
             }
 
             history = create_history("Analysis History")
@@ -27,6 +28,7 @@ class TestIntegration:
 
             # 2. Upload a file
             from galaxy_mcp.server import upload_file
+
             mock_galaxy_instance.tools.upload_file.return_value = {
                 "outputs": [{"id": "uploaded_dataset_1", "name": "input.fasta"}]
             }
@@ -37,15 +39,16 @@ class TestIntegration:
 
             # 3. Run a tool on the uploaded file
             from galaxy_mcp.server import run_tool
+
             mock_galaxy_instance.tools.run_tool.return_value = {
                 "jobs": [{"id": "job_1", "state": "ok"}],
-                "outputs": [{"id": "output_dataset_1", "name": "aligned.bam"}]
+                "outputs": [{"id": "output_dataset_1", "name": "aligned.bam"}],
             }
 
             tool_result = run_tool(
                 history["id"],
                 "bwa",
-                {"input": {"src": "hda", "id": dataset["outputs"][0]["id"]}, "reference": "hg38"}
+                {"input": {"src": "hda", "id": dataset["outputs"][0]["id"]}, "reference": "hg38"},
             )
             assert tool_result["outputs"][0]["id"] == "output_dataset_1"
 
@@ -61,27 +64,28 @@ class TestIntegration:
             mock_response = Mock()
             mock_response.json.return_value = {
                 "name": "RNA-seq Pipeline",
-                "steps": [{"id": 0, "tool_id": "fastqc"}]
+                "steps": [{"id": 0, "tool_id": "fastqc"}],
             }
             mock_response.raise_for_status.return_value = None
 
             # Mock the IWC API
             mock_iwc_response = Mock()
-            mock_iwc_response.json.return_value = [{
-                "workflows": [{
-                    "trsID": "workflows/rnaseq-pe",
-                    "definition": {
-                        "name": "RNA-seq Pipeline",
-                        "steps": []
-                    }
-                }]
-            }]
+            mock_iwc_response.json.return_value = [
+                {
+                    "workflows": [
+                        {
+                            "trsID": "workflows/rnaseq-pe",
+                            "definition": {"name": "RNA-seq Pipeline", "steps": []},
+                        }
+                    ]
+                }
+            ]
             mock_iwc_response.raise_for_status.return_value = None
 
-            with patch('requests.get', return_value=mock_iwc_response):
+            with patch("requests.get", return_value=mock_iwc_response):
                 mock_galaxy_instance.workflows.import_workflow_dict.return_value = {
                     "id": "imported_workflow_1",
-                    "name": "RNA-seq Pipeline"
+                    "name": "RNA-seq Pipeline",
                 }
 
                 result = import_workflow_from_iwc("workflows/rnaseq-pe")
@@ -89,6 +93,7 @@ class TestIntegration:
 
             # 2. Prepare input datasets
             from galaxy_mcp.server import list_history_ids
+
             mock_galaxy_instance.histories.get_histories.return_value = [
                 {"id": "history_1", "name": "RNA-seq Data"}
             ]
@@ -113,6 +118,6 @@ class TestIntegration:
             # Test error in workflow import
             from galaxy_mcp.server import import_workflow_from_iwc
 
-            with patch('requests.get', side_effect=Exception("Network error")):
+            with patch("requests.get", side_effect=Exception("Network error")):
                 with pytest.raises(ValueError, match="Failed to import workflow from IWC"):
                     import_workflow_from_iwc("nonexistent-workflow")

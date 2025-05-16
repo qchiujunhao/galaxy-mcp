@@ -21,9 +21,9 @@ class TestConnection:
     def test_connection_success(self, mock_galaxy_instance, test_env):
         """Test successful connection to Galaxy"""
         with patch.dict(galaxy_state, {"connected": False, "gi": None}):
-            with patch('main.GalaxyInstance', return_value=mock_galaxy_instance):
+            with patch("galaxy_mcp.server.GalaxyInstance", return_value=mock_galaxy_instance):
                 # This should trigger initialization in the actual module
-                from main import galaxy_state as new_state
+                from galaxy_mcp.server import galaxy_state as new_state
 
                 # Simulate the initialization
                 new_state["gi"] = mock_galaxy_instance
@@ -47,13 +47,13 @@ class TestConnection:
     def test_connection_with_invalid_url(self, test_env):
         """Test connection fails gracefully with invalid URL"""
         with patch.dict(galaxy_state, {"connected": False}):
-            with patch('main.GalaxyInstance', side_effect=Exception("Invalid URL")):
+            with patch("galaxy_mcp.server.GalaxyInstance", side_effect=Exception("Invalid URL")):
                 # In real implementation, this would be handled during initialization
                 assert not galaxy_state["connected"]
 
     def test_connection_with_missing_credentials(self):
         """Test connection requires credentials"""
-        with patch.dict('os.environ', {}, clear=True):
-            with patch.dict(galaxy_state, {'connected': False}):
+        with patch.dict("os.environ", {}, clear=True):
+            with patch.dict(galaxy_state, {"connected": False}):
                 # Without credentials, should not connect
                 assert not galaxy_state.get("connected", False)

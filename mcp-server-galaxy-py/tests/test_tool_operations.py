@@ -36,7 +36,7 @@ class TestToolOperations:
         all_tools = [
             {"id": "tool1", "name": "BWA Aligner", "description": "Aligns sequences"},
             {"id": "tool2", "name": "Samtools", "description": "Process BAM files"},
-            {"id": "tool3", "name": "HISAT2", "description": "Fast aligner"}
+            {"id": "tool3", "name": "HISAT2", "description": "Fast aligner"},
         ]
 
         with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
@@ -44,7 +44,8 @@ class TestToolOperations:
             def mock_get_tools(name=None):
                 if name and name.lower() == "align":
                     return [
-                        t for t in all_tools
+                        t
+                        for t in all_tools
                         if "align" in t["name"].lower() or "align" in t["description"].lower()
                     ]
                 return all_tools
@@ -63,7 +64,7 @@ class TestToolOperations:
         """Test running a tool"""
         mock_galaxy_instance.tools.run_tool.return_value = {
             "jobs": [{"id": "job_1", "state": "ok"}],
-            "outputs": [{"id": "output_1", "name": "aligned.bam"}]
+            "outputs": [{"id": "output_1", "name": "aligned.bam"}],
         }
 
         with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
@@ -79,7 +80,7 @@ class TestToolOperations:
             mock_galaxy_instance.tools.run_tool.assert_called_once_with(
                 "test_history_1",
                 "tool1",
-                {"input1": {"src": "hda", "id": "dataset_1"}, "param1": "value1"}
+                {"input1": {"src": "hda", "id": "dataset_1"}, "param1": "value1"},
             )
 
     def test_run_tool_error(self, mock_galaxy_instance):

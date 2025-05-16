@@ -157,12 +157,97 @@ See [tests/README.md](tests/README.md) for more details on the testing strategy.
 - Use Python 3.12+ features
 - Employ type hints where appropriate
 - Follow PEP 8 style guidelines
+- Use ruff for code formatting and linting
+- All code should pass type checking with mypy
+
+### Development Setup
+
+```bash
+# Install development dependencies
+make install-dev
+
+# Set up pre-commit hooks (optional but recommended)
+pre-commit install
+```
 
 ### Development Commands
 
-- Lint the code: `ruff check .`
-- Format the code: `ruff format .`
-- Start the development server: `mcp dev main.py`
+We use a Makefile for consistent development commands:
+
+```bash
+# Show all available commands
+make help
+
+# Install dependencies
+make install        # Install runtime dependencies
+make install-dev    # Install development dependencies
+
+# Code quality
+make lint          # Run linting checks
+make format        # Auto-format code
+make check         # Run all checks (lint + test)
+
+# Testing
+make test          # Run tests
+make test-cov      # Run tests with coverage report
+make test-watch    # Run tests in watch mode
+
+# Building
+make clean         # Clean build artifacts
+make build         # Build distribution packages
+
+# Running
+make run           # Run the MCP server
+make dev           # Run MCP dev server with explorer
+```
+
+### Using uv directly
+
+All commands can also be run directly with uv:
+
+```bash
+# Lint the code
+uv run ruff check .
+
+# Format the code
+uv run ruff format .
+
+# Run tests
+uv run pytest
+
+# Run with coverage
+uv run pytest --cov=galaxy_mcp --cov-report=html
+```
+
+### Cross-version Testing
+
+Test across multiple Python versions using tox:
+
+```bash
+# Test on all supported Python versions
+tox
+
+# Test on specific version
+tox -e py312
+
+# Run only linting
+tox -e lint
+
+# Run type checking
+tox -e type
+```
+
+### Pre-commit Hooks
+
+The project includes pre-commit hooks for automatic code formatting:
+
+```bash
+# Install pre-commit hooks
+pre-commit install
+
+# Run pre-commit manually on all files
+pre-commit run --all-files
+```
 
 ## License
 

@@ -19,12 +19,12 @@ def mock_galaxy_instance():
     mock_histories = Mock()
     mock_histories.get_histories.return_value = [
         {"id": "test_history_1", "name": "Test History 1"},
-        {"id": "test_history_2", "name": "Test History 2"}
+        {"id": "test_history_2", "name": "Test History 2"},
     ]
     mock_histories.show_history.return_value = {
         "id": "test_history_1",
         "name": "Test History 1",
-        "state": "ok"
+        "state": "ok",
     }
     mock_gi.histories = mock_histories
 
@@ -32,15 +32,13 @@ def mock_galaxy_instance():
     mock_tools = Mock()
     mock_tools.get_tools.return_value = [
         {"id": "tool1", "name": "Test Tool 1"},
-        {"id": "tool2", "name": "Test Tool 2"}
+        {"id": "tool2", "name": "Test Tool 2"},
     ]
     mock_gi.tools = mock_tools
 
     # Mock workflows
     mock_workflows = Mock()
-    mock_workflows.get_workflows.return_value = [
-        {"id": "workflow1", "name": "Test Workflow 1"}
-    ]
+    mock_workflows.get_workflows.return_value = [{"id": "workflow1", "name": "Test Workflow 1"}]
     mock_gi.workflows = mock_workflows
 
     # Mock invocations
@@ -68,12 +66,7 @@ def reset_galaxy_state():
 
     # Clear state
     galaxy_state.clear()
-    galaxy_state.update({
-        "url": None,
-        "api_key": None,
-        "gi": None,
-        "connected": False
-    })
+    galaxy_state.update({"url": None, "api_key": None, "gi": None, "connected": False})
 
     yield
 
@@ -112,7 +105,7 @@ def mcp_server_instance(mock_galaxy_instance, test_env):
     original_state = galaxy_state.copy()
 
     try:
-        with patch('galaxy_mcp.server.GalaxyInstance', return_value=mock_galaxy_instance):
+        with patch("galaxy_mcp.server.GalaxyInstance", return_value=mock_galaxy_instance):
             # Initialize galaxy state
             galaxy_state["gi"] = mock_galaxy_instance
             galaxy_state["connected"] = True
@@ -120,6 +113,7 @@ def mcp_server_instance(mock_galaxy_instance, test_env):
             galaxy_state["api_key"] = os.environ["GALAXY_API_KEY"]
 
             from galaxy_mcp.server import mcp
+
             yield mcp
     finally:
         # Restore original state
@@ -137,6 +131,7 @@ def event_loop():
 
 class MockMCPContext:
     """Mock MCP context for testing tools"""
+
     def __init__(self, session_data=None):
         self.session_data = session_data or {}
         self.request_id = "test-request-123"

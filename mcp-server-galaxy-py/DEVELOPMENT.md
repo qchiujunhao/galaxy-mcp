@@ -123,6 +123,7 @@ pre-commit run --all-files
 ```
 
 Hooks include:
+
 - Trailing whitespace removal
 - End-of-file fixing
 - YAML/JSON/TOML validation
@@ -134,6 +135,7 @@ Hooks include:
 ### Test Structure
 
 Tests are organized by functionality:
+
 - `test_connection.py` - Galaxy connection and authentication
 - `test_history_operations.py` - History-related operations
 - `test_dataset_operations.py` - Dataset upload/download
@@ -173,6 +175,7 @@ make test-watch
 The project uses GitHub Actions for CI/CD:
 
 1. **Python Tests** (`python-tests.yml`)
+
    - Runs on push/PR to main branch
    - Tests on Python 3.10, 3.11, 3.12
    - Includes linting, type checking, and coverage
