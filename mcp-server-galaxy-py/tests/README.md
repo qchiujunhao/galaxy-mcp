@@ -15,31 +15,37 @@ This directory contains integration tests for the Galaxy MCP server.
 ## Running Tests
 
 ### Install test dependencies
+
 ```bash
 pip install -r requirements-test.txt
 ```
 
 ### Run all tests
+
 ```bash
 pytest
 ```
 
 ### Run specific test file
+
 ```bash
 pytest tests/test_history_operations.py
 ```
 
 ### Run with coverage
+
 ```bash
 pytest --cov=main --cov-report=html
 ```
 
 ### Run only unit tests
+
 ```bash
 pytest -m unit
 ```
 
 ### Run only integration tests
+
 ```bash
 pytest -m integration
 ```
@@ -72,7 +78,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: "3.11"
       - run: pip install -r requirements.txt -r requirements-test.txt
       - run: pytest --cov=main
 ```

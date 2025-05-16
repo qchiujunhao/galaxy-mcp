@@ -37,6 +37,7 @@ tests/
 ### Key Testing Patterns
 
 1. **Mock Galaxy API Responses**:
+
    ```python
    mock_galaxy_instance.histories.get_histories.return_value = [
        {"id": "test_history_1", "name": "Test History 1"}
@@ -44,6 +45,7 @@ tests/
    ```
 
 2. **Test State Isolation**:
+
    ```python
    with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
        # Test code here

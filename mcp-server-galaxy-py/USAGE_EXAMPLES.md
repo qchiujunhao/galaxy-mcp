@@ -20,18 +20,21 @@ connect(url="https://your-galaxy-instance.org", api_key="your-api-key")
 ### 2. Working with Histories
 
 #### List all histories
+
 ```python
 histories = get_histories()
 # Returns: [{"id": "abc123", "name": "My Analysis", ...}, ...]
 ```
 
 #### Get just IDs and names (simplified)
+
 ```python
 history_list = list_history_ids()
 # Returns: [{"id": "abc123", "name": "My Analysis"}, ...]
 ```
 
 #### Get history details
+
 ```python
 # IMPORTANT: Pass only the ID string, not the entire history object
 history_id = "abc123"  # or history_list[0]["id"]
@@ -42,18 +45,21 @@ details = get_history_details(history_id)
 ### 3. Working with Tools
 
 #### Search for tools
+
 ```python
 tools = search_tools("fastqc")
 # Returns: {"tools": [...]}
 ```
 
 #### Get tool details
+
 ```python
 tool_details = get_tool_details("toolshed.g2.bx.psu.edu/repos/devteam/fastqc/fastqc/0.72")
 # Returns: Detailed tool information including parameters
 ```
 
 #### Run a tool
+
 ```python
 # First, create or select a history
 history_id = "abc123"
@@ -71,6 +77,7 @@ result = run_tool(history_id, tool_id, inputs)
 ### 4. File Operations
 
 #### Upload a file
+
 ```python
 # Upload to default history
 upload_result = upload_file("/path/to/your/file.txt")
@@ -82,6 +89,7 @@ upload_result = upload_file("/path/to/your/file.txt", history_id="abc123")
 ### 5. Workflow Operations
 
 #### Browse IWC workflows
+
 ```python
 # Get all workflows from Interactive Workflow Composer
 iwc_workflows = get_iwc_workflows()
@@ -91,6 +99,7 @@ matching_workflows = search_iwc_workflows("RNA-seq")
 ```
 
 #### Import a workflow
+
 ```python
 # Import from IWC using TRS ID
 imported = import_workflow_from_iwc("github.com/galaxyproject/iwc/tree/main/workflows/epigenetics/chipseq-pe")
@@ -144,7 +153,7 @@ for h in histories:
 if target_history:
     # 3. Get history details
     details = get_history_details(target_history["id"])
-    
+
     # 4. Find specific datasets
     for item in details["contents"]:
         if item["name"] == "results.txt":
@@ -156,10 +165,12 @@ if target_history:
 ### Common Issues and Solutions
 
 1. **"History ID invalid" error**
+
    - Problem: Passing the entire history object instead of just the ID
    - Solution: Use `history["id"]` not `history`
 
 2. **"Not connected to Galaxy" error**
+
    - Problem: Trying to use tools before connecting
    - Solution: Always call `connect()` first
 

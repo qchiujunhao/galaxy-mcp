@@ -140,6 +140,7 @@ uv run pytest -v
 ### Test Structure
 
 Tests are organized by functionality:
+
 - `test_connection.py` - Galaxy connection and authentication
 - `test_history_operations.py` - History-related operations
 - `test_dataset_operations.py` - Dataset upload/download
@@ -152,11 +153,13 @@ See [tests/README.md](tests/README.md) for more details on the testing strategy.
 ## Development
 
 ### Code Style Guidelines
+
 - Use Python 3.12+ features
 - Employ type hints where appropriate
 - Follow PEP 8 style guidelines
 
 ### Development Commands
+
 - Lint the code: `ruff check .`
 - Format the code: `ruff format .`
 - Start the development server: `mcp dev main.py`
