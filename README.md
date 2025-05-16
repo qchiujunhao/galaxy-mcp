@@ -19,16 +19,36 @@ Note: There is also a work-in-progress TypeScript implementation available in a 
 
 ## Quick Start
 
+The fastest way to get started is using `uvx`:
+
 ```bash
-cd mcp-server-galaxy-py
-pip install -r requirements.txt
-mcp run main.py
+# Run the server directly without installation
+uvx galaxy-mcp
+
+# Run with MCP developer tools for interactive exploration
+uvx --from galaxy-mcp mcp dev galaxy_mcp.server
+
+# Run as a deployed MCP server
+uvx --from galaxy-mcp mcp run galaxy_mcp.server
 ```
 
 You'll need to set up your Galaxy credentials via environment variables:
+
 ```bash
 export GALAXY_URL=<galaxy_url>
 export GALAXY_API_KEY=<galaxy_api_key>
+```
+
+### Alternative Installation
+
+```bash
+# Install from PyPI
+pip install galaxy-mcp
+
+# Or from source
+cd mcp-server-galaxy-py
+pip install -r requirements.txt
+mcp run main.py
 ```
 
 ## Development Guidelines

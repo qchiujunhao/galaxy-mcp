@@ -55,10 +55,26 @@ Alternatively, create a `.env` file in the project root with these variables.
 
 ## Usage
 
+### Quick Start with uvx
+
+The fastest way to run the Galaxy MCP server is using `uvx`:
+
+```bash
+# Run the server directly without installation
+uvx galaxy-mcp
+
+# Run with MCP developer tools for interactive exploration
+uvx --from galaxy-mcp mcp dev galaxy_mcp.server
+
+# Run as a deployed MCP server
+uvx --from galaxy-mcp mcp run galaxy_mcp.server
+```
+
 ### As a standalone MCP server
 
 ```bash
-# Run the MCP server
+# Install and run the MCP server
+pip install galaxy-mcp
 galaxy-mcp
 
 # The server will wait for MCP protocol messages on stdin
