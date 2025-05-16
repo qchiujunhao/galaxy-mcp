@@ -47,6 +47,8 @@ mcp run main.py
 mcp dev main.py
 ```
 
+See [USAGE_EXAMPLES.md](USAGE_EXAMPLES.md) for detailed usage patterns and common examples.
+
 ## Available MCP Tools
 
 The Python implementation provides the following MCP tools:
@@ -58,6 +60,8 @@ The Python implementation provides the following MCP tools:
 - `get_tool_panel`: Retrieve the Galaxy tool panel structure
 - `get_user`: Get current user information
 - `get_histories`: List available Galaxy histories
+- `list_history_ids`: Get simplified list of history IDs and names
+- `get_history_details`: Get detailed information about a specific history
 - `upload_file`: Upload local files to Galaxy
 - `get_invocations`: View workflow executions
 - `get_iwc_workflows`: Access Interactive Workflow Composer workflows
