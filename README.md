@@ -1,15 +1,12 @@
 # Galaxy MCP Server
 
-This project provides Model Context Protocol (MCP) servers for interacting with the Galaxy bioinformatics platform. It enables AI assistants and other clients to connect to Galaxy instances, search and execute tools, manage workflows, and access other features of the Galaxy ecosystem.
+This project provides a Model Context Protocol (MCP) server for interacting with the Galaxy bioinformatics platform. It enables AI assistants and other clients to connect to Galaxy instances, search and execute tools, manage workflows, and access other features of the Galaxy ecosystem.
 
-## Project Structure
+## Project Overview
 
-This repository contains two independent implementations:
+This repository contains a Python-based MCP server implementation that provides comprehensive integration with Galaxy's API through BioBlend.
 
-- **[TypeScript Implementation](mcp-server-galaxy-ts/README.md)**: A Node.js-based MCP server
-- **[Python Implementation](mcp-server-galaxy-py/README.md)**: A Python-based MCP server
-
-Both implementations provide similar functionality but may have slightly different feature sets or interfaces.
+Note: There is also a work-in-progress TypeScript implementation available in a separate branch of this repository.
 
 ## Key Features
 
@@ -21,22 +18,13 @@ Both implementations provide similar functionality but may have slightly differe
 
 ## Quick Start
 
-For the TypeScript implementation:
-```bash
-cd mcp-server-galaxy-ts
-npm install
-npm run build
-npm start
-```
-
-For the Python implementation:
 ```bash
 cd mcp-server-galaxy-py
 pip install -r requirements.txt
 mcp run main.py
 ```
 
-For both implementations, you'll need to set up your Galaxy credentials via environment variables:
+You'll need to set up your Galaxy credentials via environment variables:
 ```bash
 export GALAXY_URL=<galaxy_url>
 export GALAXY_API_KEY=<galaxy_api_key>
@@ -44,7 +32,7 @@ export GALAXY_API_KEY=<galaxy_api_key>
 
 ## Development Guidelines
 
-Each implementation directory contains a README with more specific instructions and documentation.
+See the [Python implementation README](mcp-server-galaxy-py/README.md) for specific instructions and documentation.
 
 ## License
 
