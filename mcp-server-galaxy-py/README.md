@@ -166,9 +166,11 @@ See [tests/README.md](tests/README.md) for more details on the testing strategy.
 # Install development dependencies
 make install-dev
 
-# Set up pre-commit hooks (optional but recommended)
-pre-commit install
+# Set up pre-commit hooks (required for contributing)
+uv run pre-commit install
 ```
+
+Pre-commit hooks will automatically format your code and run linting checks when you commit. All contributors should install these hooks to maintain consistent code quality.
 
 ### Development Commands
 
@@ -240,15 +242,26 @@ tox -e type
 
 ### Pre-commit Hooks
 
-The project includes pre-commit hooks for automatic code formatting:
+The project uses pre-commit hooks for automatic code quality checks:
 
 ```bash
-# Install pre-commit hooks
-pre-commit install
+# Install pre-commit hooks (one-time setup)
+uv run pre-commit install
 
 # Run pre-commit manually on all files
-pre-commit run --all-files
+uv run pre-commit run --all-files
+
+# Skip pre-commit for a single commit (not recommended)
+git commit --no-verify
 ```
+
+Pre-commit runs automatically on `git commit` and includes:
+- Code formatting with ruff
+- Linting with ruff
+- Trailing whitespace removal
+- File cleanup (EOF, YAML/JSON/TOML validation)
+- Large file detection
+- Merge conflict detection
 
 ## License
 

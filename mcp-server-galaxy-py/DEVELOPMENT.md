@@ -33,6 +33,37 @@ uv pip install -e .
 pre-commit install
 ```
 
+### Pre-commit Setup
+
+The project uses pre-commit hooks to maintain code quality. These hooks run automatically when you commit changes.
+
+```bash
+# Install pre-commit hooks (required)
+uv run pre-commit install
+
+# Run pre-commit manually on all files
+uv run pre-commit run --all-files
+
+# Run pre-commit on specific files
+uv run pre-commit run --files src/galaxy_mcp/server.py
+
+# Skip pre-commit temporarily (not recommended)
+git commit --no-verify
+
+# Update pre-commit hooks to latest versions
+uv run pre-commit autoupdate
+```
+
+Pre-commit hooks include:
+- Trailing whitespace removal
+- End-of-file fixing
+- YAML/JSON/TOML validation
+- Python code formatting with ruff
+- Python linting with ruff
+- Markdown formatting with prettier
+
+Note: The hooks will automatically fix many issues. If a commit fails due to pre-commit, simply review the changes and commit again.
+
 ## Available Commands
 
 ### Using Make (Recommended)
