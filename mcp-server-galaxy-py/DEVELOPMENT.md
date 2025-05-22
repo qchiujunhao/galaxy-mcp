@@ -55,6 +55,7 @@ uv run pre-commit autoupdate
 ```
 
 Pre-commit hooks include:
+
 - Trailing whitespace removal
 - End-of-file fixing
 - YAML/JSON/TOML validation
@@ -208,15 +209,15 @@ The project uses GitHub Actions for CI/CD:
 
 1. **Python Tests** (`python-tests.yml`)
 
-   - Runs on push/PR to main branch
-   - Tests on Python 3.10, 3.11, 3.12
-   - Includes linting, type checking, and coverage
-   - Uploads coverage to Codecov
+    - Runs on push/PR to main branch
+    - Tests on Python 3.10, 3.11, 3.12
+    - Includes linting, type checking, and coverage
+    - Uploads coverage to Codecov
 
 2. **Release** (`python-release.yml`)
-   - Triggered on GitHub release
-   - Builds and publishes to PyPI
-   - Optionally publishes to Test PyPI first
+    - Triggered on GitHub release
+    - Builds and publishes to PyPI
+    - Optionally publishes to Test PyPI first
 
 ### Local CI Simulation
 

@@ -5,6 +5,7 @@ Integration tests for complete workflows
 from unittest.mock import Mock, patch
 
 import pytest
+
 from galaxy_mcp.server import galaxy_state
 
 

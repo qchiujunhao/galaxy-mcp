@@ -256,6 +256,7 @@ git commit --no-verify
 ```
 
 Pre-commit runs automatically on `git commit` and includes:
+
 - Code formatting with ruff
 - Linting with ruff
 - Trailing whitespace removal
