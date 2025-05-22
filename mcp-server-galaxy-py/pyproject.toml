@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "galaxy-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "Model Context Protocol server for Galaxy bioinformatics platform"
 readme = "README.md"
 license = "MIT"
@@ -61,7 +61,7 @@ dev = [
 [tool.ruff]
 line-length = 100
 indent-width = 4
-target-version = "py311"
+target-version = "0.2.0"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "B", "UP", "A", "C4", "SIM", "PT"]
