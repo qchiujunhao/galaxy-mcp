@@ -72,13 +72,13 @@ These tests can be integrated into CI/CD pipelines. Example GitHub Actions workf
 name: Tests
 on: [push, pull_request]
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-      - run: pip install -r requirements.txt -r requirements-test.txt
-      - run: pytest --cov=main
+    test:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v3
+            - uses: actions/setup-python@v4
+              with:
+                  python-version: "3.11"
+            - run: pip install -r requirements.txt -r requirements-test.txt
+            - run: pytest --cov=main
 ```

@@ -16,10 +16,10 @@ The best approach for writing integration tests for the Galaxy MCP server is to 
 ### Test Infrastructure
 
 - **conftest.py**: Contains shared fixtures for:
-  - Mock Galaxy instance with pre-configured responses
-  - Test environment variables
-  - Auto-reset of galaxy state between tests
-  - Mock MCP context for tool testing
+    - Mock Galaxy instance with pre-configured responses
+    - Test environment variables
+    - Auto-reset of galaxy state between tests
+    - Mock MCP context for tool testing
 
 ### Test Organization
 
@@ -38,24 +38,24 @@ tests/
 
 1. **Mock Galaxy API Responses**:
 
-   ```python
-   mock_galaxy_instance.histories.get_histories.return_value = [
-       {"id": "test_history_1", "name": "Test History 1"}
-   ]
-   ```
+    ```python
+    mock_galaxy_instance.histories.get_histories.return_value = [
+        {"id": "test_history_1", "name": "Test History 1"}
+    ]
+    ```
 
 2. **Test State Isolation**:
 
-   ```python
-   with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
-       # Test code here
-   ```
+    ```python
+    with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
+        # Test code here
+    ```
 
 3. **Error Validation**:
-   ```python
-   with pytest.raises(ValueError, match="Expected error message"):
-       function_under_test(invalid_input)
-   ```
+    ```python
+    with pytest.raises(ValueError, match="Expected error message"):
+        function_under_test(invalid_input)
+    ```
 
 ## Running Tests
 

@@ -17,6 +17,26 @@ connect()
 connect(url="https://your-galaxy-instance.org", api_key="your-api-key")
 ```
 
+#### Get server information
+
+Once connected, you can retrieve comprehensive information about the Galaxy server:
+
+```python
+server_info = get_server_info()
+# Returns: {
+#   "url": "https://your-galaxy-instance.org/",
+#   "version": {"version_major": "23.1", "version_minor": "1", ...},
+#   "config": {
+#     "brand": "Galaxy",
+#     "allow_user_creation": true,
+#     "enable_quotas": false,
+#     "ftp_upload_site": "ftp.galaxy.org",
+#     "support_url": "https://help.galaxyproject.org/",
+#     ...
+#   }
+# }
+```
+
 ### 2. Working with Histories
 
 #### List all histories
@@ -166,17 +186,17 @@ if target_history:
 
 1. **"History ID invalid" error**
 
-   - Problem: Passing the entire history object instead of just the ID
-   - Solution: Use `history["id"]` not `history`
+    - Problem: Passing the entire history object instead of just the ID
+    - Solution: Use `history["id"]` not `history`
 
 2. **"Not connected to Galaxy" error**
 
-   - Problem: Trying to use tools before connecting
-   - Solution: Always call `connect()` first
+    - Problem: Trying to use tools before connecting
+    - Solution: Always call `connect()` first
 
 3. **"Tool not found" error**
-   - Problem: Using incorrect tool ID format
-   - Solution: Use the full tool ID from `search_tools()` or `get_tool_panel()`
+    - Problem: Using incorrect tool ID format
+    - Solution: Use the full tool ID from `search_tools()` or `get_tool_panel()`
 
 ## Best Practices
 
