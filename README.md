@@ -11,6 +11,7 @@ Note: There is also a work-in-progress TypeScript implementation available in a 
 ## Key Features
 
 - **Galaxy Connection**: Connect to any Galaxy instance with a URL and API key
+- **Server Information**: Retrieve comprehensive server details including version, configuration, and capabilities
 - **Tools Management**: Search, view details, and execute Galaxy tools
 - **Workflow Integration**: Access and import workflows from the Interactive Workflow Composer (IWC)
 - **History Operations**: Manage Galaxy histories and datasets
