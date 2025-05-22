@@ -10,7 +10,7 @@ import pytest
 from bioblend.galaxy import GalaxyInstance
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_galaxy_instance():
     """Mock GalaxyInstance for tests"""
     mock_gi = Mock(spec=GalaxyInstance)
@@ -53,6 +53,42 @@ def mock_galaxy_instance():
     mock_datasets.download_dataset.return_value = b"test content"
     mock_gi.datasets = mock_datasets
 
+    # Mock config
+    mock_config = Mock()
+    mock_config.get_config.return_value = {
+        "brand": "Galaxy",
+        "logo_url": None,
+        "welcome_url": None,
+        "support_url": None,
+        "citation_url": None,
+        "terms_url": None,
+        "allow_user_creation": True,
+        "allow_user_deletion": False,
+        "enable_quotas": True,
+        "ftp_upload_site": None,
+        "wiki_url": None,
+        "screencasts_url": None,
+        "library_import_dir": None,
+        "user_library_import_dir": None,
+        "allow_library_path_paste": False,
+        "enable_unique_workflow_defaults": False,
+    }
+    mock_config.get_version.return_value = {
+        "version_major": "23.1",
+        "version_minor": "1",
+        "extra": {},
+    }
+    mock_gi.config = mock_config
+
+    # Mock users
+    mock_users = Mock()
+    mock_users.get_current_user.return_value = {
+        "id": "user1",
+        "email": "test@example.com",
+        "username": "testuser",
+    }
+    mock_gi.users = mock_users
+
     return mock_gi
 
 
@@ -75,7 +111,7 @@ def _reset_galaxy_state():
     galaxy_state.update(original_state)
 
 
-@pytest.fixture()
+@pytest.fixture
 def _test_env():
     """Set up test environment variables"""
     original_env = os.environ.copy()
@@ -95,7 +131,7 @@ def _test_env():
     os.environ.update(original_env)
 
 
-@pytest.fixture()
+@pytest.fixture
 def mcp_server_instance(mock_galaxy_instance, _test_env):
     """Create MCP server instance with mocked Galaxy"""
     # Import and reset galaxy state
@@ -121,7 +157,7 @@ def mcp_server_instance(mock_galaxy_instance, _test_env):
         galaxy_state.update(original_state)
 
 
-@pytest.fixture()
+@pytest.fixture
 def event_loop():
     """Create event loop for async tests"""
     loop = asyncio.new_event_loop()
