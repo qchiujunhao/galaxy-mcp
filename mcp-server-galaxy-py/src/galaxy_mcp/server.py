@@ -347,6 +347,54 @@ def filter_tools_by_dataset(dataset_type: str) -> dict[str, Any]:
 
 
 @mcp.tool()
+def get_server_info() -> dict[str, Any]:
+    """
+    Get Galaxy server information including version, URL, and configuration details
+
+    Returns:
+        Server information including version, URL, and other configuration details
+    """
+    ensure_connected()
+
+    try:
+        # Get server configuration info
+        config_info = galaxy_state["gi"].config.get_config()
+
+        # Get server version info
+        version_info = galaxy_state["gi"].config.get_version()
+
+        # Build comprehensive server info response
+        server_info = {
+            "url": galaxy_state["url"],
+            "version": version_info,
+            "config": {
+                "brand": config_info.get("brand", "Galaxy"),
+                "logo_url": config_info.get("logo_url"),
+                "welcome_url": config_info.get("welcome_url"),
+                "support_url": config_info.get("support_url"),
+                "citation_url": config_info.get("citation_url"),
+                "terms_url": config_info.get("terms_url"),
+                "allow_user_creation": config_info.get("allow_user_creation"),
+                "allow_user_deletion": config_info.get("allow_user_deletion"),
+                "enable_quotas": config_info.get("enable_quotas"),
+                "ftp_upload_site": config_info.get("ftp_upload_site"),
+                "wiki_url": config_info.get("wiki_url"),
+                "screencasts_url": config_info.get("screencasts_url"),
+                "library_import_dir": config_info.get("library_import_dir"),
+                "user_library_import_dir": config_info.get("user_library_import_dir"),
+                "allow_library_path_paste": config_info.get("allow_library_path_paste"),
+                "enable_unique_workflow_defaults": config_info.get(
+                    "enable_unique_workflow_defaults"
+                ),
+            },
+        }
+
+        return server_info
+    except Exception as e:
+        raise ValueError(f"Failed to get server information: {str(e)}") from e
+
+
+@mcp.tool()
 def get_user() -> dict[str, Any]:
     """
     Get current user information
