@@ -107,8 +107,9 @@ jobs:
           echo ".venv/bin" >> $GITHUB_PATH
 
       - name: Install build dependencies
-        run: uv pip install build
-        run: uv pip install twine
+        run: |
+          uv pip install build
+          uv pip install twine
 
       - name: Build package
         run: uv run python -m build
