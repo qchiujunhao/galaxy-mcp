@@ -343,9 +343,8 @@ def filter_tools_by_dataset(dataset_type: list[str]) -> dict[str, Any]:
         for tool in all_tools:
             name = (tool.get("name") or "").lower()
             description = (tool.get("description") or "").lower()
-            if (
-                any(kw in name for kw in dataset_keywords)
-                or any(kw in description for kw in dataset_keywords)
+            if any(kw in name for kw in dataset_keywords) or any(
+                kw in description for kw in dataset_keywords
             ):
                 recommended_tools.append(tool)
             else:
@@ -392,12 +391,14 @@ def filter_tools_by_dataset(dataset_type: list[str]) -> dict[str, Any]:
 
         slim_tools = []
         for tool in recommended_tools:
-            slim_tools.append({
-                "id": tool.get("id", ""),
-                "name": tool.get("name", ""),
-                "description": tool.get("description", ""),
-                "versions": tool.get("versions", [])
-            })
+            slim_tools.append(
+                {
+                    "id": tool.get("id", ""),
+                    "name": tool.get("name", ""),
+                    "description": tool.get("description", ""),
+                    "versions": tool.get("versions", []),
+                }
+            )
         return {"recommended_tools": slim_tools, "count": len(slim_tools)}
     except Exception as e:
         return {"error": str(e)}
