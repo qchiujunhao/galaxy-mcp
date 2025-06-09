@@ -328,56 +328,6 @@ def get_datesets_by_history(history_id: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-def read_dataset_head(
-    dataset_path: Optional[str] = None,
-    dataset_id: Optional[str] = None,
-    nrows: int = 5,
-) -> list[str]:
-    """
-    Read the header (first few lines) of a dataset in Galaxy.
-
-    Either 'dataset_path' or 'dataset_id' must be provided.
-
-    Args:
-        dataset_path (Optional[str]): Local path to the dataset file.
-        dataset_id (Optional[str]): The ID of the dataset to read from Galaxy.
-        nrows (int): Number of lines to read from the top of the dataset.
-
-    Returns:
-        List[str]: List of the first nrows lines from the dataset.
-
-    Raises:
-        ValueError: If neither dataset_path nor dataset_id is provided, or if an error 
-                    occurs during dataset retrieval or file reading.
-    """
-    if nrows < 1:
-        raise ValueError("nrows must be greater than 0.")
-
-    if not dataset_path and not dataset_id:
-        raise ValueError("Either dataset_path or dataset_id must be provided.")
-
-    if dataset_path:
-        try:
-            with open(dataset_path, "r") as file:
-                return list(islice(file, nrows))
-        except Exception as e:
-            raise ValueError(f"Error reading local dataset at '{dataset_path}': {e}")
-
-    if dataset_id:
-        ensure_connected()
-        try:
-            dataset = galaxy_state["gi"].datasets.show_dataset(dataset_id=dataset_id)
-            if not dataset:
-                raise ValueError(f"Dataset with ID '{dataset_id}' not found in Galaxy.")
-            
-            # Download the dataset content from Galaxy.
-            file_content = galaxy_state["gi"].datasets.download_dataset(dataset_id)
-            return file_content.splitlines()[:nrows]
-        except Exception as e:
-            raise ValueError(f"Failed to read dataset from Galaxy for ID '{dataset_id}': {e}")
-
-
-@mcp.tool()
 def get_user() -> dict[str, Any]:
     """
     Get current user information
