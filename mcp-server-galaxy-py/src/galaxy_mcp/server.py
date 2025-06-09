@@ -1,15 +1,14 @@
 # Galaxy MCP Server
+import concurrent.futures
 import logging
 import os
+import threading
 from typing import Any
 
 import requests
 from bioblend.galaxy import GalaxyInstance
 from dotenv import find_dotenv, load_dotenv
 from mcp.server.fastmcp import FastMCP
-
-import concurrent.futures
-import threading
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -344,7 +343,10 @@ def filter_tools_by_dataset(dataset_type: list[str]) -> dict[str, Any]:
         for tool in all_tools:
             name = (tool.get("name") or "").lower()
             description = (tool.get("description") or "").lower()
-            if any(kw in name for kw in dataset_keywords) or any(kw in description for kw in dataset_keywords):
+            if (
+                any(kw in name for kw in dataset_keywords)
+                or any(kw in description for kw in dataset_keywords)
+            ):
                 recommended_tools.append(tool)
             else:
                 tools_to_fetch.append(tool)
@@ -368,13 +370,15 @@ def filter_tools_by_dataset(dataset_type: list[str]) -> dict[str, Any]:
                         for ext in fmt:
                             if ext and any(kw in ext.lower() for kw in dataset_keywords):
                                 return tool
-                    elif isinstance(fmt, str):
-                        if fmt and any(kw in fmt.lower() for kw in dataset_keywords):
-                            return tool
+                    elif (
+                        isinstance(fmt, str)
+                        and fmt
+                        and any(kw in fmt.lower() for kw in dataset_keywords)
+                    ):
+                        return tool
                 return None
-            except Exception as e:    
+            except Exception:
                 return None
-                
 
         # Use a thread pool to concurrently check tools that require detail retrieval.
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
@@ -385,7 +389,7 @@ def filter_tools_by_dataset(dataset_type: list[str]) -> dict[str, Any]:
                     # Use the lock to ensure thread-safe appending.
                     with lock:
                         recommended_tools.append(result)
-        
+
         slim_tools = []
         for tool in recommended_tools:
             slim_tools.append({
