@@ -401,7 +401,7 @@ def filter_tools_by_dataset(dataset_type: list[str]) -> dict[str, Any]:
             )
         return {"recommended_tools": slim_tools, "count": len(slim_tools)}
     except Exception as e:
-        return {"error": str(e)}
+        raise ValueError(f"Failed to filter tools based on dataset: {str(e)}") from e
 
 
 @mcp.tool()
