@@ -1,6 +1,8 @@
 # Galaxy MCP Server
+import concurrent.futures
 import logging
 import os
+import threading
 from typing import Any
 
 import requests
@@ -297,20 +299,25 @@ def create_history(history_name: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-def filter_tools_by_dataset(dataset_type: str) -> dict[str, Any]:
+def filter_tools_by_dataset(dataset_type: list[str]) -> dict[str, Any]:
     """
-    Filter Galaxy tools that are potentially suitable
-    for a given dataset type.
+    Filter Galaxy tools that are potentially suitable for a given dataset type.
 
     Args:
-        dataset_type: A keyword or file type
-        (e.g., "fasta", "csv", "vcf") that describes the dataset.
+        dataset_type (list[str]): A list of keywords or phrases describing the dataset type,
+                                e.g., ['csv', 'tsv']. if the dataset type is csv or tsv,
+                                please provide ['csv', 'tabular'] or ['tsv', 'tabular'].
 
     Returns:
-        A dictionary containing the list of
-        recommended tools and the count.
+        dict: A dictionary containing the list of recommended tools and the total count.
     """
+
     ensure_connected()
+
+    lock = threading.Lock()
+
+    dataset_keywords = [dt.lower() for dt in dataset_type]
+
     try:
         tool_panel = galaxy_state["gi"].tools.get_tool_panel()
 
@@ -324,24 +331,75 @@ def filter_tools_by_dataset(dataset_type: str) -> dict[str, Any]:
                     for item in panel["elems"]:
                         tools.extend(flatten_tools(item))
                 else:
-                    # If no sub-elements, assume
-                    # this dict represents a tool.
+                    # Assume this dict represents a tool if no sub-elements exist.
                     tools.append(panel)
             return tools
 
         all_tools = flatten_tools(tool_panel)
-
-        # Filter the tools by checking if the dataset_type
-        # keyword appears in their name or description.
         recommended_tools = []
-        keyword = dataset_type.lower()
+
+        # Separate tools that already match by name/description.
+        tools_to_fetch = []
         for tool in all_tools:
             name = (tool.get("name") or "").lower()
             description = (tool.get("description") or "").lower()
-            if keyword in name or keyword in description:
+            if any(kw in name for kw in dataset_keywords) or any(
+                kw in description for kw in dataset_keywords
+            ):
                 recommended_tools.append(tool)
+            else:
+                tools_to_fetch.append(tool)
 
-        return {"recommended_tools": recommended_tools, "count": len(recommended_tools)}
+        # Define a helper to check each tool's details.
+        def check_tool(tool):
+            tool_id = tool.get("id")
+            if not tool_id:
+                return None
+            if tool_id.endswith("_label"):
+                return None
+            try:
+                tool_details = galaxy_state["gi"].tools.show_tool(tool_id, io_details=True)
+                tool_inputs = tool_details.get("inputs", [{}])
+                for input_spec in tool_inputs:
+                    if not isinstance(input_spec, dict):
+                        continue
+                    fmt = input_spec.get("extensions", "")
+                    # 'extensions' might be a list or a string.
+                    if isinstance(fmt, list):
+                        for ext in fmt:
+                            if ext and any(kw in ext.lower() for kw in dataset_keywords):
+                                return tool
+                    elif (
+                        isinstance(fmt, str)
+                        and fmt
+                        and any(kw in fmt.lower() for kw in dataset_keywords)
+                    ):
+                        return tool
+                return None
+            except Exception:
+                return None
+
+        # Use a thread pool to concurrently check tools that require detail retrieval.
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            future_to_tool = {executor.submit(check_tool, tool): tool for tool in tools_to_fetch}
+            for future in concurrent.futures.as_completed(future_to_tool):
+                result = future.result()
+                if result is not None:
+                    # Use the lock to ensure thread-safe appending.
+                    with lock:
+                        recommended_tools.append(result)
+
+        slim_tools = []
+        for tool in recommended_tools:
+            slim_tools.append(
+                {
+                    "id": tool.get("id", ""),
+                    "name": tool.get("name", ""),
+                    "description": tool.get("description", ""),
+                    "versions": tool.get("versions", []),
+                }
+            )
+        return {"recommended_tools": slim_tools, "count": len(slim_tools)}
     except Exception as e:
         raise ValueError(f"Failed to filter tools based on dataset: {str(e)}") from e
 
