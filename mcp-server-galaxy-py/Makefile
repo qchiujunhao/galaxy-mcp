@@ -8,7 +8,6 @@ help:
 	@echo "  make install-dev    Install development dependencies"
 	@echo "  make lint          Run linting checks (via pre-commit)"
 	@echo "  make format        Auto-format code (via pre-commit)"
-	@echo "  make format-quick  Quick format (ruff + prettier only)"
 	@echo "  make test          Run tests"
 	@echo "  make test-cov      Run tests with coverage"
 	@echo "  make test-watch    Run tests in watch mode"
@@ -37,11 +36,6 @@ format:
 	uv run pre-commit run --all-files
 	npx prettier --write "**/*.md"
 
-# Quick format (just ruff + prettier without other pre-commit hooks)
-format-quick:
-	uv run ruff format .
-	uv run ruff check --fix . --ignore PT004,PT019
-	npx prettier --write "**/*.md"
 
 # Run tests
 test:
