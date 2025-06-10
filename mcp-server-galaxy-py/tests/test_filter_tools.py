@@ -1,7 +1,9 @@
 """Tests for filter_tools_by_dataset functionality"""
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from galaxy_mcp.server import filter_tools_by_dataset, galaxy_state
 
 
