@@ -47,7 +47,7 @@ if dotenv_path:
     print(f"Loaded environment variables from {dotenv_path}")
 
 # Create an MCP server
-mcp = FastMCP("Galaxy")
+mcp: FastMCP = FastMCP("Galaxy")
 
 # Galaxy client state
 galaxy_state: dict[str, Any] = {
