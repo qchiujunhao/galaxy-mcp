@@ -72,14 +72,6 @@ jobs:
       - name: Build package
         run: uv run python -m build
 
-      - name: Publish to Test PyPI
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
-        run: |
-          uv run twine upload --repository testpypi dist/*
-        continue-on-error: true
-
       - name: Publish to PyPI
         env:
           TWINE_USERNAME: __token__
