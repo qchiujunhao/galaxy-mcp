@@ -20,8 +20,9 @@ install:
 lint:
 	uv run pre-commit run --all-files --show-diff-on-failure
 
-# Run tests with coverage
+# Run tests with coverage and type checking
 test:
+	uv run mypy src/galaxy_mcp
 	uv run pytest --cov=galaxy_mcp --cov-report=html --cov-report=term-missing
 
 # Clean build artifacts
