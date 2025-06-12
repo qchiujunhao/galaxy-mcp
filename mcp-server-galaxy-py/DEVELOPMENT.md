@@ -237,29 +237,68 @@ Version is managed in `pyproject.toml`:
 
 ```toml
 [project]
-version = "0.1.0"
+version = "0.2.1"
 ```
 
-### Release Checklist
+### Manual Release Process (Recommended)
 
-1. Update version in `pyproject.toml`
-2. Update CHANGELOG.md
-3. Run all tests: `make check`
-4. Build package: `make build`
-5. Test package locally
-6. Create git tag: `git tag v0.1.0`
-7. Push tag: `git push origin v0.1.0`
-8. Create GitHub release
-9. CI will automatically publish to PyPI
+Follow these steps to create a new release:
 
-### Manual Publishing
+1. **Update the changelog**
+   ```bash
+   # Edit CHANGELOG.md to add the new version section
+   # Include Added, Changed, Fixed sections as appropriate
+   ```
+
+2. **Update the version**
+   ```bash
+   # Edit pyproject.toml and update the version number
+   # Follow semantic versioning: MAJOR.MINOR.PATCH
+   ```
+
+3. **Commit and push changes**
+   ```bash
+   git add CHANGELOG.md pyproject.toml
+   git commit -m "Bump version to 0.2.1"
+   git push
+   ```
+
+4. **Create GitHub release**
+   - Go to https://github.com/galaxyproject/galaxy-mcp/releases/new
+   - In "Choose a tag" dropdown, type `v0.2.1` (prefix with 'v')
+   - Select "Create new tag: v0.2.1 on publish"
+   - Title: `v0.2.1`
+   - Description: Copy the changelog entry for this version
+   - Click "Publish release"
+
+5. **Verify deployment**
+   - GitHub Actions will automatically build and publish to PyPI
+   - Check https://pypi.org/project/galaxy-mcp/ for the new version
+   - Test installation: `pip install galaxy-mcp==0.2.1`
+
+### Required GitHub Secrets
+
+For automatic PyPI deployment, ensure this secret is set:
+- `PYPI_API_TOKEN`: Your PyPI API token (scoped to the galaxy-mcp project)
+
+Set at: https://github.com/galaxyproject/galaxy-mcp/settings/secrets/actions
+
+### Alternative: GitHub Actions Workflow
+
+You can also trigger the release workflow manually:
+
+```bash
+# Using GitHub CLI
+gh workflow run python-release.yml -f version=0.2.1
+```
+
+### Manual Publishing (Fallback)
+
+If GitHub Actions fails:
 
 ```bash
 # Build package
 make build
-
-# Test upload to Test PyPI
-uv run twine upload --repository testpypi dist/*
 
 # Upload to PyPI
 uv run twine upload dist/*
