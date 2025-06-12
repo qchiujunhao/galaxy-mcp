@@ -22,8 +22,8 @@ This is the Python implementation of the Galaxy MCP server, providing a Model Co
 # Install from PyPI
 pip install galaxy-mcp
 
-# Or using uv package manager
-uv pip install galaxy-mcp
+# Or using uv (recommended)
+uvx galaxy-mcp
 ```
 
 ### From Source
@@ -33,11 +33,8 @@ uv pip install galaxy-mcp
 git clone https://github.com/galaxyproject/galaxy-mcp.git
 cd galaxy-mcp/mcp-server-galaxy-py
 
-# Install in development mode
-pip install -e .
-
-# Or using uv package manager
-uv pip install -e .
+# Install with uv (recommended)
+uv sync --all-extras
 ```
 
 ## Configuration
@@ -199,17 +196,17 @@ make dev           # Run FastMCP2 dev server
 All commands can also be run directly with uv:
 
 ```bash
-# Lint the code
-uv run ruff check .
+# Install dependencies
+uv sync --all-extras
 
-# Format the code
-uv run ruff format .
+# Format and lint code
+uv run pre-commit run --all-files
 
-# Run tests
-uv run pytest
-
-# Run with coverage
+# Run tests with coverage
 uv run pytest --cov=galaxy_mcp --cov-report=html
+
+# Update dependencies
+uv lock --upgrade
 ```
 
 ### Cross-version Testing

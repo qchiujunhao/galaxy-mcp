@@ -14,9 +14,7 @@ help:
 
 # Install all dependencies
 install:
-	uv pip install -r requirements.txt
-	uv pip install -r requirements-test.txt
-	uv pip install -e .
+	uv sync --all-extras
 
 # Format code and run all checks
 lint:
