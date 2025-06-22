@@ -518,8 +518,7 @@ def get_history_details(history_id: str) -> dict[str, Any]:
     Get detailed information about a specific history, including datasets
 
     Args:
-        history_id: ID of the history (the 'id' field from get_histories(),
-            not the entire history object)
+        history_id: Galaxy history ID (string hash)
 
     Returns:
         History details with datasets
@@ -527,24 +526,6 @@ def get_history_details(history_id: str) -> dict[str, Any]:
     ensure_connected()
 
     try:
-        # Check if the history_id looks like a dictionary string
-        if history_id.startswith("{") and history_id.endswith("}"):
-            # Try to parse it and extract the actual ID
-            import json
-
-            try:
-                history_dict = json.loads(history_id)
-                history_id = history_dict.get("id")
-                logger.warning(
-                    f"Received full history object instead of ID, extracting ID: {history_id}"
-                )
-            except json.JSONDecodeError as json_error:
-                logger.error(f"Invalid history_id format: {history_id}")
-                raise ValueError(
-                    "Invalid history_id: expected a history ID string, "
-                    "got what looks like a malformed dictionary"
-                ) from json_error
-
         logger.info(f"Getting details for history ID: {history_id}")
 
         # Get history details
@@ -560,8 +541,7 @@ def get_history_details(history_id: str) -> dict[str, Any]:
         logger.error(f"Failed to get history details for ID '{history_id}': {str(e)}")
         if "404" in str(e) or "No route" in str(e):
             raise ValueError(
-                f"History ID '{history_id}' not found. Make sure to pass just "
-                "the ID string from get_histories(), not the entire history object."
+                f"History ID '{history_id}' not found. Make sure to pass a valid history ID string."
             ) from e
         raise ValueError(f"Failed to get history details for ID '{history_id}': {str(e)}") from e
 
@@ -572,7 +552,7 @@ def get_job_details(dataset_id: str, history_id: str | None = None) -> dict[str,
     Get detailed information about the job that created a specific dataset
 
     Args:
-        dataset_id: ID of the dataset (will find the job that created it)
+        dataset_id: Galaxy dataset ID (string hash) to find the creating job for
         history_id: ID of the history containing the dataset (optional, for optimization)
 
     Returns:
@@ -581,22 +561,6 @@ def get_job_details(dataset_id: str, history_id: str | None = None) -> dict[str,
     ensure_connected()
 
     try:
-        # Check if dataset_id looks like a dictionary string and extract the ID
-        if dataset_id.startswith("{") and dataset_id.endswith("}"):
-            import json
-
-            try:
-                dataset_dict = json.loads(dataset_id)
-                dataset_id = dataset_dict.get("id")
-                logger.warning(
-                    f"Received full dataset object instead of ID, extracting ID: {dataset_id}"
-                )
-            except json.JSONDecodeError as json_error:
-                raise ValueError(
-                    "Invalid dataset_id: expected a dataset ID string, "
-                    "got what looks like a malformed dictionary"
-                ) from json_error
-
         # Get dataset provenance to find the creating job
         try:
             provenance = galaxy_state["gi"].histories.show_dataset_provenance(

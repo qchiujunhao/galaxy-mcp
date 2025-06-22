@@ -62,13 +62,14 @@ class TestHistoryOperations:
             assert len(result["contents"]) == 2
 
     def test_get_history_details_with_dict_string(self, mock_galaxy_instance):
-        """Test get_history_details handles dict string input"""
+        """Test get_history_details treats dict string as regular ID (should fail)"""
+        mock_galaxy_instance.histories.show_history.side_effect = Exception("404 Not Found")
+
         with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
-            # User passes string representation of dict
+            # User passes string representation of dict - should be treated as invalid ID
             dict_string = "{'id': 'test_history_1', 'name': 'Test History 1'}"
 
-            msg = "Invalid history_id: expected a history ID string"
-            with pytest.raises(ValueError, match=msg):
+            with pytest.raises(ValueError, match="History ID .* not found"):
                 get_history_details_fn(dict_string)
 
     def test_get_history_details_invalid_id(self, mock_galaxy_instance):
