@@ -567,32 +567,65 @@ def get_history_details(history_id: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-def get_job_details(job_id: str) -> dict[str, Any]:
+def get_job_details(dataset_id: str, history_id: str | None = None) -> dict[str, Any]:
     """
-    Get detailed information about a specific job
+    Get detailed information about the job that created a specific dataset
 
     Args:
-        job_id: ID of the job (not the entire job object)
+        dataset_id: ID of the dataset (will find the job that created it)
+        history_id: ID of the history containing the dataset (optional, for optimization)
 
     Returns:
-        Job details with tool information
+        Job details with tool information for the job that created the dataset
     """
     ensure_connected()
 
     try:
-        # Check if job_id looks like a dictionary string and extract the ID
-        if job_id.startswith("{") and job_id.endswith("}"):
+        # Check if dataset_id looks like a dictionary string and extract the ID
+        if dataset_id.startswith("{") and dataset_id.endswith("}"):
             import json
 
             try:
-                job_dict = json.loads(job_id)
-                job_id = job_dict.get("id")
-                logger.warning(f"Received full job object instead of ID, extracting ID: {job_id}")
+                dataset_dict = json.loads(dataset_id)
+                dataset_id = dataset_dict.get("id")
+                logger.warning(
+                    f"Received full dataset object instead of ID, extracting ID: {dataset_id}"
+                )
             except json.JSONDecodeError as json_error:
                 raise ValueError(
-                    "Invalid job_id: expected a job ID string, "
+                    "Invalid dataset_id: expected a dataset ID string, "
                     "got what looks like a malformed dictionary"
                 ) from json_error
+
+        # Get dataset provenance to find the creating job
+        try:
+            provenance = galaxy_state["gi"].histories.show_dataset_provenance(
+                history_id=history_id, dataset_id=dataset_id
+            )
+
+            # Extract job ID from provenance
+            job_id = provenance.get("job_id")
+            if not job_id:
+                raise ValueError(
+                    f"No job information found for dataset '{dataset_id}'. "
+                    "The dataset may not have been created by a job."
+                )
+
+        except Exception as provenance_error:
+            # If provenance fails, try getting dataset details which might contain job info
+            try:
+                dataset_details = galaxy_state["gi"].datasets.show_dataset(dataset_id)
+                job_id = dataset_details.get("creating_job")
+                if not job_id:
+                    raise ValueError(
+                        f"No job information found for dataset '{dataset_id}'. "
+                        "The dataset may not have been created by a job."
+                    )
+            except Exception:
+                raise ValueError(
+                    f"Failed to get job information for dataset '{dataset_id}': "
+                    f"{str(provenance_error)}"
+                ) from provenance_error
 
         # Get job details using the Galaxy API directly
         # (Bioblend doesn't have a direct method for this)
@@ -602,14 +635,14 @@ def get_job_details(job_id: str) -> dict[str, Any]:
         response.raise_for_status()
         job_info = response.json()
 
-        return {"job": job_info}
+        return {"job": job_info, "dataset_id": dataset_id, "job_id": job_id}
     except Exception as e:
         if "404" in str(e):
             raise ValueError(
-                f"Job ID '{job_id}' not found. Make sure to pass just "
-                "the ID string, not the entire job object."
+                f"Dataset ID '{dataset_id}' not found or job not accessible. "
+                "Make sure the dataset exists and you have permission to view it."
             ) from e
-        raise ValueError(f"Failed to get job details: {str(e)}") from e
+        raise ValueError(f"Failed to get job details for dataset '{dataset_id}': {str(e)}") from e
 
 
 @mcp.tool()
