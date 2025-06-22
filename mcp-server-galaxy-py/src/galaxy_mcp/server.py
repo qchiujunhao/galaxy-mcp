@@ -244,12 +244,14 @@ def run_tool(history_id: str, tool_id: str, inputs: dict[str, Any]) -> dict[str,
     Run a tool in Galaxy
 
     Args:
-        history_id: ID of the history where to run the tool
-        tool_id: ID of the tool to run
-        inputs: Tool input parameters and datasets
+        history_id: Galaxy history ID where to run the tool - a hexadecimal hash string
+                   (e.g., '1cd8e2f6b131e5aa', typically 16 characters)
+        tool_id: Galaxy tool identifier - typically in format 'toolshed.g2.bx.psu.edu/repos/...'
+                (e.g., 'Cut1' for simple tools or full toolshed URLs for complex tools)
+        inputs: Dictionary of tool input parameters and dataset references matching tool schema
 
     Returns:
-        Information about the tool execution
+        Dictionary containing tool execution information including job IDs and output dataset IDs
     """
     ensure_connected()
 
@@ -290,9 +292,13 @@ def get_tool_panel() -> dict[str, Any]:
 @mcp.tool()
 def create_history(history_name: str) -> dict[str, Any]:
     """
-    Create a new history in Galaxy.
-    :param history_name: Name for the new history.
-    :return: Created history ID.
+    Create a new history in Galaxy
+
+    Args:
+        history_name: Human-readable name for the new history (e.g., 'RNA-seq Analysis')
+
+    Returns:
+        Dictionary containing the created history details including the new history ID hash
     """
     ensure_connected()
     return galaxy_state["gi"].histories.create_history(history_name)
@@ -518,33 +524,15 @@ def get_history_details(history_id: str) -> dict[str, Any]:
     Get detailed information about a specific history, including datasets
 
     Args:
-        history_id: ID of the history (the 'id' field from get_histories(),
-            not the entire history object)
+        history_id: Galaxy history ID - a hexadecimal hash string identifying the history
+                   (e.g., '1cd8e2f6b131e5aa', typically 16 characters)
 
     Returns:
-        History details with datasets
+        Dictionary containing history metadata and list of datasets within the history
     """
     ensure_connected()
 
     try:
-        # Check if the history_id looks like a dictionary string
-        if history_id.startswith("{") and history_id.endswith("}"):
-            # Try to parse it and extract the actual ID
-            import json
-
-            try:
-                history_dict = json.loads(history_id)
-                history_id = history_dict.get("id")
-                logger.warning(
-                    f"Received full history object instead of ID, extracting ID: {history_id}"
-                )
-            except json.JSONDecodeError as json_error:
-                logger.error(f"Invalid history_id format: {history_id}")
-                raise ValueError(
-                    "Invalid history_id: expected a history ID string, "
-                    "got what looks like a malformed dictionary"
-                ) from json_error
-
         logger.info(f"Getting details for history ID: {history_id}")
 
         # Get history details
@@ -560,8 +548,7 @@ def get_history_details(history_id: str) -> dict[str, Any]:
         logger.error(f"Failed to get history details for ID '{history_id}': {str(e)}")
         if "404" in str(e) or "No route" in str(e):
             raise ValueError(
-                f"History ID '{history_id}' not found. Make sure to pass just "
-                "the ID string from get_histories(), not the entire history object."
+                f"History ID '{history_id}' not found. Make sure to pass a valid history ID string."
             ) from e
         raise ValueError(f"Failed to get history details for ID '{history_id}': {str(e)}") from e
 
@@ -572,31 +559,17 @@ def get_job_details(dataset_id: str, history_id: str | None = None) -> dict[str,
     Get detailed information about the job that created a specific dataset
 
     Args:
-        dataset_id: ID of the dataset (will find the job that created it)
-        history_id: ID of the history containing the dataset (optional, for optimization)
+        dataset_id: Galaxy dataset ID - a hexadecimal hash string identifying the dataset
+                   (e.g., 'f2db41e1fa331b3e', typically 16 characters)
+        history_id: Galaxy history ID containing the dataset - optional for performance optimization
+                   (e.g., '1cd8e2f6b131e5aa', typically 16 characters)
 
     Returns:
-        Job details with tool information for the job that created the dataset
+        Dictionary containing job metadata, tool information, dataset ID, and job ID
     """
     ensure_connected()
 
     try:
-        # Check if dataset_id looks like a dictionary string and extract the ID
-        if dataset_id.startswith("{") and dataset_id.endswith("}"):
-            import json
-
-            try:
-                dataset_dict = json.loads(dataset_id)
-                dataset_id = dataset_dict.get("id")
-                logger.warning(
-                    f"Received full dataset object instead of ID, extracting ID: {dataset_id}"
-                )
-            except json.JSONDecodeError as json_error:
-                raise ValueError(
-                    "Invalid dataset_id: expected a dataset ID string, "
-                    "got what looks like a malformed dictionary"
-                ) from json_error
-
         # Get dataset provenance to find the creating job
         try:
             provenance = galaxy_state["gi"].histories.show_dataset_provenance(
@@ -646,16 +619,192 @@ def get_job_details(dataset_id: str, history_id: str | None = None) -> dict[str,
 
 
 @mcp.tool()
+def get_dataset_details(
+    dataset_id: str, include_preview: bool = True, preview_lines: int = 10
+) -> dict[str, Any]:
+    """
+    Get detailed information about a specific dataset, optionally including a content preview
+
+    Args:
+        dataset_id: Galaxy dataset ID - a hexadecimal hash string identifying the dataset
+                   (e.g., 'f2db41e1fa331b3e', typically 16 characters)
+        include_preview: Whether to include a preview of the dataset content showing first N lines
+                        (default: True, only works for datasets in 'ok' state)
+        preview_lines: Number of lines to include in the content preview (default: 10)
+
+    Returns:
+        Dictionary containing dataset metadata (name, size, state, extension) and optional
+        content preview with line count and truncation information
+    """
+    ensure_connected()
+
+    try:
+        # Get dataset details using bioblend
+        dataset_info = galaxy_state["gi"].datasets.show_dataset(dataset_id)
+
+        result = {"dataset": dataset_info, "dataset_id": dataset_id}
+
+        # Add content preview if requested and dataset is in 'ok' state
+        if include_preview and dataset_info.get("state") == "ok":
+            try:
+                # Get dataset content for preview
+                content = galaxy_state["gi"].datasets.download_dataset(
+                    dataset_id, use_default_filename=False, require_ok_state=False
+                )
+
+                # Convert bytes to string if needed
+                if isinstance(content, bytes):
+                    try:
+                        content_str = content.decode("utf-8")
+                    except UnicodeDecodeError:
+                        # For binary files, show first part as hex
+                        content_str = (
+                            f"[Binary content - first 100 bytes as hex: {content[:100].hex()}]"
+                        )
+                else:
+                    content_str = content
+
+                # Get preview lines
+                lines = content_str.split("\n")
+                preview = "\n".join(lines[:preview_lines])
+
+                result["preview"] = {
+                    "lines": preview,
+                    "total_lines": len(lines),
+                    "preview_lines": min(preview_lines, len(lines)),
+                    "truncated": len(lines) > preview_lines,
+                }
+
+            except Exception as preview_error:
+                logger.warning(f"Could not get preview for dataset {dataset_id}: {preview_error}")
+                result["preview"] = {
+                    "error": f"Preview unavailable: {str(preview_error)}",
+                    "lines": None,
+                }
+
+        return result
+
+    except Exception as e:
+        if "404" in str(e):
+            raise ValueError(
+                f"Dataset ID '{dataset_id}' not found. "
+                "Make sure the dataset exists and you have permission to view it."
+            ) from e
+        raise ValueError(f"Failed to get dataset details for '{dataset_id}': {str(e)}") from e
+
+
+@mcp.tool()
+def download_dataset(
+    dataset_id: str,
+    file_path: str | None = None,
+    use_default_filename: bool = True,
+    require_ok_state: bool = True,
+) -> dict[str, Any]:
+    """
+    Download a dataset from Galaxy to the local filesystem
+
+    Args:
+        dataset_id: Galaxy dataset ID - a hexadecimal hash string identifying the dataset
+                   (e.g., 'f2db41e1fa331b3e', typically 16 characters)
+        file_path: Local filesystem path where to save the downloaded file
+                  (e.g., '/path/to/data.txt', if not provided uses dataset name)
+        use_default_filename: When file_path not provided, use Galaxy's dataset name as filename
+                             (default: True, creates filename like 'dataset_name.extension')
+        require_ok_state: Only allow download if dataset processing state is 'ok'
+                         (default: True, set False to download datasets in other states)
+
+    Returns:
+        Dictionary containing download path, file size, and dataset metadata
+        (name, extension, state, genome build)
+    """
+    ensure_connected()
+
+    try:
+        # Get dataset info first to check state and get metadata
+        dataset_info = galaxy_state["gi"].datasets.show_dataset(dataset_id)
+
+        # Check dataset state if required
+        if require_ok_state and dataset_info.get("state") != "ok":
+            raise ValueError(
+                f"Dataset '{dataset_id}' is in state '{dataset_info.get('state')}', not 'ok'. "
+                "Set require_ok_state=False to download anyway."
+            )
+
+        # Download the dataset
+        if file_path:
+            # Download to specific path
+            result_path = galaxy_state["gi"].datasets.download_dataset(
+                dataset_id,
+                file_path=file_path,
+                use_default_filename=False,
+                require_ok_state=require_ok_state,
+            )
+            download_path = file_path
+        else:
+            # Download with default filename
+            result_path = galaxy_state["gi"].datasets.download_dataset(
+                dataset_id,
+                use_default_filename=use_default_filename,
+                require_ok_state=require_ok_state,
+            )
+            # For default filename, bioblend returns the content, we need to save it
+            if use_default_filename:
+                # Create filename from dataset info
+                filename = dataset_info.get("name", f"dataset_{dataset_id}")
+                extension = dataset_info.get("extension", "")
+                if extension and not filename.endswith(f".{extension}"):
+                    filename = f"{filename}.{extension}"
+
+                download_path = filename
+
+                # Write content to file
+                with open(download_path, "wb") as f:
+                    if isinstance(result_path, bytes):
+                        f.write(result_path)
+                    else:
+                        f.write(result_path.encode("utf-8"))
+            else:
+                download_path = result_path
+
+        # Get file size
+        import os
+
+        file_size = os.path.getsize(download_path) if os.path.exists(download_path) else None
+
+        return {
+            "dataset_id": dataset_id,
+            "file_path": download_path,
+            "file_size": file_size,
+            "dataset_info": {
+                "name": dataset_info.get("name"),
+                "extension": dataset_info.get("extension"),
+                "state": dataset_info.get("state"),
+                "genome_build": dataset_info.get("genome_build"),
+                "file_size": dataset_info.get("file_size"),
+            },
+        }
+
+    except Exception as e:
+        if "404" in str(e):
+            raise ValueError(
+                f"Dataset ID '{dataset_id}' not found. "
+                "Make sure the dataset exists and you have permission to view it."
+            ) from e
+        raise ValueError(f"Failed to download dataset '{dataset_id}': {str(e)}") from e
+
+
+@mcp.tool()
 def upload_file(path: str, history_id: str | None = None) -> dict[str, Any]:
     """
     Upload a local file to Galaxy
 
     Args:
-        path: Path to local file
-        history_id: Target history ID (optional)
+        path: Local filesystem path to the file to upload (e.g., '/path/to/data.csv')
+        history_id: Galaxy history ID where to upload the file - optional, uses current history
+                   (e.g., '1cd8e2f6b131e5aa', typically 16 characters)
 
     Returns:
-        Upload status
+        Dictionary containing upload status and information about the created dataset(s)
     """
     ensure_connected()
 
@@ -686,16 +835,20 @@ def get_invocations(
     View workflow invocations in Galaxy
 
     Args:
-        invocation_id: Specific invocation ID to view details (optional)
-        workflow_id: Filter invocations by workflow ID (optional)
-        history_id: Filter invocations by history ID (optional)
-        limit: Maximum number of invocations to return (optional)
-        view: Level of detail to return, either 'element' or 'collection'
-            (default: collection)
-        step_details: Include details on individual steps (only if view is 'element')
+        invocation_id: Specific workflow invocation ID to view - a hexadecimal hash string
+                      (e.g., 'a1b2c3d4e5f6789a', typically 16 characters, optional)
+        workflow_id: Filter invocations by workflow ID - a hexadecimal hash string
+                    (e.g., 'b2c3d4e5f6789abc', typically 16 characters, optional)
+        history_id: Filter invocations by history ID - a hexadecimal hash string
+                   (e.g., '1cd8e2f6b131e5aa', typically 16 characters, optional)
+        limit: Maximum number of invocations to return (optional, default: no limit)
+        view: Level of detail to return - 'element' for detailed or 'collection' for summary
+             (default: 'collection')
+        step_details: Include details on individual workflow steps
+                     (only applies when view is 'element', default: False)
 
     Returns:
-        Workflow invocation(s) information
+        Dictionary containing workflow invocation information, execution status, and step details
     """
     ensure_connected()
 

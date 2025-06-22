@@ -1,7 +1,5 @@
 """Tests for job operations"""
 
-import json
-
 import pytest
 import responses
 from galaxy_mcp.server import galaxy_state
@@ -101,34 +99,6 @@ class TestJobOperations:
 
         with pytest.raises(ValueError, match="No job information found"):
             get_job_details_fn(dataset_id)
-
-    @responses.activate
-    def test_get_job_details_with_dict_string(self):
-        """Test handling dataset_id as JSON string"""
-        dataset_dict = {"id": "dataset123", "name": "test"}
-        dataset_id_str = json.dumps(dataset_dict)
-        job_id = "job456"
-
-        # Mock the bioblend provenance call
-        mock_gi = type("MockGI", (), {})()
-        mock_histories = type("MockHistories", (), {})()
-        mock_histories.show_dataset_provenance = lambda history_id, dataset_id: {"job_id": job_id}
-        mock_gi.histories = mock_histories
-        galaxy_state["gi"] = mock_gi
-
-        # Mock the Galaxy API job details call
-        responses.add(
-            responses.GET,
-            f"http://localhost:8080/api/jobs/{job_id}",
-            json={"id": job_id, "tool_id": "test_tool", "state": "ok"},
-            status=200,
-        )
-
-        result = get_job_details_fn(dataset_id_str)
-
-        assert result["job"]["id"] == job_id
-        assert result["dataset_id"] == "dataset123"  # Extracted from JSON
-        assert result["job_id"] == job_id
 
     def test_get_job_details_not_connected(self):
         """Test error when not connected to Galaxy"""
