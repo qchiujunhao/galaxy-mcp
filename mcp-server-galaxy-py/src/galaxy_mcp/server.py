@@ -653,7 +653,7 @@ def get_dataset_details(
     Get detailed information about a specific dataset, optionally including a content preview
 
     Args:
-        dataset_id: ID of the dataset
+        dataset_id: Galaxy dataset ID (string hash)
         include_preview: Whether to include a preview of the dataset content (default: True)
         preview_lines: Number of lines to include in preview (default: 10)
 
@@ -663,22 +663,6 @@ def get_dataset_details(
     ensure_connected()
 
     try:
-        # Check if dataset_id looks like a dictionary string and extract the ID
-        if dataset_id.startswith("{") and dataset_id.endswith("}"):
-            import json
-
-            try:
-                dataset_dict = json.loads(dataset_id)
-                dataset_id = dataset_dict.get("id")
-                logger.warning(
-                    f"Received full dataset object instead of ID, extracting ID: {dataset_id}"
-                )
-            except json.JSONDecodeError as json_error:
-                raise ValueError(
-                    "Invalid dataset_id: expected a dataset ID string, "
-                    "got what looks like a malformed dictionary"
-                ) from json_error
-
         # Get dataset details using bioblend
         dataset_info = galaxy_state["gi"].datasets.show_dataset(dataset_id)
 
@@ -744,7 +728,7 @@ def download_dataset(
     Download a dataset from Galaxy to the local filesystem
 
     Args:
-        dataset_id: ID of the dataset to download
+        dataset_id: Galaxy dataset ID (string hash) to download
         file_path: Local file path to save the dataset (optional)
         use_default_filename: Use Galaxy's default filename if file_path not provided
         require_ok_state: Only download if dataset state is 'ok' (default: True)
@@ -755,22 +739,6 @@ def download_dataset(
     ensure_connected()
 
     try:
-        # Check if dataset_id looks like a dictionary string and extract the ID
-        if dataset_id.startswith("{") and dataset_id.endswith("}"):
-            import json
-
-            try:
-                dataset_dict = json.loads(dataset_id)
-                dataset_id = dataset_dict.get("id")
-                logger.warning(
-                    f"Received full dataset object instead of ID, extracting ID: {dataset_id}"
-                )
-            except json.JSONDecodeError as json_error:
-                raise ValueError(
-                    "Invalid dataset_id: expected a dataset ID string, "
-                    "got what looks like a malformed dictionary"
-                ) from json_error
-
         # Get dataset info first to check state and get metadata
         dataset_info = galaxy_state["gi"].datasets.show_dataset(dataset_id)
 

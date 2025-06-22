@@ -2,7 +2,6 @@
 Test dataset-related operations
 """
 
-import json
 from unittest.mock import patch
 
 import pytest
@@ -190,21 +189,6 @@ class TestDatasetOperations:
         with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
             with pytest.raises(ValueError, match="Dataset .* is in state 'running', not 'ok'"):
                 download_dataset_fn(dataset_id)
-
-    def test_dataset_operations_with_json_string(self, mock_galaxy_instance):
-        """Test dataset operations handle JSON string input"""
-        dataset_dict = {"id": "dataset123", "name": "test"}
-        dataset_id_str = json.dumps(dataset_dict)
-
-        mock_dataset_info = {"id": "dataset123", "name": "test_data.txt", "state": "ok"}
-
-        mock_galaxy_instance.datasets.show_dataset.return_value = mock_dataset_info
-
-        with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
-            result = get_dataset_details_fn(dataset_id_str, include_preview=False)
-
-            assert result["dataset_id"] == "dataset123"  # Extracted from JSON
-            mock_galaxy_instance.datasets.show_dataset.assert_called_once_with("dataset123")
 
     def test_dataset_operations_not_connected(self):
         """Test dataset operations fail when not connected"""
