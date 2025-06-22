@@ -4,9 +4,11 @@
 from galaxy_mcp.server import (
     connect,
     create_history,
+    download_dataset,
     ensure_connected,
     filter_tools_by_dataset,
     galaxy_state,
+    get_dataset_details,
     get_histories,
     get_history_details,
     get_invocations,
@@ -38,7 +40,9 @@ def get_function(tool_or_function):
 # Create function aliases for testing
 connect_fn = get_function(connect)
 create_history_fn = get_function(create_history)
+download_dataset_fn = get_function(download_dataset)
 filter_tools_by_dataset_fn = get_function(filter_tools_by_dataset)
+get_dataset_details_fn = get_function(get_dataset_details)
 get_histories_fn = get_function(get_histories)
 get_history_details_fn = get_function(get_history_details)
 get_iwc_workflows_fn = get_function(get_iwc_workflows)
@@ -60,7 +64,9 @@ upload_file_fn = get_function(upload_file)
 __all__ = [
     "connect_fn",
     "create_history_fn",
+    "download_dataset_fn",
     "filter_tools_by_dataset_fn",
+    "get_dataset_details_fn",
     "get_histories_fn",
     "get_history_details_fn",
     "get_iwc_workflows_fn",

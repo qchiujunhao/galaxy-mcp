@@ -646,6 +646,205 @@ def get_job_details(dataset_id: str, history_id: str | None = None) -> dict[str,
 
 
 @mcp.tool()
+def get_dataset_details(
+    dataset_id: str, include_preview: bool = True, preview_lines: int = 10
+) -> dict[str, Any]:
+    """
+    Get detailed information about a specific dataset, optionally including a content preview
+
+    Args:
+        dataset_id: ID of the dataset
+        include_preview: Whether to include a preview of the dataset content (default: True)
+        preview_lines: Number of lines to include in preview (default: 10)
+
+    Returns:
+        Dataset details including metadata and optional content preview
+    """
+    ensure_connected()
+
+    try:
+        # Check if dataset_id looks like a dictionary string and extract the ID
+        if dataset_id.startswith("{") and dataset_id.endswith("}"):
+            import json
+
+            try:
+                dataset_dict = json.loads(dataset_id)
+                dataset_id = dataset_dict.get("id")
+                logger.warning(
+                    f"Received full dataset object instead of ID, extracting ID: {dataset_id}"
+                )
+            except json.JSONDecodeError as json_error:
+                raise ValueError(
+                    "Invalid dataset_id: expected a dataset ID string, "
+                    "got what looks like a malformed dictionary"
+                ) from json_error
+
+        # Get dataset details using bioblend
+        dataset_info = galaxy_state["gi"].datasets.show_dataset(dataset_id)
+
+        result = {"dataset": dataset_info, "dataset_id": dataset_id}
+
+        # Add content preview if requested and dataset is in 'ok' state
+        if include_preview and dataset_info.get("state") == "ok":
+            try:
+                # Get dataset content for preview
+                content = galaxy_state["gi"].datasets.download_dataset(
+                    dataset_id, use_default_filename=False, require_ok_state=False
+                )
+
+                # Convert bytes to string if needed
+                if isinstance(content, bytes):
+                    try:
+                        content_str = content.decode("utf-8")
+                    except UnicodeDecodeError:
+                        # For binary files, show first part as hex
+                        content_str = (
+                            f"[Binary content - first 100 bytes as hex: {content[:100].hex()}]"
+                        )
+                else:
+                    content_str = content
+
+                # Get preview lines
+                lines = content_str.split("\n")
+                preview = "\n".join(lines[:preview_lines])
+
+                result["preview"] = {
+                    "lines": preview,
+                    "total_lines": len(lines),
+                    "preview_lines": min(preview_lines, len(lines)),
+                    "truncated": len(lines) > preview_lines,
+                }
+
+            except Exception as preview_error:
+                logger.warning(f"Could not get preview for dataset {dataset_id}: {preview_error}")
+                result["preview"] = {
+                    "error": f"Preview unavailable: {str(preview_error)}",
+                    "lines": None,
+                }
+
+        return result
+
+    except Exception as e:
+        if "404" in str(e):
+            raise ValueError(
+                f"Dataset ID '{dataset_id}' not found. "
+                "Make sure the dataset exists and you have permission to view it."
+            ) from e
+        raise ValueError(f"Failed to get dataset details for '{dataset_id}': {str(e)}") from e
+
+
+@mcp.tool()
+def download_dataset(
+    dataset_id: str,
+    file_path: str | None = None,
+    use_default_filename: bool = True,
+    require_ok_state: bool = True,
+) -> dict[str, Any]:
+    """
+    Download a dataset from Galaxy to the local filesystem
+
+    Args:
+        dataset_id: ID of the dataset to download
+        file_path: Local file path to save the dataset (optional)
+        use_default_filename: Use Galaxy's default filename if file_path not provided
+        require_ok_state: Only download if dataset state is 'ok' (default: True)
+
+    Returns:
+        Download information including file path and dataset details
+    """
+    ensure_connected()
+
+    try:
+        # Check if dataset_id looks like a dictionary string and extract the ID
+        if dataset_id.startswith("{") and dataset_id.endswith("}"):
+            import json
+
+            try:
+                dataset_dict = json.loads(dataset_id)
+                dataset_id = dataset_dict.get("id")
+                logger.warning(
+                    f"Received full dataset object instead of ID, extracting ID: {dataset_id}"
+                )
+            except json.JSONDecodeError as json_error:
+                raise ValueError(
+                    "Invalid dataset_id: expected a dataset ID string, "
+                    "got what looks like a malformed dictionary"
+                ) from json_error
+
+        # Get dataset info first to check state and get metadata
+        dataset_info = galaxy_state["gi"].datasets.show_dataset(dataset_id)
+
+        # Check dataset state if required
+        if require_ok_state and dataset_info.get("state") != "ok":
+            raise ValueError(
+                f"Dataset '{dataset_id}' is in state '{dataset_info.get('state')}', not 'ok'. "
+                "Set require_ok_state=False to download anyway."
+            )
+
+        # Download the dataset
+        if file_path:
+            # Download to specific path
+            result_path = galaxy_state["gi"].datasets.download_dataset(
+                dataset_id,
+                file_path=file_path,
+                use_default_filename=False,
+                require_ok_state=require_ok_state,
+            )
+            download_path = file_path
+        else:
+            # Download with default filename
+            result_path = galaxy_state["gi"].datasets.download_dataset(
+                dataset_id,
+                use_default_filename=use_default_filename,
+                require_ok_state=require_ok_state,
+            )
+            # For default filename, bioblend returns the content, we need to save it
+            if use_default_filename:
+                # Create filename from dataset info
+                filename = dataset_info.get("name", f"dataset_{dataset_id}")
+                extension = dataset_info.get("extension", "")
+                if extension and not filename.endswith(f".{extension}"):
+                    filename = f"{filename}.{extension}"
+
+                download_path = filename
+
+                # Write content to file
+                with open(download_path, "wb") as f:
+                    if isinstance(result_path, bytes):
+                        f.write(result_path)
+                    else:
+                        f.write(result_path.encode("utf-8"))
+            else:
+                download_path = result_path
+
+        # Get file size
+        import os
+
+        file_size = os.path.getsize(download_path) if os.path.exists(download_path) else None
+
+        return {
+            "dataset_id": dataset_id,
+            "file_path": download_path,
+            "file_size": file_size,
+            "dataset_info": {
+                "name": dataset_info.get("name"),
+                "extension": dataset_info.get("extension"),
+                "state": dataset_info.get("state"),
+                "genome_build": dataset_info.get("genome_build"),
+                "file_size": dataset_info.get("file_size"),
+            },
+        }
+
+    except Exception as e:
+        if "404" in str(e):
+            raise ValueError(
+                f"Dataset ID '{dataset_id}' not found. "
+                "Make sure the dataset exists and you have permission to view it."
+            ) from e
+        raise ValueError(f"Failed to download dataset '{dataset_id}': {str(e)}") from e
+
+
+@mcp.tool()
 def upload_file(path: str, history_id: str | None = None) -> dict[str, Any]:
     """
     Upload a local file to Galaxy
