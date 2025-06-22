@@ -244,12 +244,14 @@ def run_tool(history_id: str, tool_id: str, inputs: dict[str, Any]) -> dict[str,
     Run a tool in Galaxy
 
     Args:
-        history_id: ID of the history where to run the tool
-        tool_id: ID of the tool to run
-        inputs: Tool input parameters and datasets
+        history_id: Galaxy history ID where to run the tool - a hexadecimal hash string
+                   (e.g., '1cd8e2f6b131e5aa', typically 16 characters)
+        tool_id: Galaxy tool identifier - typically in format 'toolshed.g2.bx.psu.edu/repos/...'
+                (e.g., 'Cut1' for simple tools or full toolshed URLs for complex tools)
+        inputs: Dictionary of tool input parameters and dataset references matching tool schema
 
     Returns:
-        Information about the tool execution
+        Dictionary containing tool execution information including job IDs and output dataset IDs
     """
     ensure_connected()
 
@@ -290,9 +292,13 @@ def get_tool_panel() -> dict[str, Any]:
 @mcp.tool()
 def create_history(history_name: str) -> dict[str, Any]:
     """
-    Create a new history in Galaxy.
-    :param history_name: Name for the new history.
-    :return: Created history ID.
+    Create a new history in Galaxy
+
+    Args:
+        history_name: Human-readable name for the new history (e.g., 'RNA-seq Analysis')
+
+    Returns:
+        Dictionary containing the created history details including the new history ID hash
     """
     ensure_connected()
     return galaxy_state["gi"].histories.create_history(history_name)
@@ -518,10 +524,11 @@ def get_history_details(history_id: str) -> dict[str, Any]:
     Get detailed information about a specific history, including datasets
 
     Args:
-        history_id: Galaxy history ID (string hash)
+        history_id: Galaxy history ID - a hexadecimal hash string identifying the history
+                   (e.g., '1cd8e2f6b131e5aa', typically 16 characters)
 
     Returns:
-        History details with datasets
+        Dictionary containing history metadata and list of datasets within the history
     """
     ensure_connected()
 
@@ -552,11 +559,13 @@ def get_job_details(dataset_id: str, history_id: str | None = None) -> dict[str,
     Get detailed information about the job that created a specific dataset
 
     Args:
-        dataset_id: Galaxy dataset ID (string hash) to find the creating job for
-        history_id: ID of the history containing the dataset (optional, for optimization)
+        dataset_id: Galaxy dataset ID - a hexadecimal hash string identifying the dataset
+                   (e.g., 'f2db41e1fa331b3e', typically 16 characters)
+        history_id: Galaxy history ID containing the dataset - optional for performance optimization
+                   (e.g., '1cd8e2f6b131e5aa', typically 16 characters)
 
     Returns:
-        Job details with tool information for the job that created the dataset
+        Dictionary containing job metadata, tool information, dataset ID, and job ID
     """
     ensure_connected()
 
@@ -617,12 +626,15 @@ def get_dataset_details(
     Get detailed information about a specific dataset, optionally including a content preview
 
     Args:
-        dataset_id: Galaxy dataset ID (string hash)
-        include_preview: Whether to include a preview of the dataset content (default: True)
-        preview_lines: Number of lines to include in preview (default: 10)
+        dataset_id: Galaxy dataset ID - a hexadecimal hash string identifying the dataset
+                   (e.g., 'f2db41e1fa331b3e', typically 16 characters)
+        include_preview: Whether to include a preview of the dataset content showing first N lines
+                        (default: True, only works for datasets in 'ok' state)
+        preview_lines: Number of lines to include in the content preview (default: 10)
 
     Returns:
-        Dataset details including metadata and optional content preview
+        Dictionary containing dataset metadata (name, size, state, extension) and optional
+        content preview with line count and truncation information
     """
     ensure_connected()
 
@@ -692,13 +704,18 @@ def download_dataset(
     Download a dataset from Galaxy to the local filesystem
 
     Args:
-        dataset_id: Galaxy dataset ID (string hash) to download
-        file_path: Local file path to save the dataset (optional)
-        use_default_filename: Use Galaxy's default filename if file_path not provided
-        require_ok_state: Only download if dataset state is 'ok' (default: True)
+        dataset_id: Galaxy dataset ID - a hexadecimal hash string identifying the dataset
+                   (e.g., 'f2db41e1fa331b3e', typically 16 characters)
+        file_path: Local filesystem path where to save the downloaded file
+                  (e.g., '/path/to/data.txt', if not provided uses dataset name)
+        use_default_filename: When file_path not provided, use Galaxy's dataset name as filename
+                             (default: True, creates filename like 'dataset_name.extension')
+        require_ok_state: Only allow download if dataset processing state is 'ok'
+                         (default: True, set False to download datasets in other states)
 
     Returns:
-        Download information including file path and dataset details
+        Dictionary containing download path, file size, and dataset metadata
+        (name, extension, state, genome build)
     """
     ensure_connected()
 
@@ -782,11 +799,12 @@ def upload_file(path: str, history_id: str | None = None) -> dict[str, Any]:
     Upload a local file to Galaxy
 
     Args:
-        path: Path to local file
-        history_id: Target history ID (optional)
+        path: Local filesystem path to the file to upload (e.g., '/path/to/data.csv')
+        history_id: Galaxy history ID where to upload the file - optional, uses current history
+                   (e.g., '1cd8e2f6b131e5aa', typically 16 characters)
 
     Returns:
-        Upload status
+        Dictionary containing upload status and information about the created dataset(s)
     """
     ensure_connected()
 
@@ -817,16 +835,20 @@ def get_invocations(
     View workflow invocations in Galaxy
 
     Args:
-        invocation_id: Specific invocation ID to view details (optional)
-        workflow_id: Filter invocations by workflow ID (optional)
-        history_id: Filter invocations by history ID (optional)
-        limit: Maximum number of invocations to return (optional)
-        view: Level of detail to return, either 'element' or 'collection'
-            (default: collection)
-        step_details: Include details on individual steps (only if view is 'element')
+        invocation_id: Specific workflow invocation ID to view - a hexadecimal hash string
+                      (e.g., 'a1b2c3d4e5f6789a', typically 16 characters, optional)
+        workflow_id: Filter invocations by workflow ID - a hexadecimal hash string
+                    (e.g., 'b2c3d4e5f6789abc', typically 16 characters, optional)
+        history_id: Filter invocations by history ID - a hexadecimal hash string
+                   (e.g., '1cd8e2f6b131e5aa', typically 16 characters, optional)
+        limit: Maximum number of invocations to return (optional, default: no limit)
+        view: Level of detail to return - 'element' for detailed or 'collection' for summary
+             (default: 'collection')
+        step_details: Include details on individual workflow steps
+                     (only applies when view is 'element', default: False)
 
     Returns:
-        Workflow invocation(s) information
+        Dictionary containing workflow invocation information, execution status, and step details
     """
     ensure_connected()
 
