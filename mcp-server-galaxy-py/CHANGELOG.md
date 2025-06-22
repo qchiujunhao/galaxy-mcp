@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2025-06-22
+
+### Added
+
+- `get_dataset_details` MCP tool for comprehensive dataset metadata with optional content preview
+- `download_dataset` MCP tool to download datasets to local filesystem with flexible naming options
+- Binary file support in dataset content preview with hexadecimal display
+- Enhanced parameter documentation with detailed Galaxy ID format examples and comprehensive descriptions
+
+### Changed
+
+- **BREAKING**: `get_job_details` now accepts `dataset_id` instead of `job_id` as primary parameter, using dataset provenance to find creating job
+- Upgraded from FastMCP 1.0 to FastMCP2 with remote deployment support via SSE transport
+- Simplified parameter validation by removing complex JSON string parsing across all functions
+- Improved API consistency with plain string-only identifier parameters
+- Consolidated dependency management to use uv with lock file
+- Enhanced test coverage for job operations and dataset functionality
+
+### Fixed
+
+- Job lookup now works with the more commonly available dataset IDs instead of job IDs
+- Fallback mechanism for job details when provenance data is unavailable
+- Better error handling for dataset state validation in download operations
+
 ## [0.2.1] - 2025-06-11
 
 ### Added
