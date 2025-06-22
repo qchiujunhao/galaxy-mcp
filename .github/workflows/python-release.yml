@@ -33,7 +33,7 @@ jobs:
       - name: Update version in pyproject.toml
         working-directory: mcp-server-galaxy-py
         run: |
-          sed -i 's/version = "[^"]*"/version = "${{ inputs.version }}"/' pyproject.toml
+          sed -i '/^\[project\]/,/^\[/ s/^version = "[^"]*"/version = "${{ inputs.version }}"/' pyproject.toml
           git add pyproject.toml
           git commit -m "Bump version to ${{ inputs.version }}"
           git push

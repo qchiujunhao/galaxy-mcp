@@ -237,12 +237,12 @@ Version is managed in `pyproject.toml`:
 
 ```toml
 [project]
-version = "0.2.1"
+version = "1.0.0"
 ```
 
-### Manual Release Process (Recommended)
+### Release Process (Recommended)
 
-Follow these steps to create a new release:
+The project uses Release Drafter to automatically create draft releases. Follow these steps:
 
 1. **Update the changelog**
    ```bash
@@ -259,22 +259,22 @@ Follow these steps to create a new release:
 3. **Commit and push changes**
    ```bash
    git add CHANGELOG.md pyproject.toml
-   git commit -m "Bump version to 0.2.1"
+   git commit -m "Prepare for X.Y.Z release"
    git push
    ```
 
-4. **Create GitHub release**
-   - Go to https://github.com/galaxyproject/galaxy-mcp/releases/new
-   - In "Choose a tag" dropdown, type `v0.2.1` (prefix with 'v')
-   - Select "Create new tag: v0.2.1 on publish"
-   - Title: `v0.2.1`
-   - Description: Copy the changelog entry for this version
+4. **Curate and publish the release**
+   - Go to https://github.com/galaxyproject/galaxy-mcp/releases
+   - Find the draft release created by Release Drafter
+   - Edit the release notes to match your changelog entries
+   - Update the tag to match your version (e.g., `v1.0.0`)
+   - Update the title (e.g., `v1.0.0`)
    - Click "Publish release"
 
 5. **Verify deployment**
    - GitHub Actions will automatically build and publish to PyPI
    - Check https://pypi.org/project/galaxy-mcp/ for the new version
-   - Test installation: `pip install galaxy-mcp==0.2.1`
+   - Test installation: `pip install galaxy-mcp==X.Y.Z`
 
 ### Required GitHub Secrets
 
@@ -283,13 +283,13 @@ For automatic PyPI deployment, ensure this secret is set:
 
 Set at: https://github.com/galaxyproject/galaxy-mcp/settings/secrets/actions
 
-### Alternative: GitHub Actions Workflow
+### Alternative: Manual Workflow Dispatch (Not Recommended)
 
-You can also trigger the release workflow manually:
+If needed, you can trigger the release workflow manually, but this bypasses Release Drafter:
 
 ```bash
 # Using GitHub CLI
-gh workflow run python-release.yml -f version=0.2.1
+gh workflow run python-release.yml -f version=1.0.0
 ```
 
 ### Manual Publishing (Fallback)
