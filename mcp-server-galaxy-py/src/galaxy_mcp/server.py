@@ -880,7 +880,8 @@ def download_dataset(
         dataset_id: Galaxy dataset ID - a hexadecimal hash string identifying the dataset
                    (e.g., 'f2db41e1fa331b3e', typically 16 characters)
         file_path: Local filesystem path where to save the downloaded file
-                  (e.g., '/path/to/data.txt', if not provided downloads to memory)
+                  (e.g., '/path/to/data.txt', requires write access to filesystem)
+                  If not provided, downloads to memory instead
         use_default_filename: Deprecated - use file_path for specific locations
                              (default: True, ignored when file_path not provided)
         require_ok_state: Only allow download if dataset processing state is 'ok'
@@ -894,8 +895,9 @@ def download_dataset(
         - file_size: Size of downloaded content in bytes
         - dataset_info: Dataset metadata (name, extension, state, genome build)
 
-    Note: If no file_path is provided, content is downloaded to memory to avoid
-    filesystem write errors in read-only environments.
+    IMPORTANT FOR LLMs: If you don't have filesystem write access (common in sandboxed
+    environments), omit the file_path parameter to download content to memory. Only
+    specify file_path if you can actually write files to the local filesystem.
     """
     ensure_connected()
 
