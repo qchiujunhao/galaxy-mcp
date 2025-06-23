@@ -874,21 +874,30 @@ def download_dataset(
     require_ok_state: bool = True,
 ) -> dict[str, Any]:
     """
-    Download a dataset from Galaxy to the local filesystem
+    Download a dataset from Galaxy to the local filesystem or memory
 
     Args:
         dataset_id: Galaxy dataset ID - a hexadecimal hash string identifying the dataset
                    (e.g., 'f2db41e1fa331b3e', typically 16 characters)
         file_path: Local filesystem path where to save the downloaded file
-                  (e.g., '/path/to/data.txt', if not provided uses dataset name)
-        use_default_filename: When file_path not provided, use Galaxy's dataset name as filename
-                             (default: True, creates filename like 'dataset_name.extension')
+                  (e.g., '/path/to/data.txt', requires write access to filesystem)
+                  If not provided, downloads to memory instead
+        use_default_filename: Deprecated - use file_path for specific locations
+                             (default: True, ignored when file_path not provided)
         require_ok_state: Only allow download if dataset processing state is 'ok'
                          (default: True, set False to download datasets in other states)
 
     Returns:
-        Dictionary containing download path, file size, and dataset metadata
-        (name, extension, state, genome build)
+        Dictionary containing download information:
+        - file_path: Path where file was saved (None if downloaded to memory)
+        - suggested_filename: Recommended filename based on dataset name
+        - content_available: Whether content was successfully downloaded
+        - file_size: Size of downloaded content in bytes
+        - dataset_info: Dataset metadata (name, extension, state, genome build)
+
+    IMPORTANT FOR LLMs: If you don't have filesystem write access (common in sandboxed
+    environments), omit the file_path parameter to download content to memory. Only
+    specify file_path if you can actually write files to the local filesystem.
     """
     ensure_connected()
 
@@ -913,41 +922,40 @@ def download_dataset(
                 require_ok_state=require_ok_state,
             )
             download_path = file_path
+
+            # Get file size
+            import os
+
+            file_size = os.path.getsize(download_path) if os.path.exists(download_path) else None
+
         else:
-            # Download with default filename
+            # Download content to memory (don't save to filesystem)
             result_path = galaxy_state["gi"].datasets.download_dataset(
                 dataset_id,
-                use_default_filename=use_default_filename,
+                use_default_filename=False,  # Get content in memory
                 require_ok_state=require_ok_state,
             )
-            # For default filename, bioblend returns the content, we need to save it
-            if use_default_filename:
-                # Create filename from dataset info
-                filename = dataset_info.get("name", f"dataset_{dataset_id}")
-                extension = dataset_info.get("extension", "")
-                if extension and not filename.endswith(f".{extension}"):
-                    filename = f"{filename}.{extension}"
 
-                download_path = filename
+            # Create suggested filename from dataset info
+            filename = dataset_info.get("name", f"dataset_{dataset_id}")
+            extension = dataset_info.get("extension", "")
+            if extension and not filename.endswith(f".{extension}"):
+                filename = f"{filename}.{extension}"
 
-                # Write content to file
-                with open(download_path, "wb") as f:
-                    if isinstance(result_path, bytes):
-                        f.write(result_path)
-                    else:
-                        f.write(result_path.encode("utf-8"))
-            else:
-                download_path = result_path
-
-        # Get file size
-        import os
-
-        file_size = os.path.getsize(download_path) if os.path.exists(download_path) else None
+            download_path = None  # No file saved
+            file_size = len(result_path) if isinstance(result_path, bytes | str) else None
 
         return {
             "dataset_id": dataset_id,
             "file_path": download_path,
-            "file_size": file_size,
+            "suggested_filename": filename if not file_path else None,
+            "content_available": result_path is not None,
+            "file_size": file_size,  # Keep consistent with existing API
+            "note": (
+                "Content downloaded to memory. Use file_path parameter to save to a location."
+                if not file_path
+                else "File saved to specified path."
+            ),
             "dataset_info": {
                 "name": dataset_info.get("name"),
                 "extension": dataset_info.get("extension"),

@@ -144,7 +144,7 @@ class TestDatasetOperations:
                     )
 
     def test_download_dataset_default_filename(self, mock_galaxy_instance):
-        """Test dataset download with default filename"""
+        """Test dataset download to memory (no file path specified)"""
         dataset_id = "dataset123"
 
         mock_dataset_info = {
@@ -161,17 +161,20 @@ class TestDatasetOperations:
         mock_galaxy_instance.datasets.download_dataset.return_value = mock_content
 
         with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
-            with patch("builtins.open", create=True) as mock_open:
-                with patch("os.path.exists", return_value=True):
-                    with patch("os.path.getsize", return_value=len(mock_content)):
-                        result = download_dataset_fn(dataset_id)
+            result = download_dataset_fn(dataset_id)
 
-                        assert result["dataset_id"] == dataset_id
-                        assert result["file_path"] == "test_data.txt"
-                        assert result["dataset_info"]["name"] == "test_data"
+            assert result["dataset_id"] == dataset_id
+            assert result["file_path"] is None  # No file saved
+            assert result["suggested_filename"] == "test_data.txt"
+            assert result["content_available"] is True
+            assert result["file_size"] == len(mock_content)
+            assert result["dataset_info"]["name"] == "test_data"
+            assert "memory" in result["note"]
 
-                        # Verify file was written
-                        mock_open.assert_called_once_with("test_data.txt", "wb")
+            # Verify bioblend was called with use_default_filename=False
+            mock_galaxy_instance.datasets.download_dataset.assert_called_once_with(
+                dataset_id, use_default_filename=False, require_ok_state=True
+            )
 
     def test_download_dataset_not_ok_state(self, mock_galaxy_instance):
         """Test download fails when dataset not in ok state"""
