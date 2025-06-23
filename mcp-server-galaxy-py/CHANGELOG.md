@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2025-06-23
+
+### Fixed
+
+- `download_dataset` now handles read-only filesystem environments gracefully by downloading to memory when no file path is specified
+- Fixed Makefile `make dev` command to work with current uv version by removing unsupported `--from` flag
+
+### Improved
+
+- Enhanced `download_dataset` documentation with explicit LLM guidance for filesystem access requirements
+- Added clear messaging about memory vs. filesystem download modes with suggested filename support
+- Updated function signature to provide better error handling and user feedback
+
 ## [1.0.0] - 2025-06-22
 
 ### Added
