@@ -476,19 +476,67 @@ def get_user() -> dict[str, Any]:
 
 
 @mcp.tool()
-def get_histories() -> list[dict[str, Any]]:
+def get_histories(
+    limit: int | None = None, offset: int = 0, name: str | None = None
+) -> dict[str, Any]:
     """
-    Get list of user histories
+    Get paginated list of user histories
+
+    Args:
+        limit: Maximum number of histories to return (default: None for all histories)
+        offset: Number of histories to skip from the beginning (default: 0, for pagination)
+        name: Filter histories by name pattern (optional, case-sensitive partial match)
 
     Returns:
-        List of histories, where each history is a dictionary containing
-        'id', 'name', and other fields
+        Dictionary containing list of histories and pagination metadata
     """
     ensure_connected()
 
     try:
-        histories = galaxy_state["gi"].histories.get_histories()
-        return histories
+        # Get histories with pagination and optional filtering
+        histories = galaxy_state["gi"].histories.get_histories(
+            limit=limit, offset=offset, name=name
+        )
+
+        # If pagination is used, get total count for metadata
+        if limit is not None:
+            # Get total count without pagination
+            all_histories = galaxy_state["gi"].histories.get_histories(name=name)
+            total_items = len(all_histories) if all_histories else 0
+
+            # Calculate pagination metadata
+            has_next = (offset + limit) < total_items
+            has_previous = offset > 0
+            current_page = (offset // limit) + 1 if limit > 0 else 1
+            total_pages = ((total_items - 1) // limit) + 1 if limit > 0 and total_items > 0 else 1
+
+            pagination = {
+                "total_items": total_items,
+                "returned_items": len(histories),
+                "limit": limit,
+                "offset": offset,
+                "current_page": current_page,
+                "total_pages": total_pages,
+                "has_next": has_next,
+                "has_previous": has_previous,
+                "next_offset": offset + limit if has_next else None,
+                "previous_offset": max(0, offset - limit) if has_previous else None,
+                "helper_text": f"Page {current_page} of {total_pages}. "
+                + (
+                    f"Use offset={offset + limit} for next page."
+                    if has_next
+                    else "This is the last page."
+                ),
+            }
+        else:
+            # No pagination requested, return simple count
+            pagination = {
+                "total_items": len(histories),
+                "returned_items": len(histories),
+                "paginated": False,
+            }
+
+        return {"histories": histories, "pagination": pagination}
     except Exception as e:
         raise ValueError(
             f"Failed to get histories: {str(e)}. "
@@ -521,14 +569,23 @@ def list_history_ids() -> list[dict[str, str]]:
 @mcp.tool()
 def get_history_details(history_id: str) -> dict[str, Any]:
     """
-    Get detailed information about a specific history, including datasets
+    Get history metadata and summary count ONLY - does not return actual datasets
+
+    This function provides quick access to history information without loading all datasets.
+    For the actual datasets/contents, use get_history_contents() which supports
+    pagination and ordering.
 
     Args:
         history_id: Galaxy history ID - a hexadecimal hash string identifying the history
                    (e.g., '1cd8e2f6b131e5aa', typically 16 characters)
 
     Returns:
-        Dictionary containing history metadata and list of datasets within the history
+        Dictionary containing:
+        - history: Basic history metadata (name, id, state, etc.)
+        - contents_summary: Just the count of datasets, not the datasets themselves
+
+        To get actual datasets: Use get_history_contents(history_id, limit=N,
+                                         order="create_time-dsc")
     """
     ensure_connected()
 
@@ -539,11 +596,18 @@ def get_history_details(history_id: str) -> dict[str, Any]:
         history_info = galaxy_state["gi"].histories.show_history(history_id, contents=False)
         logger.info(f"Successfully retrieved history info: {history_info.get('name', 'Unknown')}")
 
-        # Get history contents (datasets)
-        contents = galaxy_state["gi"].histories.show_history(history_id, contents=True)
-        logger.info(f"Successfully retrieved {len(contents)} items from history")
+        # Get total count by calling without limit
+        all_contents = galaxy_state["gi"].histories.show_history(history_id, contents=True)
+        total_items = len(all_contents) if all_contents else 0
 
-        return {"history": history_info, "contents": contents}
+        return {
+            "history": history_info,
+            "contents_summary": {
+                "total_items": total_items,
+                "note": "This is just a count. To get actual datasets, use get_history_contents("
+                "history_id, limit=25, order='create_time-dsc') for newest datasets first.",
+            },
+        }
     except Exception as e:
         logger.error(f"Failed to get history details for ID '{history_id}': {str(e)}")
         if "404" in str(e) or "No route" in str(e):
@@ -551,6 +615,115 @@ def get_history_details(history_id: str) -> dict[str, Any]:
                 f"History ID '{history_id}' not found. Make sure to pass a valid history ID string."
             ) from e
         raise ValueError(f"Failed to get history details for ID '{history_id}': {str(e)}") from e
+
+
+@mcp.tool()
+def get_history_contents(
+    history_id: str,
+    limit: int = 100,
+    offset: int = 0,
+    deleted: bool = False,
+    visible: bool = True,
+    details: bool = False,
+    order: str = "hid-asc",
+) -> dict[str, Any]:
+    """
+    Get paginated contents (datasets) from a specific history with ordering support
+
+    Args:
+        history_id: Galaxy history ID - a hexadecimal hash string identifying the history
+                   (e.g., '1cd8e2f6b131e5aa', typically 16 characters)
+        limit: Maximum number of items to return per page (default: 100, max recommended: 500)
+        offset: Number of items to skip from the beginning (default: 0, for pagination)
+        deleted: Include deleted datasets in results (default: False)
+        visible: Include only visible datasets (default: True, set False to include hidden)
+        details: Include detailed metadata for each dataset (default: False, impacts performance)
+        order: Sort order for results. Options include:
+              - 'hid-asc': History ID ascending (default, oldest first)
+              - 'hid-dsc': History ID descending (newest first)
+              - 'create_time-dsc': Creation time descending (most recent first)
+              - 'create_time-asc': Creation time ascending (oldest first)
+              - 'update_time-dsc': Last updated descending (most recently modified first)
+              - 'name-asc': Dataset name ascending (alphabetical)
+
+    Returns:
+        Dictionary containing paginated dataset list, pagination metadata, and history reference
+    """
+    ensure_connected()
+
+    try:
+        logger.info(
+            f"Getting contents for history ID: {history_id} "
+            f"(limit={limit}, offset={offset}, order={order})"
+        )
+
+        # Use datasets API for better ordering support
+        contents = galaxy_state["gi"].datasets.get_datasets(
+            limit=limit,
+            offset=offset,
+            history_id=history_id,
+            order=order,
+            # Note: datasets API uses different parameter names
+            # deleted and visible filtering is done post-query if needed
+        )
+
+        # Filter by visibility and deleted status if needed
+        if not deleted:
+            contents = [item for item in contents if not item.get("deleted", False)]
+        if visible:
+            contents = [item for item in contents if item.get("visible", True)]
+
+        # Get total count for pagination metadata
+        all_contents = galaxy_state["gi"].datasets.get_datasets(
+            history_id=history_id,
+            order=order,
+        )
+
+        # Apply same filtering to total count
+        if not deleted:
+            all_contents = [item for item in all_contents if not item.get("deleted", False)]
+        if visible:
+            all_contents = [item for item in all_contents if item.get("visible", True)]
+
+        total_items = len(all_contents) if all_contents else 0
+
+        # Calculate pagination metadata
+        has_next = (offset + limit) < total_items
+        has_previous = offset > 0
+        current_page = (offset // limit) + 1 if limit > 0 else 1
+        total_pages = ((total_items - 1) // limit) + 1 if limit > 0 and total_items > 0 else 1
+
+        logger.info(f"Retrieved {len(contents)} items (page {current_page} of {total_pages})")
+
+        return {
+            "history_id": history_id,
+            "contents": contents,
+            "pagination": {
+                "total_items": total_items,
+                "returned_items": len(contents),
+                "limit": limit,
+                "offset": offset,
+                "current_page": current_page,
+                "total_pages": total_pages,
+                "has_next": has_next,
+                "has_previous": has_previous,
+                "next_offset": offset + limit if has_next else None,
+                "previous_offset": max(0, offset - limit) if has_previous else None,
+                "helper_text": f"Showing page {current_page} of {total_pages}. "
+                + (
+                    f"Use offset={offset + limit} for next page."
+                    if has_next
+                    else "This is the last page."
+                ),
+            },
+        }
+    except Exception as e:
+        logger.error(f"Failed to get history contents for ID '{history_id}': {str(e)}")
+        if "404" in str(e) or "No route" in str(e):
+            raise ValueError(
+                f"History ID '{history_id}' not found. Make sure to pass a valid history ID string."
+            ) from e
+        raise ValueError(f"Failed to get history contents for ID '{history_id}': {str(e)}") from e
 
 
 @mcp.tool()

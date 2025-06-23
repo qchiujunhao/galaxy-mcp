@@ -10,6 +10,7 @@ from galaxy_mcp.server import (
     galaxy_state,
     get_dataset_details,
     get_histories,
+    get_history_contents,
     get_history_details,
     get_invocations,
     get_iwc_workflows,
@@ -44,6 +45,7 @@ download_dataset_fn = get_function(download_dataset)
 filter_tools_by_dataset_fn = get_function(filter_tools_by_dataset)
 get_dataset_details_fn = get_function(get_dataset_details)
 get_histories_fn = get_function(get_histories)
+get_history_contents_fn = get_function(get_history_contents)
 get_history_details_fn = get_function(get_history_details)
 get_iwc_workflows_fn = get_function(get_iwc_workflows)
 get_job_details_fn = get_function(get_job_details)
@@ -68,6 +70,7 @@ __all__ = [
     "filter_tools_by_dataset_fn",
     "get_dataset_details_fn",
     "get_histories_fn",
+    "get_history_contents_fn",
     "get_history_details_fn",
     "get_iwc_workflows_fn",
     "get_job_details_fn",

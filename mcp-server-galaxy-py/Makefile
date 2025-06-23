@@ -48,4 +48,4 @@ run:
 
 # Run FastMCP2 dev server
 dev:
-	uv run --from . fastmcp dev src/galaxy_mcp/server.py
+	uv run fastmcp dev src/galaxy_mcp/server.py

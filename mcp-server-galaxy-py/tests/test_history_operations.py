@@ -2,7 +2,7 @@
 Test history-related operations
 """
 
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import pytest
 
@@ -18,23 +18,28 @@ class TestHistoryOperations:
     """Test history operations"""
 
     def test_get_histories_fn(self, mcp_server_instance, mock_galaxy_instance):
-        """Test get_histories returns list of histories"""
+        """Test get_histories returns paginated results"""
         with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
-            histories = get_histories_fn()
+            result = get_histories_fn()
 
-            assert isinstance(histories, list)
-            assert len(histories) == 2
-            assert histories[0]["id"] == "test_history_1"
-            assert histories[0]["name"] == "Test History 1"
+            assert isinstance(result, dict)
+            assert "histories" in result
+            assert "pagination" in result
+            assert len(result["histories"]) == 2
+            assert result["histories"][0]["id"] == "test_history_1"
+            assert result["histories"][0]["name"] == "Test History 1"
+            assert result["pagination"]["total_items"] == 2
+            assert result["pagination"]["paginated"] is False
 
     def test_get_histories_empty(self, mock_galaxy_instance):
         """Test get_histories with no histories"""
         mock_galaxy_instance.histories.get_histories.return_value = []
 
         with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
-            histories = get_histories_fn()
+            result = get_histories_fn()
 
-            assert histories == []
+            assert result["histories"] == []
+            assert result["pagination"]["total_items"] == 0
 
     def test_list_history_ids_fn(self, mock_galaxy_instance):
         """Test list_history_ids returns simplified list"""
@@ -49,17 +54,19 @@ class TestHistoryOperations:
     def test_get_history_details_fn(self, mock_galaxy_instance):
         """Test get_history_details with valid ID"""
         mock_galaxy_instance.histories.show_history.side_effect = [
-            {"id": "test_history_1", "name": "Test History 1", "state": "ok"},
-            ["dataset1", "dataset2"],  # Contents
+            {"id": "test_history_1", "name": "Test History 1", "state": "ok"},  # History info
+            ["dataset1", "dataset2"],  # All contents for count
         ]
 
         with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
             result = get_history_details_fn("test_history_1")
 
             assert "history" in result
-            assert "contents" in result
+            assert "contents_summary" in result
             assert result["history"]["id"] == "test_history_1"
-            assert len(result["contents"]) == 2
+            assert result["contents_summary"]["total_items"] == 2
+            assert "get_history_contents(" in result["contents_summary"]["note"]
+            assert "create_time-dsc" in result["contents_summary"]["note"]
 
     def test_get_history_details_with_dict_string(self, mock_galaxy_instance):
         """Test get_history_details treats dict string as regular ID (should fail)"""
@@ -95,3 +102,119 @@ class TestHistoryOperations:
 
             with pytest.raises(Exception):
                 get_history_details_fn("any_id")
+
+    def test_get_history_contents_paginated(self, mock_galaxy_instance):
+        """Test get_history_contents with pagination"""
+        # Mock datasets API calls
+        mock_galaxy_instance.datasets.get_datasets.side_effect = [
+            [
+                {"id": "dataset1", "visible": True, "deleted": False},
+                {"id": "dataset2", "visible": True, "deleted": False},
+            ],  # Paginated contents
+            [
+                {"id": "dataset1", "visible": True, "deleted": False},
+                {"id": "dataset2", "visible": True, "deleted": False},
+                {"id": "dataset3", "visible": True, "deleted": False},
+                {"id": "dataset4", "visible": True, "deleted": False},
+                {"id": "dataset5", "visible": True, "deleted": False},
+            ],  # Total contents
+        ]
+
+        with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
+            from tests.test_helpers import get_history_contents_fn
+
+            result = get_history_contents_fn("test_history_1", limit=2, offset=0)
+
+            assert "contents" in result
+            assert "pagination" in result
+            assert result["history_id"] == "test_history_1"
+            assert len(result["contents"]) == 2
+            assert result["pagination"]["total_items"] == 5
+            assert result["pagination"]["current_page"] == 1
+            assert result["pagination"]["has_next"] is True
+            assert result["pagination"]["has_previous"] is False
+            assert result["pagination"]["next_offset"] == 2
+
+    def test_get_history_contents_no_pagination(self, mock_galaxy_instance):
+        """Test get_history_contents without pagination (default)"""
+        mock_galaxy_instance.datasets.get_datasets.side_effect = [
+            [
+                {"id": "dataset1", "visible": True, "deleted": False},
+                {"id": "dataset2", "visible": True, "deleted": False},
+                {"id": "dataset3", "visible": True, "deleted": False},
+            ],  # All contents
+            [
+                {"id": "dataset1", "visible": True, "deleted": False},
+                {"id": "dataset2", "visible": True, "deleted": False},
+                {"id": "dataset3", "visible": True, "deleted": False},
+            ],  # Total contents (same)
+        ]
+
+        with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
+            from tests.test_helpers import get_history_contents_fn
+
+            result = get_history_contents_fn("test_history_1")
+
+            assert len(result["contents"]) == 3
+            assert result["pagination"]["total_items"] == 3
+            assert result["pagination"]["has_next"] is False
+            assert result["pagination"]["has_previous"] is False
+
+    def test_get_history_contents_most_recent_first(self, mock_galaxy_instance):
+        """Test get_history_contents with ordering for most recent datasets"""
+        mock_galaxy_instance.datasets.get_datasets.side_effect = [
+            [
+                {
+                    "id": "dataset5",
+                    "create_time": "2023-12-01T10:00:00",
+                    "visible": True,
+                    "deleted": False,
+                },
+                {
+                    "id": "dataset4",
+                    "create_time": "2023-11-30T09:00:00",
+                    "visible": True,
+                    "deleted": False,
+                },
+            ],  # Most recent first
+            [
+                {
+                    "id": "dataset5",
+                    "create_time": "2023-12-01T10:00:00",
+                    "visible": True,
+                    "deleted": False,
+                },
+                {
+                    "id": "dataset4",
+                    "create_time": "2023-11-30T09:00:00",
+                    "visible": True,
+                    "deleted": False,
+                },
+                {
+                    "id": "dataset3",
+                    "create_time": "2023-11-29T08:00:00",
+                    "visible": True,
+                    "deleted": False,
+                },
+            ],  # All contents
+        ]
+
+        with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
+            from tests.test_helpers import get_history_contents_fn
+
+            result = get_history_contents_fn("test_history_1", limit=2, order="create_time-dsc")
+
+            assert len(result["contents"]) == 2
+            assert result["contents"][0]["id"] == "dataset5"  # Most recent first
+            assert result["contents"][1]["id"] == "dataset4"
+            assert result["pagination"]["total_items"] == 3
+
+            # Verify datasets API was called with correct order parameter for pagination
+            calls = mock_galaxy_instance.datasets.get_datasets.call_args_list
+            assert len(calls) == 2
+            # First call should be the paginated call
+            assert calls[0] == call(
+                limit=2, offset=0, history_id="test_history_1", order="create_time-dsc"
+            )
+            # Second call should be for total count
+            assert calls[1] == call(history_id="test_history_1", order="create_time-dsc")
