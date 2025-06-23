@@ -259,19 +259,25 @@ The project uses Release Drafter to automatically create draft releases. Follow 
 3. **Commit and push changes**
    ```bash
    git add CHANGELOG.md pyproject.toml
-   git commit -m "Prepare for X.Y.Z release"
+   git commit -m "Bump version to X.Y.Z"
    git push
    ```
 
-4. **Curate and publish the release**
+4. **Trigger Release Drafter (if needed)**
+   ```bash
+   # Manually trigger Release Drafter to update the draft with latest commits
+   gh workflow run "Release Drafter"
+   ```
+
+5. **Curate and publish the release**
    - Go to https://github.com/galaxyproject/galaxy-mcp/releases
    - Find the draft release created by Release Drafter
    - Edit the release notes to match your changelog entries
-   - Update the tag to match your version (e.g., `v1.0.0`)
+   - Verify the tag matches your version (e.g., `v1.0.0`)
    - Update the title (e.g., `v1.0.0`)
    - Click "Publish release"
 
-5. **Verify deployment**
+6. **Verify deployment**
    - GitHub Actions will automatically build and publish to PyPI
    - Check https://pypi.org/project/galaxy-mcp/ for the new version
    - Test installation: `pip install galaxy-mcp==X.Y.Z`
