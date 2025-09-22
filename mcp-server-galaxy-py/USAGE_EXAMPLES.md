@@ -125,6 +125,115 @@ matching_workflows = search_iwc_workflows("RNA-seq")
 imported = import_workflow_from_iwc("github.com/galaxyproject/iwc/tree/main/workflows/epigenetics/chipseq-pe")
 ```
 
+#### List and manage workflows
+
+```python
+# List all workflows available in your Galaxy instance
+workflows = list_workflows()
+print(f"Found {len(workflows['workflows'])} workflows")
+
+# Filter workflows by name or published status
+published_workflows = list_workflows(published=True)
+my_workflows = list_workflows(name="RNA-seq")
+
+# Get detailed information about a specific workflow
+workflow_id = workflows["workflows"][0]["id"]
+details = get_workflow_details(workflow_id)
+print(f"Workflow: {details['workflow']['name']}")
+print(f"Steps: {len(details['workflow']['steps'])}")
+```
+
+#### Run (invoke) workflows
+
+```python
+# Get workflow details to understand input requirements
+workflow_id = "your-workflow-id"
+details = get_workflow_details(workflow_id)
+
+# Examine workflow inputs
+inputs_info = details["workflow"]["inputs"]
+for input_id, input_details in inputs_info.items():
+    print(f"Input {input_id}: {input_details['label']}")
+
+# Prepare input mapping - datasets from your history
+# Format: {'step_index': {'id': 'dataset_id', 'src': 'source_type'}}
+workflow_inputs = {
+    "0": {"id": "your-dataset-id", "src": "hda"}  # hda = HistoryDatasetAssociation
+}
+
+# Optional: parameter overrides for tools in the workflow
+workflow_params = {
+    "1": {"param_name": "custom_value"}  # Override parameters for step 1
+}
+
+# Invoke the workflow
+invocation = invoke_workflow(
+    workflow_id=workflow_id,
+    inputs=workflow_inputs,
+    params=workflow_params,
+    history_id="target-history-id"  # Where to store outputs
+)
+
+print(f"Workflow invocation started: {invocation['invocation']['id']}")
+print(f"Status: {invocation['invocation']['state']}")
+```
+
+#### Monitor and manage workflow invocations
+
+```python
+# Check status of a specific invocation
+invocation_id = "your-invocation-id"
+status = get_invocations(invocation_id=invocation_id)
+print(f"Invocation state: {status['invocation']['state']}")
+
+# List all invocations for a workflow
+all_invocations = get_invocations(workflow_id=workflow_id)
+
+# List invocations in a specific history
+history_invocations = get_invocations(history_id="your-history-id")
+
+# Cancel a running workflow if needed
+if status["invocation"]["state"] in ["new", "ready", "running"]:
+    cancelled = cancel_workflow_invocation(invocation_id)
+    print(f"Workflow cancelled: {cancelled['cancelled']}")
+```
+
+#### Complete workflow execution example
+
+```python
+# 1. Connect and set up
+connect()
+history = create_history("Workflow Analysis Results")
+history_id = history["id"]
+
+# 2. Upload input data
+uploaded = upload_file("/path/to/input.fastq", history_id)
+dataset_id = uploaded["dataset_id"]
+
+# 3. Find and examine a workflow
+workflows = list_workflows(name="RNA-seq")
+if workflows["workflows"]:
+    workflow_id = workflows["workflows"][0]["id"]
+
+    # Get workflow details to understand inputs
+    details = get_workflow_details(workflow_id)
+    print(f"Running workflow: {details['workflow']['name']}")
+
+    # 4. Run the workflow
+    invocation = invoke_workflow(
+        workflow_id=workflow_id,
+        inputs={"0": {"id": dataset_id, "src": "hda"}},
+        history_id=history_id
+    )
+
+    invocation_id = invocation["invocation"]["id"]
+    print(f"Workflow started with invocation ID: {invocation_id}")
+
+    # 5. Monitor progress
+    status = get_invocations(invocation_id=invocation_id)
+    print(f"Current status: {status['invocation']['state']}")
+```
+
 ## Common Patterns
 
 ### Pattern 1: Complete Analysis Pipeline
