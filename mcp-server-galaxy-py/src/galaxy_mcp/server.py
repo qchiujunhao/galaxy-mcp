@@ -1063,8 +1063,15 @@ def get_iwc_workflows() -> dict[str, Any]:
     try:
         response = requests.get("https://iwc.galaxyproject.org/workflow_manifest.json")
         response.raise_for_status()
-        workflows = response.json()[0]["workflows"]
-        return {"workflows": workflows}
+        manifest = response.json()
+
+        # Collect workflows from all manifest entries
+        all_workflows = []
+        for entry in manifest:
+            if "workflows" in entry:
+                all_workflows.extend(entry["workflows"])
+
+        return {"workflows": all_workflows}
     except Exception as e:
         raise ValueError(f"Failed to fetch IWC workflows: {str(e)}") from e
 
