@@ -177,10 +177,7 @@ def search_tools(query: str) -> dict[str, Any]:
         tools = galaxy_state["gi"].tools.get_tools(name=query)
         return {"tools": tools}
     except Exception as e:
-        raise ValueError(
-            f"Failed to search tools with query '{query}': {str(e)}. "
-            "Check that the Galaxy instance is accessible and the tool name is correct."
-        ) from e
+        raise ValueError(format_error("Search tools", e, {"query": query})) from e
 
 
 @mcp.tool()
@@ -203,9 +200,7 @@ def get_tool_details(tool_id: str, io_details: bool = False) -> dict[str, Any]:
         return tool_info
     except Exception as e:
         raise ValueError(
-            f"Failed to get tool details for ID '{tool_id}': {str(e)}. "
-            "Verify the tool ID is correct and the tool is installed on this "
-            "Galaxy instance."
+            format_error("Get tool details", e, {"tool_id": tool_id, "io_details": io_details})
         ) from e
 
 
@@ -235,7 +230,7 @@ def get_tool_citations(tool_id: str) -> dict[str, Any]:
             "citations": citations,
         }
     except Exception as e:
-        raise ValueError(f"Failed to get tool citations: {str(e)}") from e
+        raise ValueError(format_error("Get tool citations", e, {"tool_id": tool_id})) from e
 
 
 @mcp.tool()
@@ -260,15 +255,11 @@ def run_tool(history_id: str, tool_id: str, inputs: dict[str, Any]) -> dict[str,
         result = galaxy_state["gi"].tools.run_tool(history_id, tool_id, inputs)
         return result
     except Exception as e:
-        error_msg = f"Failed to run tool '{tool_id}' in history '{history_id}': {str(e)}"
-        if "400" in str(e) or "bad request" in str(e).lower():
-            error_msg += " Check that all required tool parameters are provided correctly."
-        elif "404" in str(e):
-            error_msg += " Verify the tool ID and history ID are valid."
-        else:
-            error_msg += " Check the tool inputs format matches the tool's requirements."
-
-        raise ValueError(error_msg) from e
+        raise ValueError(
+            format_error(
+                "Run tool", e, {"history_id": history_id, "tool_id": tool_id, "inputs": inputs}
+            )
+        ) from e
 
 
 @mcp.tool()
@@ -286,7 +277,7 @@ def get_tool_panel() -> dict[str, Any]:
         tool_panel = galaxy_state["gi"].tools.get_tool_panel()
         return {"tool_panel": tool_panel}
     except Exception as e:
-        raise ValueError(f"Failed to get tool panel: {str(e)}") from e
+        raise ValueError(format_error("Get tool panel", e)) from e
 
 
 @mcp.tool()
