@@ -67,7 +67,7 @@ details = get_history_details(history_id)
 #### Search for tools
 
 ```python
-tools = search_tools("fastqc")
+tools = search_tools_by_name("fastqc")
 # Returns: {"tools": [...]}
 ```
 
@@ -142,7 +142,7 @@ upload_file("/data/sample1_R1.fastq", history_id)
 upload_file("/data/sample1_R2.fastq", history_id)
 
 # 4. Search and run quality control
-qc_tools = search_tools("fastqc")
+qc_tools = search_tools_by_name("fastqc")
 tool_id = qc_tools["tools"][0]["id"]
 
 # 5. Get history contents to find dataset IDs
@@ -196,7 +196,7 @@ if target_history:
 
 3. **"Tool not found" error**
     - Problem: Using incorrect tool ID format
-    - Solution: Use the full tool ID from `search_tools()` or `get_tool_panel()`
+    - Solution: Use the full tool ID from `search_tools_by_name()` or `get_tool_panel()`
 
 ## Best Practices
 

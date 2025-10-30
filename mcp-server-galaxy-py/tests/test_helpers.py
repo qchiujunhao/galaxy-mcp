@@ -24,7 +24,7 @@ from galaxy_mcp.server import (
     run_tool,
     search_iwc_workflows,
     search_tool_by_keywords,
-    search_tools,
+    search_tools_by_name,
     upload_file,
 )
 
@@ -59,7 +59,7 @@ import_workflow_from_iwc_fn = get_function(import_workflow_from_iwc)
 list_history_ids_fn = get_function(list_history_ids)
 run_tool_fn = get_function(run_tool)
 search_iwc_workflows_fn = get_function(search_iwc_workflows)
-search_tools_fn = get_function(search_tools)
+search_tools_fn = get_function(search_tools_by_name)
 upload_file_fn = get_function(upload_file)
 
 # Re-export non-wrapped items
