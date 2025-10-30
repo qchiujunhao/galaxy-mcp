@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from .test_helpers import search_tool_by_keywords_fn, galaxy_state
+from .test_helpers import galaxy_state, search_tool_by_keywords_fn
 
 
 class TestsearchTools:
