@@ -161,9 +161,9 @@ def connect(url: str | None = None, api_key: str | None = None) -> dict[str, Any
 
 
 @mcp.tool()
-def search_tools(query: str) -> dict[str, Any]:
+def search_tools_by_name(query: str) -> dict[str, Any]:
     """
-    Search for tools in Galaxy
+    Search Galaxy tools whose name contains the given query (substring match).
 
     Args:
         query: Search query (tool name to filter on)
@@ -328,24 +328,27 @@ def create_history(history_name: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-def filter_tools_by_dataset(dataset_type: list[str]) -> dict[str, Any]:
+def search_tool_by_keywords(keywords: list[str]) -> dict[str, Any]:
     """
-    Filter Galaxy tools that are potentially suitable for a given dataset type.
+    Recommend Galaxy tools based on a list of keywords.
 
     Args:
-        dataset_type (list[str]): A list of keywords or phrases describing the dataset type,
-                                e.g., ['csv', 'tsv']. if the dataset type is csv or tsv,
-                                please provide ['csv', 'tabular'] or ['tsv', 'tabular'].
+        keywords (list[str]): A list of keywords or phrases describing what you're looking for,
+            e.g., ["csv", "rna", "alignment", "visualization"]. The search will match tools
+            whose name, description, or accepted input formats contain any of these keywords.
 
     Returns:
-        dict: A dictionary containing the list of recommended tools and the total count.
+        dict: {
+            "recommended_tools": [ {id, name, description, versions}, ... ],
+            "count": <number_of_tools>
+        }
     """
 
     ensure_connected()
 
     lock = threading.Lock()
 
-    dataset_keywords = [dt.lower() for dt in dataset_type]
+    keywords_lower = [k.lower() for k in keywords]
 
     try:
         tool_panel = galaxy_state["gi"].tools.get_tool_panel()
@@ -372,8 +375,8 @@ def filter_tools_by_dataset(dataset_type: list[str]) -> dict[str, Any]:
         for tool in all_tools:
             name = (tool.get("name") or "").lower()
             description = (tool.get("description") or "").lower()
-            if any(kw in name for kw in dataset_keywords) or any(
-                kw in description for kw in dataset_keywords
+            if any(kw in name for kw in keywords_lower) or any(
+                kw in description for kw in keywords_lower
             ):
                 recommended_tools.append(tool)
             else:
@@ -396,12 +399,12 @@ def filter_tools_by_dataset(dataset_type: list[str]) -> dict[str, Any]:
                     # 'extensions' might be a list or a string.
                     if isinstance(fmt, list):
                         for ext in fmt:
-                            if ext and any(kw in ext.lower() for kw in dataset_keywords):
+                            if ext and any(kw in ext.lower() for kw in keywords_lower):
                                 return tool
                     elif (
                         isinstance(fmt, str)
                         and fmt
-                        and any(kw in fmt.lower() for kw in dataset_keywords)
+                        and any(kw in fmt.lower() for kw in keywords_lower)
                     ):
                         return tool
                 return None
