@@ -95,7 +95,7 @@ See [USAGE_EXAMPLES.md](USAGE_EXAMPLES.md) for detailed usage patterns and commo
 The Python implementation provides the following MCP tools:
 
 - `connect`: Establish connection to a Galaxy instance
-- `search_tools`: Find Galaxy tools by name
+- `search_tools_by_name`: Find Galaxy tools by name
 - `get_tool_details`: Retrieve detailed tool information
 - `run_tool`: Execute a Galaxy tool with parameters
 - `get_tool_panel`: Retrieve the Galaxy tool panel structure

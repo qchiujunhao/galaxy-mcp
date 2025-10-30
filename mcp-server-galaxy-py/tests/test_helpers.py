@@ -29,7 +29,7 @@ from galaxy_mcp.server import (
     run_tool,
     search_iwc_workflows,
     search_tool_by_keywords,
-    search_tools,
+    search_tools_by_name,
     upload_file,
     upload_file_from_url,
 )
@@ -70,7 +70,7 @@ list_history_ids_fn = get_function(list_history_ids)
 list_workflows_fn = get_function(list_workflows)
 run_tool_fn = get_function(run_tool)
 search_iwc_workflows_fn = get_function(search_iwc_workflows)
-search_tools_fn = get_function(search_tools)
+search_tools_fn = get_function(search_tools_by_name)
 upload_file_fn = get_function(upload_file)
 upload_file_from_url_fn = get_function(upload_file_from_url)
 
