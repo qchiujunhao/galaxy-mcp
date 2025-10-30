@@ -433,7 +433,7 @@ def search_tool_by_keywords(keywords: list[str]) -> dict[str, Any]:
             )
         return {"recommended_tools": slim_tools, "count": len(slim_tools)}
     except Exception as e:
-        raise ValueError(f"Failed to filter tools based on dataset: {str(e)}") from e
+        raise ValueError(f"Failed to search tools based on dataset: {str(e)}") from e
 
 
 @mcp.tool()
