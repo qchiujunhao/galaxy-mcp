@@ -23,7 +23,7 @@ from galaxy_mcp.server import (
     list_history_ids,
     run_tool,
     search_iwc_workflows,
-    search_tool_by_keywords,
+    search_tools_by_keywords,
     search_tools_by_name,
     upload_file,
 )
@@ -42,7 +42,7 @@ def get_function(tool_or_function):
 connect_fn = get_function(connect)
 create_history_fn = get_function(create_history)
 download_dataset_fn = get_function(download_dataset)
-search_tool_by_keywords_fn = get_function(search_tool_by_keywords)
+search_tool_by_keywords_fn = get_function(search_tools_by_keywords)
 get_dataset_details_fn = get_function(get_dataset_details)
 get_histories_fn = get_function(get_histories)
 get_history_contents_fn = get_function(get_history_contents)
