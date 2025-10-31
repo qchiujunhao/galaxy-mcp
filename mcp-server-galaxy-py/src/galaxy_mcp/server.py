@@ -328,7 +328,7 @@ def create_history(history_name: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-def search_tool_by_keywords(keywords: list[str]) -> dict[str, Any]:
+def search_tools_by_keywords(keywords: list[str]) -> dict[str, Any]:
     """
     Recommend Galaxy tools based on a list of keywords.
 
