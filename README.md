@@ -63,15 +63,19 @@ mcp run main.py
   "mcpServers": {
     "galaxy-mcp": {
       "command": "uvx",
-      "args": ["galaxy-mcp"]
+      "args": ["galaxy-mcp"],
+      "env": {
+        "GALAXY_URL": "https://usegalaxy.org",
+        "GALAXY_API_KEY": "SECRETS"
+      }
     }
   }
 }
 ```
 - Under the developer menu, you should now see `galaxy-mcp` as running (you may need to restart Claude desktop)
 - Prompt Claude with "can you connect to galaxy"
-- It will ask for you API key - provide it with "use this for my Galaxy API key: XXXXXXXXX"
-- Talk to claude to work with your galaxy instance, e.g. "give a summary with my histories"
+- If you have not provided the optional env config you'll be asked for connection details which you can provide like "Use my Galaxy API key: XXXXXXX"
+- Talk to Claude to work with your galaxy instance, e.g. "give a summary with my histories"
 
   
 ## Development Guidelines
