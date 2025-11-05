@@ -52,6 +52,28 @@ pip install -r requirements.txt
 mcp run main.py
 ```
 
+## Connect to Claude Desktop
+- Ensure that GalaxyMCP runs with `uvx galaxy-mcp`
+- Add `export GALAXY_SERVER=https://usegalaxy.org` to your .bashrc (or equiv)
+- Download and install [claude desktop](https://www.claude.com/download)
+- Go to Settings -> Developer -> Edit Config
+- Add this to `claude_desktop_config.json`
+```
+{
+  "mcpServers": {
+    "galaxy-mcp": {
+      "command": "uvx",
+      "args": ["galaxy-mcp"]
+    }
+  }
+}
+```
+- Under the developer menu, you should now see `galaxy-mcp` as running (you may need to restart Claude desktop)
+- Prompt Claude with "can you connect to galaxy"
+- It will ask for you API key - provide it with "use this for my Galaxy API key: XXXXXXXXX"
+- Talk to claude to work with your galaxy instance, e.g. "give a summary with my histories"
+
+  
 ## Development Guidelines
 
 See the [Python implementation README](mcp-server-galaxy-py/README.md) for specific instructions and documentation.
