@@ -6,7 +6,12 @@ from unittest.mock import patch
 
 import pytest
 
-from .test_helpers import galaxy_state, run_tool_fn, search_tools_fn
+from .test_helpers import (
+    galaxy_state,
+    get_tool_run_examples_fn,
+    run_tool_fn,
+    search_tools_fn,
+)
 
 
 class TestToolOperations:
@@ -99,3 +104,33 @@ class TestToolOperations:
 
             with pytest.raises(Exception):
                 run_tool_fn("history_1", "tool1", {})
+
+    def test_get_tool_run_examples(self, mock_galaxy_instance):
+        """Test retrieving tool usage lessons"""
+        mock_galaxy_instance.tools.get_tool_tests.return_value = [
+            {
+                "name": "Test-1",
+                "tool_id": "tool1",
+                "tool_version": "1.0",
+                "inputs": {"param": ["value"]},
+                "outputs": [{"name": "out_file1", "value": "dataset.txt"}],
+            }
+        ]
+
+        with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
+            result = get_tool_run_examples_fn("tool1", "1.0")
+
+        assert result["count"] == 1
+        assert result["requested_version"] == "1.0"
+        assert result["test_cases"][0]["name"] == "Test-1"
+        mock_galaxy_instance.tools.get_tool_tests.assert_called_once_with(
+            "tool1", tool_version="1.0"
+        )
+
+    def test_get_tool_run_examples_error(self, mock_galaxy_instance):
+        """Test error handling when fetching tool run lessons fails"""
+        mock_galaxy_instance.tools.get_tool_tests.side_effect = Exception("Boom")
+
+        with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
+            with pytest.raises(ValueError, match="Get tool run examples failed"):
+                get_tool_run_examples_fn("tool1")
