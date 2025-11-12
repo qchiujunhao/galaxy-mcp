@@ -34,6 +34,7 @@ def mock_galaxy_instance():
         {"id": "tool1", "name": "Test Tool 1"},
         {"id": "tool2", "name": "Test Tool 2"},
     ]
+    mock_tools.get_tool_tests.return_value = []
     mock_gi.tools = mock_tools
 
     # Mock workflows
