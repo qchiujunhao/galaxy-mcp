@@ -1104,7 +1104,7 @@ def search_iwc_workflows(query: str) -> dict[str, Any]:
                 or query in description
                 or (tags and any(query in tag for tag in tags))
             ):
-                results.append(workflow)
+                results.append({"trsID": workflow["trsID"], "name": name, "description": description, "tags": tags})
 
         return {"workflows": results, "count": len(results)}
     except Exception as e:
