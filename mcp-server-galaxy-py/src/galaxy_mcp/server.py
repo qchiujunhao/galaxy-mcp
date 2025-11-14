@@ -996,6 +996,48 @@ def upload_file(path: str, history_id: str | None = None) -> dict[str, Any]:
 
 
 @mcp.tool()
+def upload_file_from_url(
+    url: str,
+    history_id: str | None = None,
+    file_type: str = "auto",
+    dbkey: str = "?",
+    file_name: str | None = None,
+) -> dict[str, Any]:
+    """
+    Upload a file from a URL to Galaxy
+
+    Args:
+        url: URL of the file to upload (e.g., 'https://example.com/data.fasta')
+        history_id: Galaxy history ID where to upload the file - optional, uses current history
+                   (e.g., '1cd8e2f6b131e5aa', typically 16 characters)
+        file_type: Galaxy file format name (default: 'auto' for auto-detection)
+                  Common types: 'fasta', 'fastq', 'bam', 'vcf', 'bed', 'tabular', etc.
+        dbkey: Database key/genome build (default: '?', e.g., 'hg38', 'mm10', 'dm6')
+        file_name: Optional name for the uploaded file in Galaxy (inferred from URL if not provided)
+
+    Returns:
+        Dictionary containing upload status and information about the created dataset(s)
+    """
+    ensure_connected()
+
+    try:
+        # Prepare kwargs for put_url
+        kwargs = {
+            "file_type": file_type,
+            "dbkey": dbkey,
+        }
+        if file_name:
+            kwargs["file_name"] = file_name
+
+        result = galaxy_state["gi"].tools.put_url(url, history_id=history_id, **kwargs)
+        return result
+    except Exception as e:
+        raise ValueError(
+            format_error("Upload file from URL", e, {"url": url, "history_id": history_id})
+        ) from e
+
+
+@mcp.tool()
 def get_invocations(
     invocation_id: str | None = None,
     workflow_id: str | None = None,
@@ -1046,10 +1088,10 @@ def get_invocations(
 
 @lru_cache
 def get_manifest_json():
-        response = requests.get("https://iwc.galaxyproject.org/workflow_manifest.json")
-        response.raise_for_status()
-        manifest = response.json()
-        return manifest
+    response = requests.get("https://iwc.galaxyproject.org/workflow_manifest.json")
+    response.raise_for_status()
+    manifest = response.json()
+    return manifest
 
 
 @mcp.tool()
@@ -1061,7 +1103,6 @@ def get_iwc_workflows() -> dict[str, Any]:
         Complete workflow manifest from IWC
     """
     try:
-
         manifest = get_manifest_json()
         # Collect workflows from all manifest entries
         all_workflows = []
@@ -1104,7 +1145,14 @@ def search_iwc_workflows(query: str) -> dict[str, Any]:
                 or query in description
                 or (tags and any(query in tag for tag in tags))
             ):
-                results.append({"trsID": workflow["trsID"], "name": name, "description": description, "tags": tags})
+                results.append(
+                    {
+                        "trsID": workflow["trsID"],
+                        "name": name,
+                        "description": description,
+                        "tags": tags,
+                    }
+                )
 
         return {"workflows": results, "count": len(results)}
     except Exception as e:
