@@ -3,6 +3,7 @@ import concurrent.futures
 import logging
 import os
 import threading
+from functools import lru_cache
 from typing import Any
 
 import requests
@@ -1043,6 +1044,14 @@ def get_invocations(
         raise ValueError(f"Failed to get workflow invocations: {str(e)}") from e
 
 
+@lru_cache
+def get_manifest_json():
+        response = requests.get("https://iwc.galaxyproject.org/workflow_manifest.json")
+        response.raise_for_status()
+        manifest = response.json()
+        return manifest
+
+
 @mcp.tool()
 def get_iwc_workflows() -> dict[str, Any]:
     """
@@ -1052,10 +1061,8 @@ def get_iwc_workflows() -> dict[str, Any]:
         Complete workflow manifest from IWC
     """
     try:
-        response = requests.get("https://iwc.galaxyproject.org/workflow_manifest.json")
-        response.raise_for_status()
-        manifest = response.json()
 
+        manifest = get_manifest_json()
         # Collect workflows from all manifest entries
         all_workflows = []
         for entry in manifest:
