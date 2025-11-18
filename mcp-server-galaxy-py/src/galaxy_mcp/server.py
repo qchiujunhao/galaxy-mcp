@@ -1135,15 +1135,21 @@ def search_iwc_workflows(query: str) -> dict[str, Any]:
         query = query.lower()
 
         for workflow in manifest:
-            # Check if query matches name, description or tags
-            name = workflow.get("definition", {}).get("name", "").lower()
-            description = workflow.get("definition", {}).get("annotation", "").lower()
-            tags = [tag.lower() for tag in workflow.get("definition", {}).get("tags", [])]
+            # Check if query matches name, description or tags (case-insensitive)
+            definition = workflow.get("definition", {})
+            name = definition.get("name", "")
+            description = definition.get("annotation", "")
+            tags = definition.get("tags", [])
+
+            # Lowercase for matching
+            name_lower = name.lower()
+            description_lower = description.lower()
+            tags_lower = [tag.lower() for tag in tags]
 
             if (
-                query in name
-                or query in description
-                or (tags and any(query in tag for tag in tags))
+                query in name_lower
+                or query in description_lower
+                or (tags_lower and any(query in tag for tag in tags_lower))
             ):
                 results.append(
                     {

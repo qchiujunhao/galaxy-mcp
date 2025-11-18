@@ -6,7 +6,13 @@ from unittest.mock import patch
 
 import pytest
 
-from .test_helpers import download_dataset_fn, galaxy_state, get_dataset_details_fn, upload_file_fn
+from .test_helpers import (
+    download_dataset_fn,
+    galaxy_state,
+    get_dataset_details_fn,
+    upload_file_fn,
+    upload_file_from_url_fn,
+)
 
 
 class TestDatasetOperations:
@@ -193,11 +199,58 @@ class TestDatasetOperations:
             with pytest.raises(ValueError, match="Dataset .* is in state 'running', not 'ok'"):
                 download_dataset_fn(dataset_id)
 
+    def test_upload_file_from_url(self, mock_galaxy_instance):
+        """Test file upload from URL"""
+        url = "https://example.com/data.fasta"
+        history_id = "test_history_1"
+
+        mock_galaxy_instance.tools.put_url.return_value = {
+            "outputs": [{"id": "new_dataset_1", "name": "data.fasta"}]
+        }
+
+        with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
+            result = upload_file_from_url_fn(
+                url, history_id=history_id, file_type="fasta", dbkey="hg38"
+            )
+
+            assert result["outputs"][0]["id"] == "new_dataset_1"
+            assert result["outputs"][0]["name"] == "data.fasta"
+            mock_galaxy_instance.tools.put_url.assert_called_once_with(
+                url, history_id=history_id, file_type="fasta", dbkey="hg38"
+            )
+
+    def test_upload_file_from_url_with_custom_name(self, mock_galaxy_instance):
+        """Test file upload from URL with custom filename"""
+        url = "https://example.com/data.txt"
+
+        mock_galaxy_instance.tools.put_url.return_value = {
+            "outputs": [{"id": "new_dataset_1", "name": "custom_name.txt"}]
+        }
+
+        with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
+            result = upload_file_from_url_fn(url, file_name="custom_name.txt", file_type="tabular")
+
+            assert result["outputs"][0]["name"] == "custom_name.txt"
+            mock_galaxy_instance.tools.put_url.assert_called_once_with(
+                url, history_id=None, file_type="tabular", dbkey="?", file_name="custom_name.txt"
+            )
+
+    def test_upload_file_from_url_error(self, mock_galaxy_instance):
+        """Test error handling for URL upload"""
+        mock_galaxy_instance.tools.put_url.side_effect = Exception("Upload failed")
+
+        with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
+            with pytest.raises(ValueError, match="Upload file from URL failed"):
+                upload_file_from_url_fn("https://example.com/data.txt")
+
     def test_dataset_operations_not_connected(self):
         """Test dataset operations fail when not connected"""
         with patch.dict(galaxy_state, {"connected": False}):
             with pytest.raises(ValueError, match="Not connected to Galaxy"):
                 upload_file_fn("/path/to/file.txt", "history_1")
+
+            with pytest.raises(ValueError, match="Not connected to Galaxy"):
+                upload_file_from_url_fn("https://example.com/data.txt")
 
             with pytest.raises(ValueError, match="Not connected to Galaxy"):
                 get_dataset_details_fn("dataset123")
