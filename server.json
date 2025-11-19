@@ -1,0 +1,38 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
+  "name": "io.github.galaxyproject/galaxy-mcp",
+  "description": "MCP server for Galaxy bioinformatics platform - connect, execute tools, and manage workflows",
+  "repository": {
+    "url": "https://github.com/galaxyproject/galaxy-mcp",
+    "source": "github"
+  },
+  "version": "1.1.0",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "galaxy-mcp",
+      "version": "1.1.0",
+      "command": "uvx",
+      "args": ["galaxy-mcp"],
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "description": "URL of the Galaxy instance to connect to (e.g., https://usegalaxy.org)",
+          "isRequired": true,
+          "format": "string",
+          "isSecret": false,
+          "name": "GALAXY_URL"
+        },
+        {
+          "description": "API key for authenticating with the Galaxy instance",
+          "isRequired": true,
+          "format": "string",
+          "isSecret": true,
+          "name": "GALAXY_API_KEY"
+        }
+      ]
+    }
+  ]
+}
