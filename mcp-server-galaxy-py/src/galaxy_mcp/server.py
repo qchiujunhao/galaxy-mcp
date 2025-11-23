@@ -1033,7 +1033,17 @@ def upload_file_from_url(
         return result
     except Exception as e:
         raise ValueError(
-            format_error("Upload file from URL", e, {"url": url, "history_id": history_id})
+            format_error(
+                "Upload file from URL",
+                e,
+                {
+                    "url": url,
+                    "history_id": history_id,
+                    "file_type": file_type,
+                    "dbkey": dbkey,
+                    "file_name": file_name,
+                },
+            )
         ) from e
 
 
@@ -1086,8 +1096,8 @@ def get_invocations(
         raise ValueError(f"Failed to get workflow invocations: {str(e)}") from e
 
 
-@lru_cache
-def get_manifest_json():
+@lru_cache(maxsize=1)
+def get_manifest_json() -> list[dict[str, Any]]:
     response = requests.get("https://iwc.galaxyproject.org/workflow_manifest.json")
     response.raise_for_status()
     manifest = response.json()
