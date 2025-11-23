@@ -2,7 +2,7 @@
 Test workflow-related operations
 """
 
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -24,8 +24,7 @@ class TestWorkflowOperations:
 
     def test_get_iwc_workflows_fn(self):
         """Test getting IWC workflows"""
-        mock_response = Mock()
-        mock_response.json.return_value = [
+        mock_manifest = [
             {
                 "workflows": [
                     {"trs_id": "workflow1", "definition": {"name": "Test Workflow 1"}},
@@ -33,9 +32,8 @@ class TestWorkflowOperations:
                 ]
             }
         ]
-        mock_response.raise_for_status.return_value = None
 
-        with patch("requests.get", return_value=mock_response):
+        with patch("galaxy_mcp.server.get_manifest_json", return_value=mock_manifest):
             result = get_iwc_workflows_fn()
 
             assert "workflows" in result
@@ -44,29 +42,31 @@ class TestWorkflowOperations:
 
     def test_search_iwc_workflows_fn(self):
         """Test searching IWC workflows"""
-        # Mock the get_iwc_workflows function since search calls it
-        mock_workflows = {
-            "workflows": [
-                {
-                    "trsID": "workflow-rna-seq",
-                    "definition": {
-                        "name": "RNA-seq Analysis",
-                        "annotation": "Analysis pipeline for RNA sequencing",
-                        "tags": ["rna", "transcriptomics"],
+        # Mock the manifest data that get_manifest_json returns
+        mock_manifest = [
+            {
+                "workflows": [
+                    {
+                        "trsID": "workflow-rna-seq",
+                        "definition": {
+                            "name": "RNA-seq Analysis",
+                            "annotation": "Analysis pipeline for RNA sequencing",
+                            "tags": ["rna", "transcriptomics"],
+                        },
                     },
-                },
-                {
-                    "trsID": "workflow-dna-variant",
-                    "definition": {
-                        "name": "DNA Variant Calling",
-                        "annotation": "Pipeline for calling variants from DNA sequencing",
-                        "tags": ["dna", "variants"],
+                    {
+                        "trsID": "workflow-dna-variant",
+                        "definition": {
+                            "name": "DNA Variant Calling",
+                            "annotation": "Pipeline for calling variants from DNA sequencing",
+                            "tags": ["dna", "variants"],
+                        },
                     },
-                },
-            ]
-        }
+                ]
+            }
+        ]
 
-        with patch("galaxy_mcp.server.get_iwc_workflows.fn", return_value=mock_workflows):
+        with patch("galaxy_mcp.server.get_manifest_json", return_value=mock_manifest):
             result = search_iwc_workflows_fn("rna")
 
             assert "workflows" in result
@@ -78,14 +78,16 @@ class TestWorkflowOperations:
 
     def test_import_workflow_from_iwc_fn(self, mock_galaxy_instance):
         """Test importing workflow from IWC"""
-        # Mock the get_iwc_workflows function to return a workflow with the test trsID
-        mock_workflows = {
-            "workflows": [
-                {"trsID": "test-workflow", "definition": {"name": "Test Workflow", "steps": []}}
-            ]
-        }
+        # Mock the manifest data that get_manifest_json returns
+        mock_manifest = [
+            {
+                "workflows": [
+                    {"trsID": "test-workflow", "definition": {"name": "Test Workflow", "steps": []}}
+                ]
+            }
+        ]
 
-        with patch("galaxy_mcp.server.get_iwc_workflows.fn", return_value=mock_workflows):
+        with patch("galaxy_mcp.server.get_manifest_json", return_value=mock_manifest):
             with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
                 mock_galaxy_instance.workflows.import_workflow_dict.return_value = {
                     "id": "imported_workflow_1",
