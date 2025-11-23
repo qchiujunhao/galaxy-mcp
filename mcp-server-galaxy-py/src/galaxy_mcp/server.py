@@ -3,6 +3,7 @@ import concurrent.futures
 import logging
 import os
 import threading
+from functools import lru_cache
 from typing import Any
 
 import requests
@@ -995,6 +996,58 @@ def upload_file(path: str, history_id: str | None = None) -> dict[str, Any]:
 
 
 @mcp.tool()
+def upload_file_from_url(
+    url: str,
+    history_id: str | None = None,
+    file_type: str = "auto",
+    dbkey: str = "?",
+    file_name: str | None = None,
+) -> dict[str, Any]:
+    """
+    Upload a file from a URL to Galaxy
+
+    Args:
+        url: URL of the file to upload (e.g., 'https://example.com/data.fasta')
+        history_id: Galaxy history ID where to upload the file - optional, uses current history
+                   (e.g., '1cd8e2f6b131e5aa', typically 16 characters)
+        file_type: Galaxy file format name (default: 'auto' for auto-detection)
+                  Common types: 'fasta', 'fastq', 'bam', 'vcf', 'bed', 'tabular', etc.
+        dbkey: Database key/genome build (default: '?', e.g., 'hg38', 'mm10', 'dm6')
+        file_name: Optional name for the uploaded file in Galaxy (inferred from URL if not provided)
+
+    Returns:
+        Dictionary containing upload status and information about the created dataset(s)
+    """
+    ensure_connected()
+
+    try:
+        # Prepare kwargs for put_url
+        kwargs = {
+            "file_type": file_type,
+            "dbkey": dbkey,
+        }
+        if file_name:
+            kwargs["file_name"] = file_name
+
+        result = galaxy_state["gi"].tools.put_url(url, history_id=history_id, **kwargs)
+        return result
+    except Exception as e:
+        raise ValueError(
+            format_error(
+                "Upload file from URL",
+                e,
+                {
+                    "url": url,
+                    "history_id": history_id,
+                    "file_type": file_type,
+                    "dbkey": dbkey,
+                    "file_name": file_name,
+                },
+            )
+        ) from e
+
+
+@mcp.tool()
 def get_invocations(
     invocation_id: str | None = None,
     workflow_id: str | None = None,
@@ -1043,6 +1096,14 @@ def get_invocations(
         raise ValueError(f"Failed to get workflow invocations: {str(e)}") from e
 
 
+@lru_cache(maxsize=1)
+def get_manifest_json() -> list[dict[str, Any]]:
+    response = requests.get("https://iwc.galaxyproject.org/workflow_manifest.json")
+    response.raise_for_status()
+    manifest = response.json()
+    return manifest
+
+
 @mcp.tool()
 def get_iwc_workflows() -> dict[str, Any]:
     """
@@ -1052,10 +1113,7 @@ def get_iwc_workflows() -> dict[str, Any]:
         Complete workflow manifest from IWC
     """
     try:
-        response = requests.get("https://iwc.galaxyproject.org/workflow_manifest.json")
-        response.raise_for_status()
-        manifest = response.json()
-
+        manifest = get_manifest_json()
         # Collect workflows from all manifest entries
         all_workflows = []
         for entry in manifest:
@@ -1087,17 +1145,30 @@ def search_iwc_workflows(query: str) -> dict[str, Any]:
         query = query.lower()
 
         for workflow in manifest:
-            # Check if query matches name, description or tags
-            name = workflow.get("definition", {}).get("name", "").lower()
-            description = workflow.get("definition", {}).get("annotation", "").lower()
-            tags = [tag.lower() for tag in workflow.get("definition", {}).get("tags", [])]
+            # Check if query matches name, description or tags (case-insensitive)
+            definition = workflow.get("definition", {})
+            name = definition.get("name", "")
+            description = definition.get("annotation", "")
+            tags = definition.get("tags", [])
+
+            # Lowercase for matching
+            name_lower = name.lower()
+            description_lower = description.lower()
+            tags_lower = [tag.lower() for tag in tags]
 
             if (
-                query in name
-                or query in description
-                or (tags and any(query in tag for tag in tags))
+                query in name_lower
+                or query in description_lower
+                or (tags_lower and any(query in tag for tag in tags_lower))
             ):
-                results.append(workflow)
+                results.append(
+                    {
+                        "trsID": workflow["trsID"],
+                        "name": name,
+                        "description": description,
+                        "tags": tags,
+                    }
+                )
 
         return {"workflows": results, "count": len(results)}
     except Exception as e:

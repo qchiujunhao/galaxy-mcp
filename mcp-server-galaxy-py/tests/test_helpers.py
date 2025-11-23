@@ -30,6 +30,7 @@ from galaxy_mcp.server import (
     search_iwc_workflows,
     search_tools,
     upload_file,
+    upload_file_from_url,
 )
 
 
@@ -69,6 +70,7 @@ run_tool_fn = get_function(run_tool)
 search_iwc_workflows_fn = get_function(search_iwc_workflows)
 search_tools_fn = get_function(search_tools)
 upload_file_fn = get_function(upload_file)
+upload_file_from_url_fn = get_function(upload_file_from_url)
 
 # Re-export non-wrapped items
 __all__ = [
@@ -98,6 +100,7 @@ __all__ = [
     "search_iwc_workflows_fn",
     "search_tools_fn",
     "upload_file_fn",
+    "upload_file_from_url_fn",
     "galaxy_state",
     "ensure_connected",
 ]

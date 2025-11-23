@@ -95,7 +95,10 @@ def mock_galaxy_instance():
 @pytest.fixture(autouse=True)
 def _reset_galaxy_state():
     """Reset galaxy state for each test"""
-    from galaxy_mcp.server import galaxy_state
+    from galaxy_mcp.server import galaxy_state, get_manifest_json
+
+    # Clear lru_cache to prevent test pollution
+    get_manifest_json.cache_clear()
 
     # Save original state
     original_state = galaxy_state.copy()
