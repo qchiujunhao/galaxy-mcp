@@ -53,7 +53,7 @@ class TestWorkflowOperations:
                         "name": "RNA-seq Analysis",
                         "annotation": "Analysis pipeline for RNA sequencing",
                         "tags": ["rna", "transcriptomics"],
-                    }
+                    },
                 },
                 {
                     "trsID": "workflow-dna-variant",
@@ -61,7 +61,7 @@ class TestWorkflowOperations:
                         "name": "DNA Variant Calling",
                         "annotation": "Pipeline for calling variants from DNA sequencing",
                         "tags": ["dna", "variants"],
-                    }
+                    },
                 },
             ]
         }
@@ -81,10 +81,7 @@ class TestWorkflowOperations:
         # Mock the get_iwc_workflows function to return a workflow with the test trsID
         mock_workflows = {
             "workflows": [
-                {
-                    "trsID": "test-workflow",
-                    "definition": {"name": "Test Workflow", "steps": []}
-                }
+                {"trsID": "test-workflow", "definition": {"name": "Test Workflow", "steps": []}}
             ]
         }
 
