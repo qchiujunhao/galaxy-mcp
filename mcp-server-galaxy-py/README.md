@@ -1,5 +1,7 @@
 # Galaxy MCP Server - Python Implementation
 
+<!-- mcp-name: io.github.galaxyproject/galaxy-mcp -->
+
 This is the Python implementation of the Galaxy MCP server, providing a Model Context Protocol server for interacting with Galaxy instances.
 
 ## Features
