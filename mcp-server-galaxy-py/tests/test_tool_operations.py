@@ -105,6 +105,9 @@ class TestToolOperations:
             with pytest.raises(Exception):
                 run_tool_fn("history_1", "tool1", {})
 
+            with pytest.raises(Exception):
+                get_tool_run_examples_fn("tool1")
+
     def test_get_tool_run_examples(self, mock_galaxy_instance):
         """Test retrieving tool usage lessons"""
         mock_galaxy_instance.tools.get_tool_tests.return_value = [
@@ -125,6 +128,20 @@ class TestToolOperations:
         assert result["test_cases"][0]["name"] == "Test-1"
         mock_galaxy_instance.tools.get_tool_tests.assert_called_once_with(
             "tool1", tool_version="1.0"
+        )
+
+    def test_get_tool_run_examples_no_version(self, mock_galaxy_instance):
+        """Test retrieving tool run examples without specifying version"""
+        mock_galaxy_instance.tools.get_tool_tests.return_value = []
+
+        with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
+            result = get_tool_run_examples_fn("tool1")
+
+        assert result["count"] == 0
+        assert result["requested_version"] is None
+        assert result["tool_id"] == "tool1"
+        mock_galaxy_instance.tools.get_tool_tests.assert_called_once_with(
+            "tool1", tool_version=None
         )
 
     def test_get_tool_run_examples_error(self, mock_galaxy_instance):

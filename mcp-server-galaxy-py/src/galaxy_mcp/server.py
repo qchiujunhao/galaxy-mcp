@@ -209,7 +209,7 @@ def get_tool_details(tool_id: str, io_details: bool = False) -> dict[str, Any]:
 def get_tool_run_examples(tool_id: str, tool_version: str | None = None) -> dict[str, Any]:
     """
     Return the exact XML test definitions (inputs, outputs, assertions, required files)
-        for a Galaxy tool so an LLM can study real, working run configurations.
+    for a Galaxy tool so an LLM can study real, working run configurations.
 
     Args:
         tool_id: ID of the tool to inspect
