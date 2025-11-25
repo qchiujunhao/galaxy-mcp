@@ -6,7 +6,7 @@ import threading
 from functools import lru_cache
 import types
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, cast
 
 import requests
 from bioblend.galaxy import GalaxyInstance
@@ -190,7 +190,7 @@ def _http_app_with_preflight(self, *args, **kwargs):
     return app
 
 
-mcp.http_app = types.MethodType(_http_app_with_preflight, mcp)
+mcp.http_app = types.MethodType(_http_app_with_preflight, mcp)  # type: ignore[method-assign]
 
 
 # Initialize Galaxy client if environment variables are set
@@ -966,20 +966,26 @@ def get_job_details(dataset_id: str, history_id: str | None = None) -> dict[str,
 
     try:
         # Get dataset provenance to find the creating job
-        try:
-            provenance = gi.histories.show_dataset_provenance(
-                history_id=history_id, dataset_id=dataset_id
-            )
-
-            # Extract job ID from provenance
-            job_id = provenance.get("job_id")
-            if not job_id:
-                raise ValueError(
-                    f"No job information found for dataset '{dataset_id}'. "
-                    "The dataset may not have been created by a job."
+        job_id: str | None = None
+        provenance_error: Exception | None = None
+        if history_id:
+            try:
+                provenance = gi.histories.show_dataset_provenance(
+                    history_id=history_id, dataset_id=dataset_id
                 )
 
-        except Exception as provenance_error:
+                # Extract job ID from provenance
+                job_id = provenance.get("job_id")
+                if not job_id:
+                    raise ValueError(
+                        f"No job information found for dataset '{dataset_id}'. "
+                        "The dataset may not have been created by a job."
+                    )
+
+            except Exception as exc:
+                provenance_error = exc
+
+        if not job_id:
             # If provenance fails, try getting dataset details which might contain job info
             try:
                 dataset_details = gi.datasets.show_dataset(dataset_id)
@@ -989,11 +995,12 @@ def get_job_details(dataset_id: str, history_id: str | None = None) -> dict[str,
                         f"No job information found for dataset '{dataset_id}'. "
                         "The dataset may not have been created by a job."
                     )
-            except Exception:
+            except Exception as dataset_error:
+                error_detail = str(provenance_error) if provenance_error else str(dataset_error)
                 raise ValueError(
                     f"Failed to get job information for dataset '{dataset_id}': "
-                    f"{str(provenance_error)}"
-                ) from provenance_error
+                    f"{error_detail}"
+                ) from (provenance_error or dataset_error)
 
         # Get job details using the Galaxy API directly
         # (Bioblend doesn't have a direct method for this)
@@ -1137,6 +1144,7 @@ def download_dataset(
             )
 
         # Download the dataset
+        result_path: str | bytes
         if file_path:
             # Download to specific path
             result_path = gi.datasets.download_dataset(
@@ -1222,7 +1230,8 @@ def upload_file(path: str, history_id: str | None = None) -> dict[str, Any]:
                 "Check that the file exists and you have read permissions."
             )
 
-        result = gi.tools.upload_file(path, history_id=history_id)
+        # BioBlend accepts None for history_id and uses the most recently used history
+        result = gi.tools.upload_file(path, history_id=history_id)  # type: ignore[arg-type]
         return result
     except Exception as e:
         raise ValueError(f"Failed to upload file: {str(e)}") from e
@@ -1604,7 +1613,7 @@ def run_http_server(
 ) -> None:
     """Run the MCP server over HTTP-based transport."""
     resolved_host = host or os.environ.get("GALAXY_MCP_HOST", "0.0.0.0")
-    resolved_port = int(port or os.environ.get("GALAXY_MCP_PORT", "8000"))
+    resolved_port = port if port is not None else int(os.environ.get("GALAXY_MCP_PORT", "8000"))
     resolved_transport = (
         transport or os.environ.get("GALAXY_MCP_TRANSPORT") or "streamable-http"
     ).lower()
@@ -1612,6 +1621,8 @@ def run_http_server(
         raise ValueError(
             f"Unsupported transport '{resolved_transport}'. Choose 'streamable-http' or 'sse'."
         )
+    # Type-safe cast after validation
+    http_transport = cast(Literal["streamable-http", "sse"], resolved_transport)
 
     resolved_path = path or os.environ.get("GALAXY_MCP_HTTP_PATH")
     if resolved_path is None and resolved_transport == "streamable-http":
@@ -1621,13 +1632,13 @@ def run_http_server(
 
     logger.info(
         "Starting Galaxy MCP server over %s at %s:%s%s",
-        resolved_transport,
+        http_transport,
         resolved_host,
         resolved_port,
         resolved_path or "",
     )
     mcp.run(
-        transport=resolved_transport,
+        transport=http_transport,
         host=resolved_host,
         port=resolved_port,
         path=resolved_path,
