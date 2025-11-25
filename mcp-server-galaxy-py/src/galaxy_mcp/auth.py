@@ -209,7 +209,7 @@ class GalaxyOAuthProvider(OAuthProvider):
             state=params.state,
             code_challenge=params.code_challenge,
             code_challenge_method=getattr(params, "code_challenge_method", "S256"),
-            scopes=params.scopes or self.required_scopes,
+            scopes=params.scopes if params.scopes else (self.required_scopes or []),
             created_at=time.time(),
         )
         self._transactions[txn_id] = transaction
@@ -248,7 +248,6 @@ class GalaxyOAuthProvider(OAuthProvider):
             code_challenge=payload["code_challenge"],
             redirect_uri=payload["redirect_uri"],
             redirect_uri_provided_explicitly=payload["redirect_uri_provided_explicitly"],
-            resource=None,
         )
 
     @override
@@ -321,17 +320,13 @@ class GalaxyOAuthProvider(OAuthProvider):
         if payload["exp"] < time.time():
             return None
 
-        galaxy_info = payload["galaxy"]
+        # Note: Galaxy session info is stored in payload["galaxy"] but FastMCP AccessToken
+        # doesn't support custom claims. Session retrieval uses get_active_session() instead.
         return FastMCPAccessToken(
             token=token,
             client_id=payload["client_id"],
             scopes=payload["scopes"],
             expires_at=payload["exp"],
-            claims={
-                "galaxy_url": galaxy_info["url"],
-                "username": galaxy_info["username"],
-                "user_email": galaxy_info.get("user_email"),
-            },
         )
 
     @override
@@ -370,12 +365,10 @@ class GalaxyOAuthProvider(OAuthProvider):
             metadata_paths.add(f"{normalized}{RESOURCE_METADATA_PATH}")
         return metadata_paths
 
-    @override
     async def handle_login(self, request: Request) -> Response:
         """Public wrapper for the login handler so it can be registered on FastMCP routes."""
         return await self._login_handler(request)
 
-    @override
     def get_resource_metadata(self) -> dict[str, Any]:
         """Return OAuth protected resource metadata."""
         return {
@@ -385,12 +378,10 @@ class GalaxyOAuthProvider(OAuthProvider):
             "token_types_supported": ["Bearer"],
         }
 
-    @override
     async def handle_resource_metadata(self, request: Request) -> Response:
         """Return OAuth protected resource metadata."""
         return JSONResponse(self.get_resource_metadata())
 
-    @override
     def get_routes(
         self, mcp_path: str | None = None, mcp_endpoint: Any | None = None
     ) -> list[Route]:
@@ -403,7 +394,7 @@ class GalaxyOAuthProvider(OAuthProvider):
         then install our own. This defensive dedupe also shields us from future FastMCP routing
         changes that might otherwise create duplicate routes and confusing behaviour.
         """
-        routes = super().get_routes(mcp_path, mcp_endpoint)
+        routes = super().get_routes(mcp_path, mcp_endpoint)  # type: ignore[misc]
 
         base_path = self._normalize_base_path(
             urlparse(str(self.base_url)).path if self.base_url else None
@@ -565,8 +556,10 @@ class GalaxyOAuthProvider(OAuthProvider):
             return self._render_login_form(transaction, error=request.query_params.get("error"))
 
         form = await request.form()
-        username = (form.get("username") or "").strip()
-        password = (form.get("password") or "").strip()
+        username_field = form.get("username")
+        password_field = form.get("password")
+        username = (username_field if isinstance(username_field, str) else "").strip()
+        password = (password_field if isinstance(password_field, str) else "").strip()
 
         if not username or not password:
             return self._render_login_form(transaction, error="Username and password are required.")
