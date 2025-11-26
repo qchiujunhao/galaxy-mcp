@@ -1,14 +1,14 @@
-"""Tests for search_tool_by_keywords functionality"""
+"""Tests for search_tools_by_keywords functionality"""
 
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from .test_helpers import galaxy_state, search_tool_by_keywords_fn
+from .test_helpers import galaxy_state, search_tools_by_keywords_fn
 
 
-class TestsearchTools:
-    """Test suite for search_tool_by_keywords function"""
+class TestSearchTools:
+    """Test suite for search_tools_by_keywords function"""
 
     @pytest.fixture()
     def mock_galaxy_instance(self):
@@ -58,7 +58,7 @@ class TestsearchTools:
         }
 
         with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
-            result = search_tool_by_keywords_fn(["csv"])
+            result = search_tools_by_keywords_fn(["csv"])
 
             assert "recommended_tools" in result
             assert "count" in result
@@ -76,7 +76,7 @@ class TestsearchTools:
         }
 
         with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
-            result = search_tool_by_keywords_fn(["csv", "tabular"])
+            result = search_tools_by_keywords_fn(["csv", "tabular"])
 
             assert "recommended_tools" in result
             assert "count" in result
@@ -100,7 +100,7 @@ class TestsearchTools:
         mock_galaxy_instance.tools.show_tool.side_effect = mock_show_tool
 
         with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
-            result = search_tool_by_keywords_fn(["csv"])
+            result = search_tools_by_keywords_fn(["csv"])
 
             # Generic tool should be included due to csv extension
             tool_ids = [tool["id"] for tool in result["recommended_tools"]]
@@ -111,15 +111,15 @@ class TestsearchTools:
         """Test that searching fails when not connected to Galaxy"""
         with patch.dict(galaxy_state, {"connected": False}):
             with pytest.raises(ValueError, match="Not connected to Galaxy"):
-                search_tool_by_keywords_fn(["csv"])
+                search_tools_by_keywords_fn(["csv"])
 
     def test_search_tools_handles_tool_panel_error(self, mock_galaxy_instance):
         """Test error handling when tool panel retrieval fails"""
         mock_galaxy_instance.tools.get_tool_panel.side_effect = Exception("API Error")
 
         with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
-            with pytest.raises(ValueError, match="Failed to search tools based on dataset"):
-                search_tool_by_keywords_fn(["csv"])
+            with pytest.raises(ValueError, match="Failed to search tools by keywords"):
+                search_tools_by_keywords_fn(["csv"])
 
     def test_search_tools_skips_label_tools(self, mock_galaxy_instance):
         """Test that tools with IDs ending in _label are skipped"""
@@ -136,7 +136,7 @@ class TestsearchTools:
         mock_galaxy_instance.tools.show_tool.return_value = {"inputs": [{"extensions": ["csv"]}]}
 
         with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
-            result = search_tool_by_keywords_fn(["csv"])
+            result = search_tools_by_keywords_fn(["csv"])
 
             # Only real_tool should be in results
             tool_ids = [tool["id"] for tool in result["recommended_tools"]]
@@ -163,7 +163,7 @@ class TestsearchTools:
 
         with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
             # Should not raise, just skip the failing tool
-            result = search_tool_by_keywords_fn(["csv"])
+            result = search_tools_by_keywords_fn(["csv"])
 
             # Only tool1 should be in results
             tool_ids = [tool["id"] for tool in result["recommended_tools"]]
