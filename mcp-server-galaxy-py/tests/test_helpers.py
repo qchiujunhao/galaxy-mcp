@@ -7,7 +7,6 @@ from galaxy_mcp.server import (
     create_history,
     download_dataset,
     ensure_connected,
-    filter_tools_by_dataset,
     galaxy_state,
     get_dataset_details,
     get_histories,
@@ -29,7 +28,8 @@ from galaxy_mcp.server import (
     list_workflows,
     run_tool,
     search_iwc_workflows,
-    search_tools,
+    search_tools_by_keywords,
+    search_tools_by_name,
     upload_file,
     upload_file_from_url,
 )
@@ -49,7 +49,7 @@ cancel_workflow_invocation_fn = get_function(cancel_workflow_invocation)
 connect_fn = get_function(connect)
 create_history_fn = get_function(create_history)
 download_dataset_fn = get_function(download_dataset)
-filter_tools_by_dataset_fn = get_function(filter_tools_by_dataset)
+search_tools_by_keywords_fn = get_function(search_tools_by_keywords)
 get_dataset_details_fn = get_function(get_dataset_details)
 get_histories_fn = get_function(get_histories)
 get_history_contents_fn = get_function(get_history_contents)
@@ -70,7 +70,7 @@ list_history_ids_fn = get_function(list_history_ids)
 list_workflows_fn = get_function(list_workflows)
 run_tool_fn = get_function(run_tool)
 search_iwc_workflows_fn = get_function(search_iwc_workflows)
-search_tools_fn = get_function(search_tools)
+search_tools_fn = get_function(search_tools_by_name)
 upload_file_fn = get_function(upload_file)
 upload_file_from_url_fn = get_function(upload_file_from_url)
 
@@ -80,7 +80,7 @@ __all__ = [
     "connect_fn",
     "create_history_fn",
     "download_dataset_fn",
-    "filter_tools_by_dataset_fn",
+    "search_tools_by_keywords_fn",
     "get_dataset_details_fn",
     "get_histories_fn",
     "get_history_contents_fn",
