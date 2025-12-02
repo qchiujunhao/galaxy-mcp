@@ -77,7 +77,6 @@ mcp run main.py
 - If you have not provided the optional env config you'll be asked for connection details which you can provide like "Use my Galaxy API key: XXXXXXX"
 - Talk to Claude to work with your galaxy instance, e.g. "give a summary with my histories"
 
-
 ## Development Guidelines
 
 See the [Python implementation README](mcp-server-galaxy-py/README.md) for specific instructions and documentation.

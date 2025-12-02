@@ -206,6 +206,37 @@ def get_tool_details(tool_id: str, io_details: bool = False) -> dict[str, Any]:
 
 
 @mcp.tool()
+def get_tool_run_examples(tool_id: str, tool_version: str | None = None) -> dict[str, Any]:
+    """
+    Return the exact XML test definitions (inputs, outputs, assertions, required files)
+    for a Galaxy tool so an LLM can study real, working run configurations.
+
+    Args:
+        tool_id: ID of the tool to inspect
+        tool_version: Optional version selector (use '*' for all versions)
+
+    Returns:
+        Dictionary containing the list of test cases and summary metadata
+    """
+    ensure_connected()
+
+    try:
+        test_cases = galaxy_state["gi"].tools.get_tool_tests(tool_id, tool_version=tool_version)
+        response: dict[str, Any] = {
+            "tool_id": tool_id,
+            "requested_version": tool_version,
+            "count": len(test_cases),
+            "test_cases": test_cases,
+        }
+        return response
+    except Exception as e:
+        context = {"tool_id": tool_id}
+        if tool_version:
+            context["tool_version"] = tool_version
+        raise ValueError(format_error("Get tool run examples", e, context)) from e
+
+
+@mcp.tool()
 def get_tool_citations(tool_id: str) -> dict[str, Any]:
     """
     Get citation information for a specific tool
