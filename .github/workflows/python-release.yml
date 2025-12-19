@@ -50,6 +50,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || format('v{0}', inputs.version) }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
