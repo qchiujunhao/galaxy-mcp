@@ -3,8 +3,8 @@ import concurrent.futures
 import logging
 import os
 import threading
-from functools import lru_cache
 import types
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal, cast
 
@@ -998,8 +998,7 @@ def get_job_details(dataset_id: str, history_id: str | None = None) -> dict[str,
             except Exception as dataset_error:
                 error_detail = str(provenance_error) if provenance_error else str(dataset_error)
                 raise ValueError(
-                    f"Failed to get job information for dataset '{dataset_id}': "
-                    f"{error_detail}"
+                    f"Failed to get job information for dataset '{dataset_id}': {error_detail}"
                 ) from (provenance_error or dataset_error)
 
         # Get job details using the Galaxy API directly
@@ -1603,6 +1602,7 @@ def cancel_workflow_invocation(invocation_id: str) -> dict[str, Any]:
         raise ValueError(
             format_error("Cancel workflow invocation", e, {"invocation_id": invocation_id})
         ) from e
+
 
 def run_http_server(
     *,
