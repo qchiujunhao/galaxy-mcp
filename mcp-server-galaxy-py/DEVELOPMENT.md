@@ -231,82 +231,79 @@ tox
 
 ## Release Process
 
-### Version Management
+Version is managed in `pyproject.toml` and follows semantic versioning (MAJOR.MINOR.PATCH).
 
-Version is managed in `pyproject.toml`:
+### Method 1: Workflow Dispatch (Quick)
 
-```toml
-[project]
-version = "1.0.0"
-```
+Use this for straightforward releases. The workflow automates the version bump, tagging, and PyPI upload.
 
-### Release Process (Recommended)
-
-The project uses Release Drafter to automatically create draft releases. Follow these steps:
-
-1. **Update the changelog**
+1. **Update the changelog first**
    ```bash
-   # Edit CHANGELOG.md to add the new version section
+   # Edit CHANGELOG.md to add the new version section with today's date
    # Include Added, Changed, Fixed sections as appropriate
+   git add CHANGELOG.md
+   git commit -m "Add X.Y.Z to changelog"
+   git push
    ```
 
-2. **Update the version**
-   ```bash
-   # Edit pyproject.toml and update the version number
-   # Follow semantic versioning: MAJOR.MINOR.PATCH
-   ```
+2. **Run the release workflow**
+   - Go to Actions → "Release Python Package" → Run workflow
+   - Enter the version number (e.g., `1.3.0`)
+   - Click "Run workflow"
 
-3. **Commit and push changes**
+3. **Verify deployment**
+   - The workflow will: update `pyproject.toml` → commit → create tag → build → publish to PyPI
+   - Verify at https://pypi.org/project/galaxy-mcp/
+
+### Method 2: GitHub Release (Curated)
+
+Use this when you want more control over release notes, or to use Release Drafter's accumulated PR summaries.
+
+1. **Update changelog and version**
    ```bash
+   # From mcp-server-galaxy-py/ directory:
+   # Edit CHANGELOG.md with the new version section
+   # Edit pyproject.toml to update the version number
    git add CHANGELOG.md pyproject.toml
    git commit -m "Bump version to X.Y.Z"
    git push
    ```
 
-4. **Trigger Release Drafter (if needed)**
-   ```bash
-   # Manually trigger Release Drafter to update the draft with latest commits
-   gh workflow run "Release Drafter"
-   ```
-
-5. **Curate and publish the release**
+2. **Create and publish the GitHub release**
    - Go to https://github.com/galaxyproject/galaxy-mcp/releases
-   - Find the draft release created by Release Drafter
-   - Edit the release notes to match your changelog entries
-   - Verify the tag matches your version (e.g., `v1.0.0`)
-   - Update the title (e.g., `v1.0.0`)
+   - Check if Release Drafter created a draft with accumulated PR notes
+   - Either edit the draft or create a new release
+   - Set the tag to `vX.Y.Z` (e.g., `v1.3.0`) - GitHub will create it if it doesn't exist
+   - Set the title to `vX.Y.Z`
+   - Add/edit release notes
    - Click "Publish release"
 
-6. **Verify deployment**
+3. **Verify deployment**
    - GitHub Actions will automatically build and publish to PyPI
    - Check https://pypi.org/project/galaxy-mcp/ for the new version
-   - Test installation: `pip install galaxy-mcp==X.Y.Z`
+
+### Release Drafter
+
+Release Drafter runs automatically on pushes to main and creates/updates a draft release with PR summaries. PRs are categorized by labels:
+- `feature`, `enhancement` → Features
+- `bug`, `fix` → Bug Fixes
+- `documentation`, `docs` → Documentation
+- `chore`, `maintenance` → Maintenance
+
+The draft is available at https://github.com/galaxyproject/galaxy-mcp/releases
 
 ### Required GitHub Secrets
 
-For automatic PyPI deployment, ensure this secret is set:
-- `PYPI_API_TOKEN`: Your PyPI API token (scoped to the galaxy-mcp project)
-
-Set at: https://github.com/galaxyproject/galaxy-mcp/settings/secrets/actions
-
-### Alternative: Manual Workflow Dispatch (Not Recommended)
-
-If needed, you can trigger the release workflow manually, but this bypasses Release Drafter:
-
-```bash
-# Using GitHub CLI
-gh workflow run python-release.yml -f version=1.0.0
-```
+For automatic PyPI deployment:
+- `PYPI_API_TOKEN`: PyPI API token scoped to the galaxy-mcp project
+- Set at: https://github.com/galaxyproject/galaxy-mcp/settings/secrets/actions
 
 ### Manual Publishing (Fallback)
 
 If GitHub Actions fails:
 
 ```bash
-# Build package
 make build
-
-# Upload to PyPI
 uv run twine upload dist/*
 ```
 
