@@ -829,9 +829,9 @@ class GalaxyOAuthProvider(OAuthProvider):
                             <button type="submit">Allow access</button>
                         </form>
                         <p class="fine-print">
-                            Need help?
-                            <a href="https://usegalaxy.org.au" target="_blank" rel="noopener">
-                                usegalaxy.org.au
+                            Need help? Visit
+                            <a href="{self._galaxy_url.rstrip('/')}" target="_blank" rel="noopener">
+                                {self._galaxy_url.rstrip('/')}
                             </a>
                         </p>
                     </main>
