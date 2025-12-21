@@ -24,6 +24,7 @@ class TestJobOperations:
     def test_get_job_details_with_provenance(self):
         """Test getting job details using dataset provenance"""
         dataset_id = "dataset123"
+        history_id = "history789"
         job_id = "job456"
 
         # Mock the bioblend provenance call
@@ -41,7 +42,7 @@ class TestJobOperations:
             status=200,
         )
 
-        result = get_job_details_fn(dataset_id)
+        result = get_job_details_fn(dataset_id, history_id=history_id)
 
         assert result["job"]["id"] == job_id
         assert result["dataset_id"] == dataset_id
