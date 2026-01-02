@@ -397,7 +397,10 @@ class TestDatasetOperations:
         with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
             with pytest.raises(
                 ValueError,
-                match="is a dataset collection, not a dataset.*My Sample Collection.*get_collection_details",
+                match=(
+                    "is a dataset collection, not a dataset.*My Sample Collection.*"
+                    "get_collection_details"
+                ),
             ):
                 get_dataset_details_fn(collection_id)
 

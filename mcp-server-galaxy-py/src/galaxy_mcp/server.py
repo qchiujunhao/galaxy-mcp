@@ -863,8 +863,9 @@ def get_history_contents(
               - 'name-asc': Dataset name ascending (alphabetical)
 
     Returns:
-        Dictionary containing paginated dataset/collection list, pagination metadata, and history reference.
-        Each item includes a 'history_content_type' field: 'dataset' or 'dataset_collection'
+        Dictionary containing paginated dataset/collection list, pagination metadata,
+        and history reference. Each item includes a 'history_content_type' field:
+        'dataset' or 'dataset_collection'
     """
     state = ensure_connected()
     gi: GalaxyInstance = state["gi"]
@@ -1118,7 +1119,8 @@ def get_dataset_details(
             raise ValueError(
                 f"The ID '{dataset_id}' is a dataset collection, not a dataset. "
                 f"Collection name: '{collection_info.get('name', 'Unknown')}'. "
-                "Use get_collection_details(collection_id) to inspect dataset collections and their members."
+                "Use get_collection_details(collection_id) to inspect dataset "
+                "collections and their members."
             ) from e
         except ValueError:
             # Re-raise the ValueError we just created above
@@ -1207,7 +1209,10 @@ def get_collection_details(collection_id: str, max_elements: int = 100) -> dict[
             "collection": collection_metadata,
             "elements": normalized_elements,
             "elements_truncated": elements_truncated,
-            "note": "Use get_dataset_details(object_id) to get full details for individual datasets in this collection.",
+            "note": (
+                "Use get_dataset_details(object_id) to get full details "
+                "for individual datasets in this collection."
+            ),
         }
 
     except Exception as e:
