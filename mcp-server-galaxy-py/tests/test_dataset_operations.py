@@ -3,12 +3,14 @@ Test dataset-related operations
 """
 
 from unittest.mock import patch
+from unittest.mock import Mock
 
 import pytest
 
 from .test_helpers import (
     download_dataset_fn,
     galaxy_state,
+    get_collection_details_fn,
     get_dataset_details_fn,
     upload_file_fn,
     upload_file_from_url_fn,
@@ -257,3 +259,155 @@ class TestDatasetOperations:
 
             with pytest.raises(ValueError, match="Not connected to Galaxy"):
                 download_dataset_fn("dataset123")
+
+    def test_get_collection_details_list_collection(self, mock_galaxy_instance):
+        mock_galaxy_instance.dataset_collections = Mock()
+        """Test getting details of a list-type dataset collection"""
+        collection_id = "collection123"
+
+        # Mock collection info with 3 elements
+        mock_collection_info = {
+            "id": collection_id,
+            "name": "My Sample Collection",
+            "collection_type": "list",
+            "element_count": 3,
+            "populated": True,
+            "state": "ok",
+            "elements": [
+                {
+                    "element_identifier": "sample1",
+                    "element_type": "hda",
+                    "object": {
+                        "id": "dataset1",
+                        "name": "sample1.fastq",
+                        "state": "ok",
+                        "extension": "fastqsanger",
+                        "file_size": 12345,
+                    },
+                },
+                {
+                    "element_identifier": "sample2",
+                    "element_type": "hda",
+                    "object": {
+                        "id": "dataset2",
+                        "name": "sample2.fastq",
+                        "state": "ok",
+                        "extension": "fastqsanger",
+                        "file_size": 23456,
+                    },
+                },
+                {
+                    "element_identifier": "sample3",
+                    "element_type": "hda",
+                    "object": {
+                        "id": "dataset3",
+                        "name": "sample3.fastq",
+                        "state": "ok",
+                        "extension": "fastqsanger",
+                        "file_size": 34567,
+                    },
+                },
+            ],
+        }
+
+        mock_galaxy_instance.dataset_collections.show_dataset_collection.return_value = (
+            mock_collection_info
+        )
+
+        with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
+            result = get_collection_details_fn(collection_id)
+
+            assert result["collection_id"] == collection_id
+            assert result["history_content_type"] == "dataset_collection"
+            assert result["collection"]["name"] == "My Sample Collection"
+            assert result["collection"]["collection_type"] == "list"
+            assert result["collection"]["element_count"] == 3
+            assert result["elements_truncated"] is False
+            assert len(result["elements"]) == 3
+
+            # Check first element structure
+            assert result["elements"][0]["element_identifier"] == "sample1"
+            assert result["elements"][0]["object_id"] == "dataset1"
+            assert result["elements"][0]["name"] == "sample1.fastq"
+            assert result["elements"][0]["state"] == "ok"
+
+            mock_galaxy_instance.dataset_collections.show_dataset_collection.assert_called_once_with(
+                collection_id, instance_type="history"
+            )
+
+    def test_get_collection_details_truncation(self, mock_galaxy_instance):
+        mock_galaxy_instance.dataset_collections = Mock()
+        """Test collection details with truncation when exceeding max_elements"""
+        collection_id = "large_collection"
+
+        # Create a collection with 150 elements
+        elements = []
+        for i in range(150):
+            elements.append(
+                {
+                    "element_identifier": f"sample{i}",
+                    "element_type": "hda",
+                    "object": {
+                        "id": f"dataset{i}",
+                        "name": f"sample{i}.fastq",
+                        "state": "ok",
+                        "extension": "fastqsanger",
+                        "file_size": 10000 + i,
+                    },
+                }
+            )
+
+        mock_collection_info = {
+            "id": collection_id,
+            "name": "Large Collection",
+            "collection_type": "list",
+            "element_count": 150,
+            "populated": True,
+            "state": "ok",
+            "elements": elements,
+        }
+
+        mock_galaxy_instance.dataset_collections.show_dataset_collection.return_value = (
+            mock_collection_info
+        )
+
+        with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
+            result = get_collection_details_fn(collection_id, max_elements=50)
+
+            assert result["collection"]["element_count"] == 150
+            assert result["elements_truncated"] is True
+            assert len(result["elements"]) == 50
+            assert result["elements"][0]["element_identifier"] == "sample0"
+            assert result["elements"][49]["element_identifier"] == "sample49"
+
+    def test_get_dataset_details_with_collection_id(self, mock_galaxy_instance):
+        mock_galaxy_instance.dataset_collections = Mock()
+        """Test that get_dataset_details raises helpful error when given a collection ID"""
+        collection_id = "collection123"
+
+        # Mock show_dataset to fail (not a dataset)
+        mock_galaxy_instance.datasets.show_dataset.side_effect = Exception(
+            "Dataset not found"
+        )
+        
+        # Mock show_dataset_collection to succeed (it IS a collection)
+        mock_galaxy_instance.dataset_collections.show_dataset_collection.return_value = {
+            "id": collection_id,
+            "name": "My Sample Collection",
+            "collection_type": "list",
+        }
+
+        with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
+            with pytest.raises(
+                ValueError,
+                match="is a dataset collection, not a dataset.*My Sample Collection.*get_collection_details",
+            ):
+                get_dataset_details_fn(collection_id)
+
+            # Verify both API calls were made
+            mock_galaxy_instance.datasets.show_dataset.assert_called_once_with(collection_id)
+            mock_galaxy_instance.dataset_collections.show_dataset_collection.assert_called_once_with(
+                collection_id, instance_type="history"
+            )
+
+

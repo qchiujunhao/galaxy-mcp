@@ -8,6 +8,7 @@ from galaxy_mcp.server import (
     download_dataset,
     ensure_connected,
     galaxy_state,
+    get_collection_details,
     get_dataset_details,
     get_histories,
     get_history_contents,
@@ -50,6 +51,7 @@ connect_fn = get_function(connect)
 create_history_fn = get_function(create_history)
 download_dataset_fn = get_function(download_dataset)
 search_tools_by_keywords_fn = get_function(search_tools_by_keywords)
+get_collection_details_fn = get_function(get_collection_details)
 get_dataset_details_fn = get_function(get_dataset_details)
 get_histories_fn = get_function(get_histories)
 get_history_contents_fn = get_function(get_history_contents)
@@ -81,6 +83,7 @@ __all__ = [
     "create_history_fn",
     "download_dataset_fn",
     "search_tools_by_keywords_fn",
+    "get_collection_details_fn",
     "get_dataset_details_fn",
     "get_histories_fn",
     "get_history_contents_fn",
