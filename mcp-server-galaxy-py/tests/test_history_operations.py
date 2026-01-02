@@ -2,7 +2,7 @@
 Test history-related operations
 """
 
-from unittest.mock import call, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -243,4 +243,3 @@ class TestHistoryOperations:
             mock_galaxy_instance.histories.show_history.assert_called_once_with(
                 "test_history_1", contents=True
             )
-

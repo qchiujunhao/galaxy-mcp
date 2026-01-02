@@ -877,7 +877,7 @@ def get_history_contents(
 
         # Use show_history with contents=True to get both datasets and collections
         all_contents_raw = gi.histories.show_history(history_id, contents=True)
-        
+
         # Add history_content_type field to distinguish datasets from collections
         all_contents = []
         for item in all_contents_raw:
@@ -889,7 +889,7 @@ def get_history_contents(
                 content_type = "dataset_collection"
             else:
                 content_type = "dataset"
-            
+
             # Add the field to the item (backward compatible - adds new field)
             item_with_type = {**item, "history_content_type": content_type}
             all_contents.append(item_with_type)
@@ -897,7 +897,9 @@ def get_history_contents(
         # Filter by visibility and deleted status
         filtered_contents = all_contents
         if not deleted:
-            filtered_contents = [item for item in filtered_contents if not item.get("deleted", False)]
+            filtered_contents = [
+                item for item in filtered_contents if not item.get("deleted", False)
+            ]
         if visible:
             filtered_contents = [item for item in filtered_contents if item.get("visible", True)]
 
@@ -913,13 +915,13 @@ def get_history_contents(
                 return item.get("name", "")
             else:
                 return item.get("hid", 0)
-        
+
         reverse = order.endswith("-dsc")
         sorted_contents = sorted(filtered_contents, key=get_sort_key, reverse=reverse)
 
         # Apply pagination
         total_items = len(sorted_contents)
-        paginated_contents = sorted_contents[offset:offset + limit]
+        paginated_contents = sorted_contents[offset : offset + limit]
 
         # Calculate pagination metadata
         has_next = (offset + limit) < total_items
@@ -927,7 +929,9 @@ def get_history_contents(
         current_page = (offset // limit) + 1 if limit > 0 else 1
         total_pages = ((total_items - 1) // limit) + 1 if limit > 0 and total_items > 0 else 1
 
-        logger.info(f"Retrieved {len(paginated_contents)} items (page {current_page} of {total_pages})")
+        logger.info(
+            f"Retrieved {len(paginated_contents)} items (page {current_page} of {total_pages})"
+        )
 
         return {
             "history_id": history_id,
@@ -958,7 +962,6 @@ def get_history_contents(
                 f"History ID '{history_id}' not found. Make sure to pass a valid history ID string."
             ) from e
         raise ValueError(f"Failed to get history contents for ID '{history_id}': {str(e)}") from e
-
 
 
 @mcp.tool()
@@ -1121,10 +1124,10 @@ def get_dataset_details(
             # Re-raise the ValueError we just created above
             raise
         except Exception:
-            # Not a collection either (show_dataset_collection failed), 
+            # Not a collection either (show_dataset_collection failed),
             # so fall through to re-raise the original dataset error
             pass
-        
+
         # Original error - not a collection
         if "404" in str(e):
             raise ValueError(
@@ -1135,9 +1138,7 @@ def get_dataset_details(
 
 
 @mcp.tool()
-def get_collection_details(
-    collection_id: str, max_elements: int = 100
-) -> dict[str, Any]:
+def get_collection_details(collection_id: str, max_elements: int = 100) -> dict[str, Any]:
     """
     Get detailed information about a dataset collection and its members
 
@@ -1180,7 +1181,7 @@ def get_collection_details(
         # Extract and normalize elements
         raw_elements = collection_info.get("elements", [])
         total_element_count = len(raw_elements)
-        
+
         # Limit elements to max_elements
         elements_to_return = raw_elements[:max_elements]
         elements_truncated = total_element_count > max_elements

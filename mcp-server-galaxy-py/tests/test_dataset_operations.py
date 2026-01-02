@@ -2,8 +2,7 @@
 Test dataset-related operations
 """
 
-from unittest.mock import patch
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -386,10 +385,8 @@ class TestDatasetOperations:
         collection_id = "collection123"
 
         # Mock show_dataset to fail (not a dataset)
-        mock_galaxy_instance.datasets.show_dataset.side_effect = Exception(
-            "Dataset not found"
-        )
-        
+        mock_galaxy_instance.datasets.show_dataset.side_effect = Exception("Dataset not found")
+
         # Mock show_dataset_collection to succeed (it IS a collection)
         mock_galaxy_instance.dataset_collections.show_dataset_collection.return_value = {
             "id": collection_id,
@@ -409,5 +406,3 @@ class TestDatasetOperations:
             mock_galaxy_instance.dataset_collections.show_dataset_collection.assert_called_once_with(
                 collection_id, instance_type="history"
             )
-
-
