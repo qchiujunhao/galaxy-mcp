@@ -23,9 +23,9 @@ class TestToolOperations:
             # Mock get_tools to return all tools (no name parameter)
             mock_galaxy_instance.tools.get_tools.return_value = [
                 {"id": "tool1", "name": "Test Tool 1", "description": "Aligns sequences"},
-                {"id": "tool2", "name": "Test Tool 2", "description": "Other tool"}
+                {"id": "tool2", "name": "Test Tool 2", "description": "Other tool"},
             ]
-            
+
             # Search with empty query should return all tools
             result = search_tools_fn("")
             assert "tools" in result
@@ -37,7 +37,7 @@ class TestToolOperations:
             assert "tools" in result
             assert len(result["tools"]) == 1
             assert result["tools"][0]["id"] == "tool1"
-            
+
             # Search should also filter by ID substring
             result = search_tools_fn("tool2")
             assert "tools" in result
@@ -63,7 +63,7 @@ class TestToolOperations:
             assert len(aligners) == 2
             assert any("BWA" in t["name"] for t in aligners)
             assert any("HISAT2" in t["name"] for t in aligners)
-            
+
             # Search by ID substring
             result = search_tools_fn("tool1")
             assert "tools" in result

@@ -358,14 +358,15 @@ def search_tools_by_name(query: str) -> dict[str, Any]:
         # The get_tools(name=query) parameter doesn't support substring matching
         all_tools = gi.tools.get_tools()
         query_lower = query.lower()
-        
+
         # Filter tools by substring match in name or ID
         matching_tools = [
-            tool for tool in all_tools
-            if query_lower in tool.get("name", "").lower() 
+            tool
+            for tool in all_tools
+            if query_lower in tool.get("name", "").lower()
             or query_lower in tool.get("id", "").lower()
         ]
-        
+
         return {"tools": matching_tools}
     except Exception as e:
         raise ValueError(format_error("Search tools", e, {"query": query})) from e
