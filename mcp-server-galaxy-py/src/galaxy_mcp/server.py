@@ -840,7 +840,6 @@ def get_history_contents(
     offset: int = 0,
     deleted: bool = False,
     visible: bool = True,
-    details: bool = False,
     order: str = "hid-asc",
 ) -> dict[str, Any]:
     """
@@ -853,7 +852,6 @@ def get_history_contents(
         offset: Number of items to skip from the beginning (default: 0, for pagination)
         deleted: Include deleted datasets in results (default: False)
         visible: Include only visible datasets (default: True, set False to include hidden)
-        details: Include detailed metadata for each dataset (default: False, impacts performance)
         order: Sort order for results. Options include:
               - 'hid-asc': History ID ascending (default, oldest first)
               - 'hid-dsc': History ID descending (newest first)
@@ -866,6 +864,12 @@ def get_history_contents(
         Dictionary containing paginated dataset/collection list, pagination metadata,
         and history reference. Each item includes a 'history_content_type' field:
         'dataset' or 'dataset_collection'
+
+    Note:
+        Performance: This function uses gi.histories.show_history(contents=True) to
+        fetch all items and then paginates client-side. For very large histories,
+        this may be slower than server-side pagination, but it is required to
+        include dataset collections alongside datasets.
     """
     state = ensure_connected()
     gi: GalaxyInstance = state["gi"]

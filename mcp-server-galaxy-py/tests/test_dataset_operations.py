@@ -260,8 +260,8 @@ class TestDatasetOperations:
                 download_dataset_fn("dataset123")
 
     def test_get_collection_details_list_collection(self, mock_galaxy_instance):
-        mock_galaxy_instance.dataset_collections = Mock()
         """Test getting details of a list-type dataset collection"""
+        mock_galaxy_instance.dataset_collections = Mock()
         collection_id = "collection123"
 
         # Mock collection info with 3 elements
@@ -335,8 +335,8 @@ class TestDatasetOperations:
             )
 
     def test_get_collection_details_truncation(self, mock_galaxy_instance):
-        mock_galaxy_instance.dataset_collections = Mock()
         """Test collection details with truncation when exceeding max_elements"""
+        mock_galaxy_instance.dataset_collections = Mock()
         collection_id = "large_collection"
 
         # Create a collection with 150 elements
@@ -380,8 +380,8 @@ class TestDatasetOperations:
             assert result["elements"][49]["element_identifier"] == "sample49"
 
     def test_get_dataset_details_with_collection_id(self, mock_galaxy_instance):
-        mock_galaxy_instance.dataset_collections = Mock()
         """Test that get_dataset_details raises helpful error when given a collection ID"""
+        mock_galaxy_instance.dataset_collections = Mock()
         collection_id = "collection123"
 
         # Mock show_dataset to fail (not a dataset)
