@@ -20,21 +20,29 @@ class TestToolOperations:
     def test_search_tools_fn(self, mock_galaxy_instance):
         """Test tool search functionality"""
         with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
-            # Search should return dict with 'tools' key
+            # Mock get_tools to return all tools (no name parameter)
+            mock_galaxy_instance.tools.get_tools.return_value = [
+                {"id": "tool1", "name": "Test Tool 1", "description": "Aligns sequences"},
+                {"id": "tool2", "name": "Test Tool 2", "description": "Other tool"}
+            ]
+            
+            # Search with empty query should return all tools
             result = search_tools_fn("")
             assert "tools" in result
             assert len(result["tools"]) == 2
             assert result["tools"][0]["id"] == "tool1"
 
-            # Search with query
-            mock_galaxy_instance.tools.get_tools.return_value = [
-                {"id": "tool1", "name": "Test Tool 1", "description": "Aligns sequences"}
-            ]
-
-            result = search_tools_fn("align")
+            # Search with query should filter by name substring
+            result = search_tools_fn("tool 1")
             assert "tools" in result
             assert len(result["tools"]) == 1
-            assert "align" in result["tools"][0]["description"].lower()
+            assert result["tools"][0]["id"] == "tool1"
+            
+            # Search should also filter by ID substring
+            result = search_tools_fn("tool2")
+            assert "tools" in result
+            assert len(result["tools"]) == 1
+            assert result["tools"][0]["id"] == "tool2"
 
     def test_search_tools_with_results(self, mock_galaxy_instance):
         """Test search tools returns filtered results"""
@@ -45,25 +53,22 @@ class TestToolOperations:
         ]
 
         with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
-            # Mock filtering behavior
-            def mock_get_tools(name=None):
-                if name and name.lower() == "align":
-                    return [
-                        t
-                        for t in all_tools
-                        if "align" in t["name"].lower() or "align" in t["description"].lower()
-                    ]
-                return all_tools
+            # Mock get_tools to return all tools
+            mock_galaxy_instance.tools.get_tools.return_value = all_tools
 
-            mock_galaxy_instance.tools.get_tools.side_effect = mock_get_tools
-
-            # Search for aligners
+            # Search for aligners by name substring
             result = search_tools_fn("align")
             assert "tools" in result
             aligners = result["tools"]
             assert len(aligners) == 2
             assert any("BWA" in t["name"] for t in aligners)
             assert any("HISAT2" in t["name"] for t in aligners)
+            
+            # Search by ID substring
+            result = search_tools_fn("tool1")
+            assert "tools" in result
+            assert len(result["tools"]) == 1
+            assert result["tools"][0]["id"] == "tool1"
 
     def test_run_tool_fn(self, mock_galaxy_instance):
         """Test running a tool"""
