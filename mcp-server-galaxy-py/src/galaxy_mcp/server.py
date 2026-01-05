@@ -342,10 +342,10 @@ def connect(url: str | None = None, api_key: str | None = None) -> dict[str, Any
 @mcp.tool()
 def search_tools_by_name(query: str) -> dict[str, Any]:
     """
-    Search Galaxy tools whose name or ID contains the given query (substring match).
+    Search Galaxy tools whose name, ID, or description contains the given query (substring match).
 
     Args:
-        query: Search query (tool name or ID to filter on)
+        query: Search query (tool name, ID, or description to filter on)
 
     Returns:
         List of tools matching the query
@@ -359,12 +359,13 @@ def search_tools_by_name(query: str) -> dict[str, Any]:
         all_tools = gi.tools.get_tools()
         query_lower = query.lower()
 
-        # Filter tools by substring match in name or ID
+        # Filter tools by substring match in name, ID, or description
         matching_tools = [
             tool
             for tool in all_tools
             if query_lower in tool.get("name", "").lower()
             or query_lower in tool.get("id", "").lower()
+            or query_lower in tool.get("description", "").lower()
         ]
 
         return {"tools": matching_tools}
