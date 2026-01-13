@@ -801,7 +801,7 @@ class GalaxyOAuthProvider(OAuthProvider):
                             <div class="logo logo-galaxy"></div>
                         </div>
                         <h1 id="title">Allow ChatGPT to access Galaxy</h1>
-                        <p>Sign in to <strong>{self._galaxy_url.rstrip('/')}</strong>.</p>
+                        <p>Sign in to <strong>{self._galaxy_url.rstrip("/")}</strong>.</p>
                         <p class="fine-print">Scopes: <strong>{scopes_text}</strong></p>
                         {error_html}
                         <form method="post">
@@ -830,8 +830,8 @@ class GalaxyOAuthProvider(OAuthProvider):
                         </form>
                         <p class="fine-print">
                             Need help? Visit
-                            <a href="{self._galaxy_url.rstrip('/')}" target="_blank" rel="noopener">
-                                {self._galaxy_url.rstrip('/')}
+                            <a href="{self._galaxy_url.rstrip("/")}" target="_blank" rel="noopener">
+                                {self._galaxy_url.rstrip("/")}
                             </a>
                         </p>
                     </main>

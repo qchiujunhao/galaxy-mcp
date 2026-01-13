@@ -852,11 +852,10 @@ def get_history_contents(
     offset: int = 0,
     deleted: bool = False,
     visible: bool = True,
-    details: bool = False,
     order: str = "hid-asc",
 ) -> dict[str, Any]:
     """
-    Get paginated contents (datasets) from a specific history with ordering support
+    Get paginated contents (datasets and collections) from a specific history with ordering support
 
     Args:
         history_id: Galaxy history ID - a hexadecimal hash string identifying the history
@@ -865,7 +864,6 @@ def get_history_contents(
         offset: Number of items to skip from the beginning (default: 0, for pagination)
         deleted: Include deleted datasets in results (default: False)
         visible: Include only visible datasets (default: True, set False to include hidden)
-        details: Include detailed metadata for each dataset (default: False, impacts performance)
         order: Sort order for results. Options include:
               - 'hid-asc': History ID ascending (default, oldest first)
               - 'hid-dsc': History ID descending (newest first)
@@ -875,7 +873,15 @@ def get_history_contents(
               - 'name-asc': Dataset name ascending (alphabetical)
 
     Returns:
-        Dictionary containing paginated dataset list, pagination metadata, and history reference
+        Dictionary containing paginated dataset/collection list, pagination metadata,
+        and history reference. Each item includes a 'history_content_type' field:
+        'dataset' or 'dataset_collection'
+
+    Note:
+        Performance: This function uses gi.histories.show_history(contents=True) to
+        fetch all items and then paginates client-side. For very large histories,
+        this may be slower than server-side pagination, but it is required to
+        include dataset collections alongside datasets.
     """
     state = ensure_connected()
     gi: GalaxyInstance = state["gi"]
@@ -886,35 +892,53 @@ def get_history_contents(
             f"(limit={limit}, offset={offset}, order={order})"
         )
 
-        # Use datasets API for better ordering support
-        contents = gi.datasets.get_datasets(
-            limit=limit,
-            offset=offset,
-            history_id=history_id,
-            order=order,
-            # Note: datasets API uses different parameter names
-            # deleted and visible filtering is done post-query if needed
-        )
+        # Use show_history with contents=True to get both datasets and collections
+        all_contents_raw = gi.histories.show_history(history_id, contents=True)
 
-        # Filter by visibility and deleted status if needed
+        # Add history_content_type field to distinguish datasets from collections
+        all_contents = []
+        for item in all_contents_raw:
+            # Determine content type based on 'history_content_type' field if present,
+            # otherwise infer from 'collection_type' or 'type' field
+            if "history_content_type" in item:
+                content_type = item["history_content_type"]
+            elif item.get("collection_type") or item.get("type") == "collection":
+                content_type = "dataset_collection"
+            else:
+                content_type = "dataset"
+
+            # Add the field to the item (backward compatible - adds new field)
+            item_with_type = {**item, "history_content_type": content_type}
+            all_contents.append(item_with_type)
+
+        # Filter by visibility and deleted status
+        filtered_contents = all_contents
         if not deleted:
-            contents = [item for item in contents if not item.get("deleted", False)]
+            filtered_contents = [
+                item for item in filtered_contents if not item.get("deleted", False)
+            ]
         if visible:
-            contents = [item for item in contents if item.get("visible", True)]
+            filtered_contents = [item for item in filtered_contents if item.get("visible", True)]
 
-        # Get total count for pagination metadata
-        all_contents = gi.datasets.get_datasets(
-            history_id=history_id,
-            order=order,
-        )
+        # Sort the contents based on order parameter
+        def get_sort_key(item):
+            if order.startswith("hid"):
+                return item.get("hid", 0)
+            elif order.startswith("create_time"):
+                return item.get("create_time", "")
+            elif order.startswith("update_time"):
+                return item.get("update_time", "")
+            elif order.startswith("name"):
+                return item.get("name", "")
+            else:
+                return item.get("hid", 0)
 
-        # Apply same filtering to total count
-        if not deleted:
-            all_contents = [item for item in all_contents if not item.get("deleted", False)]
-        if visible:
-            all_contents = [item for item in all_contents if item.get("visible", True)]
+        reverse = order.endswith("-dsc")
+        sorted_contents = sorted(filtered_contents, key=get_sort_key, reverse=reverse)
 
-        total_items = len(all_contents) if all_contents else 0
+        # Apply pagination
+        total_items = len(sorted_contents)
+        paginated_contents = sorted_contents[offset : offset + limit]
 
         # Calculate pagination metadata
         has_next = (offset + limit) < total_items
@@ -922,14 +946,16 @@ def get_history_contents(
         current_page = (offset // limit) + 1 if limit > 0 else 1
         total_pages = ((total_items - 1) // limit) + 1 if limit > 0 and total_items > 0 else 1
 
-        logger.info(f"Retrieved {len(contents)} items (page {current_page} of {total_pages})")
+        logger.info(
+            f"Retrieved {len(paginated_contents)} items (page {current_page} of {total_pages})"
+        )
 
         return {
             "history_id": history_id,
-            "contents": contents,
+            "contents": paginated_contents,
             "pagination": {
                 "total_items": total_items,
-                "returned_items": len(contents),
+                "returned_items": len(paginated_contents),
                 "limit": limit,
                 "offset": offset,
                 "current_page": current_page,
@@ -1099,12 +1125,119 @@ def get_dataset_details(
         return result
 
     except Exception as e:
+        # If show_dataset failed, check if this might be a collection ID
+        # by attempting to retrieve it as a collection
+        try:
+            collection_info = gi.dataset_collections.show_dataset_collection(
+                dataset_id, instance_type="history"
+            )
+            # If we successfully retrieved it as a collection, that's the issue
+            raise ValueError(
+                f"The ID '{dataset_id}' is a dataset collection, not a dataset. "
+                f"Collection name: '{collection_info.get('name', 'Unknown')}'. "
+                "Use get_collection_details(collection_id) to inspect dataset "
+                "collections and their members."
+            ) from e
+        except ValueError:
+            # Re-raise the ValueError we just created above
+            raise
+        except Exception:
+            # Not a collection either (show_dataset_collection failed),
+            # so fall through to re-raise the original dataset error
+            pass
+
+        # Original error - not a collection
         if "404" in str(e):
             raise ValueError(
                 f"Dataset ID '{dataset_id}' not found. "
                 "Make sure the dataset exists and you have permission to view it."
             ) from e
         raise ValueError(f"Failed to get dataset details for '{dataset_id}': {str(e)}") from e
+
+
+@mcp.tool()
+def get_collection_details(collection_id: str, max_elements: int = 100) -> dict[str, Any]:
+    """
+    Get detailed information about a dataset collection and its members
+
+    Dataset collections group multiple datasets together (e.g., paired-end reads,
+    sample lists). This tool shows the collection structure and member datasets.
+
+    Args:
+        collection_id: Galaxy dataset collection ID - a hexadecimal hash string
+                      (e.g., 'a1b2c3d4e5f6g7h8', typically 16 characters)
+        max_elements: Maximum number of collection elements to return (default: 100)
+                     Set lower for large collections to avoid overwhelming output
+
+    Returns:
+        Dictionary containing:
+        - collection: Metadata about the collection (name, type, state, element count)
+        - elements: List of collection members with their dataset IDs and metadata
+        - elements_truncated: Whether the element list was truncated
+
+        Use get_dataset_details(dataset_id) to get full details for individual datasets
+    """
+    state = ensure_connected()
+    gi: GalaxyInstance = state["gi"]
+
+    try:
+        # Get collection details using bioblend
+        collection_info = gi.dataset_collections.show_dataset_collection(
+            collection_id, instance_type="history"
+        )
+
+        # Extract and normalize collection metadata
+        collection_metadata = {
+            "id": collection_info.get("id"),
+            "name": collection_info.get("name"),
+            "collection_type": collection_info.get("collection_type"),
+            "element_count": collection_info.get("element_count", 0),
+            "populated": collection_info.get("populated", True),
+            "state": collection_info.get("state", "unknown"),
+        }
+
+        # Extract and normalize elements
+        raw_elements = collection_info.get("elements", [])
+        total_element_count = len(raw_elements)
+
+        # Limit elements to max_elements
+        elements_to_return = raw_elements[:max_elements]
+        elements_truncated = total_element_count > max_elements
+
+        normalized_elements = []
+        for idx, element in enumerate(elements_to_return):
+            element_obj = element.get("object", {})
+            normalized_element = {
+                "element_index": idx,
+                "element_identifier": element.get("element_identifier", ""),
+                "element_type": element.get("element_type", ""),
+                "object_id": element_obj.get("id", ""),
+                "name": element_obj.get("name", ""),
+                "state": element_obj.get("state", ""),
+                "extension": element_obj.get("extension", ""),
+                "file_size": element_obj.get("file_size"),
+            }
+            normalized_elements.append(normalized_element)
+
+        return {
+            "collection_id": collection_id,
+            "history_content_type": "dataset_collection",
+            "collection": collection_metadata,
+            "elements": normalized_elements,
+            "elements_truncated": elements_truncated,
+            "note": (
+                "Use get_dataset_details(object_id) to get full details "
+                "for individual datasets in this collection."
+            ),
+        }
+
+    except Exception as e:
+        if "404" in str(e):
+            raise ValueError(
+                f"Collection ID '{collection_id}' not found. "
+                "Make sure the collection exists and you have permission to view it."
+            ) from e
+        raise ValueError(f"Failed to get collection details for '{collection_id}': {str(e)}") from e
 
 
 @mcp.tool()
