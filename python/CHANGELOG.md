@@ -28,9 +28,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its query. Any `order` other than `hid` goes out with `hid-asc` behind it, since Galaxy
   sorts by exactly the keys it is given and a sort on a key rows share would otherwise
   put the same item on two pages.
+- `update_page` refuses content whose directives name an object by something other
+  than an encoded id (a hid, a name), which Galaxy cannot resolve, and a section edit
+  on a page authored as HTML.
+
 ### Added
 
 - `get_page` answers with `content_hash`, Galaxy's hash of the editable source.
+- `update_page` takes `section_heading` and `section_content` to replace one section by
+  its heading line, as Galaxy's page editor does, and `expect_hash` to refuse a write
+  when the page changed since it was read. The answer carries the page's new
+  `content_hash`.
 
 ### Fixed
 
