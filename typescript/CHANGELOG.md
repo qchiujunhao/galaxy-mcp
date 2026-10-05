@@ -4,6 +4,12 @@
 `@galaxyproject/galaxy-mcp` share a version and are published together, so one
 entry covers all three; where something only affects one surface, it says which.
 
+## Unreleased
+
+### `update_history` is marked destructive (#155)
+
+It sets MCP's `destructiveHint`, since it deletes the history when `deleted` is true.
+
 ## 0.4.0 (2026-10-19)
 
 ### `get_job_details` by job id (#167)
