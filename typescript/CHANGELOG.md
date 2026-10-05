@@ -44,6 +44,10 @@ rows are unchanged, and collection rows gain `type_id` and `store_times_summary`
 lose `model_class`, `populated` and `column_definitions`. Any `order` other than `hid`
 goes out with `hid-asc` behind it, since Galaxy sorts by exactly the keys it is given and
 a sort on a key rows share would otherwise put the same item on two pages.
+### `get_page` answers with a content hash (#155)
+
+The answer carries `content_hash`, Galaxy's hash of the editable source. galaxy-ops
+exports `contentHash`.
 
 ## 0.4.0 (2026-10-19)
 
