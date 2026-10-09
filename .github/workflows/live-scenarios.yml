@@ -31,9 +31,9 @@ jobs:
   live:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # The Galaxy secrets are set only on the steps that talk to Galaxy, never job-wide, so
+    # the pnpm and uv install steps (third-party install scripts) cannot read them.
     env:
-      GALAXY_URL: ${{ secrets.GALAXY_URL }}
-      GALAXY_API_KEY: ${{ secrets.GALAXY_API_KEY }}
       # Requirements the target Galaxy is known not to meet. A requirement that is not
       # listed here and not met fails the run.
       LIVE_WAIVE: ${{ github.event.inputs.waive || '' }}
@@ -41,6 +41,9 @@ jobs:
 
     steps:
       - name: Require the Galaxy secrets
+        env:
+          GALAXY_URL: ${{ secrets.GALAXY_URL }}
+          GALAXY_API_KEY: ${{ secrets.GALAXY_API_KEY }}
         run: |
           missing=""
           [ -n "$GALAXY_URL" ] || missing="$missing GALAXY_URL"
@@ -86,10 +89,16 @@ jobs:
 
       - name: Purge what earlier crashed runs left behind
         working-directory: python
+        env:
+          GALAXY_URL: ${{ secrets.GALAXY_URL }}
+          GALAXY_API_KEY: ${{ secrets.GALAXY_API_KEY }}
         run: uv run python -m tests.live.sweep --hours 6
 
       - name: Run the live scenarios on both servers
         working-directory: python
+        env:
+          GALAXY_URL: ${{ secrets.GALAXY_URL }}
+          GALAXY_API_KEY: ${{ secrets.GALAXY_API_KEY }}
         run: |
           args=()
           for pack in $LIVE_PACKS; do args+=(--live-pack "$pack"); done
