@@ -101,6 +101,9 @@ uv run pytest tests/test_live_scenario_files.py tests/test_live_harness.py      
 make test-live LIVE_ARGS="--live-waive unprivileged-tools"                    # build TS, run everything
 ```
 
+The nightly workflow (`.github/workflows/live-scenarios.yml`) runs the same command against
+a test Galaxy; it is manual-only until one exists.
+
 Once a live test is selected, a missing or unreachable Galaxy, a rejected key, or a stale
 TS build stops the run with exit code 4 rather than skipping. The scenario format, the
 fixture kinds and the rules for registry citations are in `tests/live/__init__.py`; the

@@ -15,6 +15,7 @@ Running (from python/, with GALAXY_URL and GALAXY_API_KEY exported):
     uv run pytest tests/live -m live --no-cov -k smoke.history         # by scenario id
     uv run pytest tests/live -m live --no-cov --live-waive network     # skip, not fail
     uv run pytest tests/test_live_scenario_files.py                    # offline checks only
+    uv run python -m tests.live.sweep --dry-run                        # crashed runs' leftovers
 
 A plain `uv run pytest` deselects the live tests and never needs Galaxy. Once a live test
 is selected, a preflight stops the run (exit code 4) on a missing or unreachable Galaxy,
