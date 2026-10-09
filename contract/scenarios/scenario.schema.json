@@ -1,0 +1,1303 @@
+{
+  "$comment": "Generated from python/tests/live/model.py by `uv run python -m tests.live.model` in python/. Do not edit by hand.",
+  "$defs": {
+    "Assertion": {
+      "additionalProperties": false,
+      "description": "`{\"path\": \"<dotted path>\", \"<op>\": value}` with exactly one op.",
+      "properties": {
+        "contains": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Contains"
+        },
+        "each": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Assertion"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Each"
+        },
+        "equals": {
+          "default": null,
+          "title": "Equals"
+        },
+        "exists": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exists"
+        },
+        "gt": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "$ref": "#/$defs/PathRef"
+            },
+            {
+              "pattern": "^\\$\\{[^}]+\\}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gt"
+        },
+        "gte": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "$ref": "#/$defs/PathRef"
+            },
+            {
+              "pattern": "^\\$\\{[^}]+\\}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gte"
+        },
+        "has_item": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Has Item"
+        },
+        "in": {
+          "anyOf": [
+            {
+              "items": {},
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "In"
+        },
+        "keys_equal": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Keys Equal"
+        },
+        "keys_exclude": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Keys Exclude"
+        },
+        "keys_include": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Keys Include"
+        },
+        "length": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LengthSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "lt": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "$ref": "#/$defs/PathRef"
+            },
+            {
+              "pattern": "^\\$\\{[^}]+\\}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lt"
+        },
+        "lte": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "$ref": "#/$defs/PathRef"
+            },
+            {
+              "pattern": "^\\$\\{[^}]+\\}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lte"
+        },
+        "matches": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Matches"
+        },
+        "not_contains": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Not Contains"
+        },
+        "not_equals": {
+          "default": null,
+          "title": "Not Equals"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "sorted": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SortedSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "type": {
+          "anyOf": [
+            {
+              "enum": [
+                "object",
+                "list",
+                "string",
+                "number",
+                "integer",
+                "boolean",
+                "null"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Type"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "title": "Assertion",
+      "type": "object"
+    },
+    "CallStep": {
+      "additionalProperties": false,
+      "properties": {
+        "args": {
+          "additionalProperties": true,
+          "title": "Args",
+          "type": "object"
+        },
+        "call": {
+          "title": "Call",
+          "type": "string"
+        },
+        "creates": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "propertyNames": {
+            "enum": [
+              "history",
+              "workflow",
+              "page",
+              "invocation",
+              "user_tool"
+            ]
+          },
+          "title": "Creates",
+          "type": "object"
+        },
+        "divergences": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Divergences",
+          "type": "array"
+        },
+        "expect": {
+          "items": {
+            "$ref": "#/$defs/Assertion"
+          },
+          "title": "Expect",
+          "type": "array"
+        },
+        "mask": {
+          "items": {
+            "$ref": "#/$defs/Mask"
+          },
+          "title": "Mask",
+          "type": "array"
+        },
+        "outcome": {
+          "default": "success",
+          "enum": [
+            "success",
+            "failure"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "parity": {
+          "default": "shape",
+          "enum": [
+            "shape",
+            "exact",
+            "none"
+          ],
+          "title": "Parity",
+          "type": "string"
+        },
+        "parity_note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parity Note"
+        },
+        "save": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Save",
+          "type": "object"
+        },
+        "until": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Until"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "call"
+      ],
+      "title": "CallStep",
+      "type": "object"
+    },
+    "CollectionElement": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Content"
+        },
+        "elements": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/CollectionElement"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Elements"
+        },
+        "ext": {
+          "default": "txt",
+          "title": "Ext",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "CollectionElement",
+      "type": "object"
+    },
+    "CollectionFixture": {
+      "additionalProperties": false,
+      "properties": {
+        "elements": {
+          "items": {
+            "$ref": "#/$defs/CollectionElement"
+          },
+          "minItems": 1,
+          "title": "Elements",
+          "type": "array"
+        },
+        "history": {
+          "title": "History",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "type": {
+          "enum": [
+            "list",
+            "paired",
+            "list:paired"
+          ],
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "history",
+        "type",
+        "elements"
+      ],
+      "title": "CollectionFixture",
+      "type": "object"
+    },
+    "DatasetFixture": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "title": "Content",
+          "type": "string"
+        },
+        "ext": {
+          "default": "txt",
+          "title": "Ext",
+          "type": "string"
+        },
+        "history": {
+          "title": "History",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        }
+      },
+      "required": [
+        "history",
+        "content"
+      ],
+      "title": "DatasetFixture",
+      "type": "object"
+    },
+    "Fixture": {
+      "additionalProperties": false,
+      "properties": {
+        "as": {
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "As",
+          "type": "string"
+        },
+        "collection": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CollectionFixture"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "dataset": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DatasetFixture"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "history": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HistoryFixture"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "invocation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InvocationFixture"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "local_file": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LocalFileFixture"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "page": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PageFixture"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "temp_path": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TempPathFixture"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "user_tool": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UserToolFixture"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "workflow": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WorkflowFixture"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "as"
+      ],
+      "title": "Fixture",
+      "type": "object"
+    },
+    "HistoryFixture": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        }
+      },
+      "title": "HistoryFixture",
+      "type": "object"
+    },
+    "InvocationFixture": {
+      "additionalProperties": false,
+      "properties": {
+        "history": {
+          "title": "History",
+          "type": "string"
+        },
+        "inputs": {
+          "additionalProperties": true,
+          "title": "Inputs",
+          "type": "object"
+        },
+        "inputs_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Inputs By"
+        },
+        "workflow": {
+          "title": "Workflow",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workflow",
+        "history"
+      ],
+      "title": "InvocationFixture",
+      "type": "object"
+    },
+    "LengthSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "eq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Eq"
+        },
+        "gt": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gt"
+        },
+        "gte": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gte"
+        },
+        "lt": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lt"
+        },
+        "lte": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lte"
+        }
+      },
+      "title": "LengthSpec",
+      "type": "object"
+    },
+    "LocalFileFixture": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "title": "Content",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "content"
+      ],
+      "title": "LocalFileFixture",
+      "type": "object"
+    },
+    "Mask": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "pattern": {
+          "title": "Pattern",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "pattern"
+      ],
+      "title": "Mask",
+      "type": "object"
+    },
+    "PageFixture": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "title": "Content",
+          "type": "string"
+        },
+        "history": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "History"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        }
+      },
+      "required": [
+        "content"
+      ],
+      "title": "PageFixture",
+      "type": "object"
+    },
+    "PathRef": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "title": "PathRef",
+      "type": "object"
+    },
+    "Requires": {
+      "additionalProperties": false,
+      "properties": {
+        "capabilities": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Capabilities",
+          "type": "array"
+        },
+        "tools": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tools",
+          "type": "array"
+        }
+      },
+      "title": "Requires",
+      "type": "object"
+    },
+    "Scenario": {
+      "additionalProperties": false,
+      "properties": {
+        "divergences": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Divergences",
+          "type": "array"
+        },
+        "fixtures": {
+          "items": {
+            "$ref": "#/$defs/Fixture"
+          },
+          "title": "Fixtures",
+          "type": "array"
+        },
+        "id": {
+          "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "note": {
+          "minLength": 1,
+          "title": "Note",
+          "type": "string"
+        },
+        "ports": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Ports",
+          "type": "array"
+        },
+        "requires": {
+          "$ref": "#/$defs/Requires"
+        },
+        "servers": {
+          "items": {
+            "enum": [
+              "python",
+              "typescript"
+            ],
+            "type": "string"
+          },
+          "title": "Servers",
+          "type": "array"
+        },
+        "steps": {
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/CallStep"
+              },
+              {
+                "$ref": "#/$defs/WaitStep"
+              },
+              {
+                "$ref": "#/$defs/VerifyStep"
+              }
+            ]
+          },
+          "minItems": 1,
+          "title": "Steps",
+          "type": "array"
+        },
+        "timeout": {
+          "default": 600,
+          "title": "Timeout",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "note",
+        "steps"
+      ],
+      "title": "Scenario",
+      "type": "object"
+    },
+    "SortedSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Key"
+        },
+        "order": {
+          "default": "asc",
+          "enum": [
+            "asc",
+            "desc"
+          ],
+          "title": "Order",
+          "type": "string"
+        }
+      },
+      "title": "SortedSpec",
+      "type": "object"
+    },
+    "TempPathFixture": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "TempPathFixture",
+      "type": "object"
+    },
+    "Uncovered": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "tool": {
+          "title": "Tool",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool",
+        "reason"
+      ],
+      "title": "Uncovered",
+      "type": "object"
+    },
+    "Until": {
+      "additionalProperties": false,
+      "properties": {
+        "expect": {
+          "items": {
+            "$ref": "#/$defs/Assertion"
+          },
+          "minItems": 1,
+          "title": "Expect",
+          "type": "array"
+        },
+        "interval": {
+          "default": 2,
+          "title": "Interval",
+          "type": "number"
+        },
+        "timeout": {
+          "default": 180,
+          "title": "Timeout",
+          "type": "number"
+        }
+      },
+      "required": [
+        "expect"
+      ],
+      "title": "Until",
+      "type": "object"
+    },
+    "UserToolFixture": {
+      "additionalProperties": false,
+      "properties": {
+        "representation": {
+          "additionalProperties": true,
+          "title": "Representation",
+          "type": "object"
+        }
+      },
+      "required": [
+        "representation"
+      ],
+      "title": "UserToolFixture",
+      "type": "object"
+    },
+    "VerifySpec": {
+      "additionalProperties": false,
+      "properties": {
+        "dataset": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dataset"
+        },
+        "dataset_text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dataset Text"
+        },
+        "file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "File"
+        },
+        "history": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "History"
+        },
+        "invocation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Invocation"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Page"
+        },
+        "workflow": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Workflow"
+        }
+      },
+      "title": "VerifySpec",
+      "type": "object"
+    },
+    "VerifyStep": {
+      "additionalProperties": false,
+      "properties": {
+        "divergences": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Divergences",
+          "type": "array"
+        },
+        "expect": {
+          "items": {
+            "$ref": "#/$defs/Assertion"
+          },
+          "minItems": 1,
+          "title": "Expect",
+          "type": "array"
+        },
+        "verify": {
+          "$ref": "#/$defs/VerifySpec"
+        }
+      },
+      "required": [
+        "verify",
+        "expect"
+      ],
+      "title": "VerifyStep",
+      "type": "object"
+    },
+    "WaitSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "dataset": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dataset"
+        },
+        "invocation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Invocation"
+        },
+        "job": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Job"
+        },
+        "state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ],
+          "default": "ok",
+          "title": "State"
+        },
+        "timeout": {
+          "default": 180,
+          "title": "Timeout",
+          "type": "number"
+        }
+      },
+      "title": "WaitSpec",
+      "type": "object"
+    },
+    "WaitStep": {
+      "additionalProperties": false,
+      "properties": {
+        "wait": {
+          "$ref": "#/$defs/WaitSpec"
+        }
+      },
+      "required": [
+        "wait"
+      ],
+      "title": "WaitStep",
+      "type": "object"
+    },
+    "WorkflowFixture": {
+      "additionalProperties": false,
+      "properties": {
+        "file": {
+          "title": "File",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file"
+      ],
+      "title": "WorkflowFixture",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "$comment": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "$Comment"
+    },
+    "pack": {
+      "pattern": "^[a-z0-9-]+$",
+      "title": "Pack",
+      "type": "string"
+    },
+    "scenarios": {
+      "items": {
+        "$ref": "#/$defs/Scenario"
+      },
+      "title": "Scenarios",
+      "type": "array"
+    },
+    "tools": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Tools",
+      "type": "array"
+    },
+    "uncovered": {
+      "items": {
+        "$ref": "#/$defs/Uncovered"
+      },
+      "title": "Uncovered",
+      "type": "array"
+    }
+  },
+  "required": [
+    "pack",
+    "tools"
+  ],
+  "title": "Pack",
+  "type": "object"
+}

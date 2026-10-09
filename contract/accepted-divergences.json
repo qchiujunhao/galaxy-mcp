@@ -572,5 +572,55 @@
         "reason": "Galaxy's requires the target history; ours takes it optionally and uploads into the current one when it is left out."
       }
     ]
+  },
+  "live": {
+    "$comment": "Differences only a live run can see: how each server answers the same call against a real Galaxy, as the live scenarios in contract/scenarios/ record them. Each row rewrites ONE server's answer (`server`) into the other's spelling, and only on the steps that cite it as live/<tool> :: <where> :: <kind>; that is a presentation choice, not a ruling on who is right -- the status and reason carry the ruling, with the same statuses as the rest of this file. An adapter that stops changing anything fails the live run as stale, and an {\"expect\": \"failure\"} row (a known server bug) fails it once the step starts passing, so a row cannot outlive what it describes. A bug both servers share is two rows under one key, one per server, and a single citation applies whichever is about the server under test. Format and runner: python/tests/live/.",
+    "ratchet": {
+      "$comment": "How many unreviewed-gap rows and rules this section holds, held in both directions by the offline check in python/tests/test_live_scenario_files.py, the same way the ratchet above works for the static rows.",
+      "unreviewedGaps": 3
+    },
+    "normalization": {
+      "argumentValidationText": {
+        "enabled": true,
+        "status": "unreviewed-gap",
+        "reason": "A call rejected by the input schema never reaches the tool: Python answers with pydantic's `N validation error(s) for call[<tool>]` text, TS with the MCP SDK's `MCP error -32602: Input validation error:` text. Both are isError and neither carries the `Error calling tool '<tool>': ` prefix, so the normaliser classes both as failure.kind `arguments` and compares only the kind."
+      }
+    },
+    "divergences": [
+      {
+        "tool": "get_server_info",
+        "where": "data.url",
+        "kind": "value-mismatch",
+        "server": "python",
+        "observed": "python reports http://localhost:8091/ for GALAXY_URL=http://localhost:8091; typescript reports it as configured",
+        "adapter": {
+          "rstrip": {
+            "paths": [
+              "data.url"
+            ],
+            "chars": "/"
+          }
+        },
+        "status": "unreviewed-gap",
+        "reason": "Python normalises the configured URL to end in a slash when it connects and reports that; TS echoes GALAXY_URL. The live harness always hands both servers the URL without a trailing slash, so the difference shows on every run."
+      },
+      {
+        "tool": "get_server_info",
+        "where": "message",
+        "kind": "value-mismatch",
+        "server": "python",
+        "observed": "python: \"Retrieved server info for http://localhost:8091/\"; typescript: \"Retrieved server info for http://localhost:8091\"",
+        "adapter": {
+          "rstrip": {
+            "paths": [
+              "message"
+            ],
+            "chars": "/"
+          }
+        },
+        "status": "unreviewed-gap",
+        "reason": "The same trailing slash as data.url, repeated in the message."
+      }
+    ]
   }
 }
