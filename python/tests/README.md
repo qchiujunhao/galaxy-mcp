@@ -96,7 +96,9 @@ export GALAXY_URL=http://localhost:8080 GALAXY_API_KEY=...   # GALAXY_TEST_* is 
 uv run pytest tests/live -m live --no-cov --live-pack smoke                    # one pack, both servers
 uv run pytest tests/live -m live --no-cov --live-pack smoke --live-server python
 uv run pytest tests/live -m live --no-cov -k smoke.history                     # one scenario
+uv run pytest tests/live -m live --no-cov --live-waive unprivileged-tools      # skip what this Galaxy can't do
 uv run pytest tests/test_live_scenario_files.py tests/test_live_harness.py      # offline, no Galaxy
+make test-live LIVE_ARGS="--live-waive unprivileged-tools"                    # build TS, run everything
 ```
 
 Once a live test is selected, a missing or unreachable Galaxy, a rejected key, or a stale
