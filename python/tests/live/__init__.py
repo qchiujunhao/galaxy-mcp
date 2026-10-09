@@ -91,10 +91,18 @@ Details that are easy to miss:
 - Verify-step citations refer to the tool of the call step before it. An
   {"expect": "failure"} row must be cited on the step that fails, and the scenario stops
   there on that server (reported as xfail); parity compares the steps both servers ran.
+  The row only explains failures at its own `where` (or below it; `file` covers a whole
+  verify:file view): an outcome flip, a missing `creates` or a failing assertion anywhere
+  else on that step is a plain failure, so a new bug cannot hide behind a known one.
 - Scenario-level citations apply to every step calling the row's tool and are stale only
   if they change nothing in the whole run; step-level ones are stale per step.
-- `parity: exact` compares masked values, so use it where the answers should be
-  identical; `mask` patterns must match on both servers or the parity test fails.
+- `parity: shape` (the default) compares the outcome, failure sentences, the success
+  `message`, and the key structure with JSON types; a null only matches a null, but an
+  empty list (or a null list element) matches any list. `parity: exact` compares masked
+  values, so use it where the answers should be identical; `mask` patterns must match on
+  both servers or the parity test fails, and should only cover values that really vary.
 - The smoke pack owns no tools; the four packs in loader.EXPECTED_PACKS own the manifest
-  between them, and the partition and legacy-port checks skip until all four exist.
+  between them, and the offline check fails if any of the four is missing.
+- A plain run deselects live tests unless the -m expression names `live`, so another -m
+  (say `-m "not slow"`) cannot run them against an exported GALAXY_URL by accident.
 """

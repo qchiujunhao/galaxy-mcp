@@ -200,8 +200,10 @@ def apply_step_masks(view: Any, masks: list[tuple[str, str]]) -> tuple[Any, list
     return out, hits
 
 
-# A shape is None (null: matches anything), a frozenset of scalar type names,
-# ("object", {key: shape}) or ("list", shape-of-elements or None when empty).
+# A shape is None (null), a frozenset of scalar type names, ("object", {key: shape}) or
+# ("list", shape-of-elements or None when empty). Null only matches null where both servers
+# name the same key -- one server's null for the other's value is a real difference -- but
+# list elements merge, so a null element or an empty list matches any list.
 Shape = Any
 
 
@@ -243,10 +245,12 @@ def _describe(shape: Shape) -> str:
 
 def shape_diff(a: Shape, b: Shape, path: str = "") -> list[str]:
     where = path or "<root>"
-    if a is None or b is None:
+    if a is None and b is None:
         return []
     if isinstance(a, tuple) and isinstance(b, tuple) and a[0] == b[0]:
         if a[0] == "list":
+            if a[1] is None or b[1] is None:
+                return []
             return shape_diff(a[1], b[1], f"{path}[]")
         out = []
         only_a, only_b = sorted(set(a[1]) - set(b[1])), sorted(set(b[1]) - set(a[1]))
@@ -326,7 +330,15 @@ def compare_views(
         return [f"failure.sentence:\n  python:     {ps}\n  typescript: {tsent}"]
     if mode == "exact":
         return exact_diff(py, ts, weak=weak)
-    return shape_diff(shape_of(py), shape_of(ts))
+    # The success message is the sentence a client shows, so shape holds it to the same
+    # standard as a failure sentence.
+    out = []
+    pm, tm = py.get("message"), ts.get("message")
+    if not (
+        pm == tm or (isinstance(pm, str) and isinstance(tm, str) and _weak_equal(pm, tm, weak))
+    ):
+        out.append(f"message: python {json.dumps(pm)[:200]}, typescript {json.dumps(tm)[:200]}")
+    return out + shape_diff(shape_of(py), shape_of(ts))
 
 
 def _failure_hint(view: dict[str, Any]) -> str:

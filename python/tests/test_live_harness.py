@@ -23,7 +23,7 @@ from tests.live.normalise import (
     mask_value,
     to_view,
 )
-from tests.live.runner import _conclude, resolve
+from tests.live.runner import _conclude, resolve, unexplained_failures
 
 
 def _result(text, *, error=False, structured=None):
@@ -163,7 +163,23 @@ class TestConclude:
 
         row = _row(kind="server-bug", where="file", adapter={"expect": "failure"})
         with pytest.raises(ExpectedFailureError, match="failed as live/"):
-            _conclude("w", "t", {}, ["content: expected 'x'"], [], row, "python")
+            _conclude("w", "t", {}, ["content: expected 'x'"], [], row, "python", whole_file=True)
+
+    def test_expected_failure_only_explains_its_own_path(self):
+        from tests.live.runner import ExpectedFailureError
+
+        row = _row(
+            kind="server-bug", where="data.elements.extension", adapter={"expect": "failure"}
+        )
+        with pytest.raises(ExpectedFailureError):
+            _conclude("w", "t", {}, ["data.elements.0.extension: x"], [], row, "python")
+        for other in ("outcome: expected success, got failure: boom", "data.collection.state: x"):
+            with pytest.raises(AssertionError, match="also failed elsewhere"):
+                _conclude("w", "t", {}, ["data.elements.1.extension: x", other], [], row, "python")
+
+    def test_bracket_qualified_where_still_matches_its_path(self):
+        row = _row(kind="server-bug", where="failure.sentence[x]", adapter={"expect": "failure"})
+        assert unexplained_failures(["failure.sentence: y"], row, whole_file=False) == []
 
     def test_expected_failure_that_passes_asks_for_the_row_to_go(self):
         row = _row(kind="server-bug", where="file", adapter={"expect": "failure"})
@@ -191,10 +207,23 @@ class TestParity:
             "by_id": {"<id>": 1},
         }
 
-    def test_shape_treats_numbers_alike_and_null_as_wildcard(self):
-        py = {"outcome": "success", "data": {"n": 0.0, "s": None, "l": []}}
-        ts = {"outcome": "success", "data": {"n": 0, "s": "running", "l": [{"a": 1}]}}
+    def test_shape_treats_numbers_alike_and_empty_lists_as_wildcards(self):
+        py = {"outcome": "success", "data": {"n": 0.0, "z": None, "l": [], "m": [None]}}
+        ts = {"outcome": "success", "data": {"n": 0, "z": None, "l": [{"a": 1}], "m": ["x"]}}
         assert compare_views(py, ts, "shape") == []
+
+    def test_shape_reports_null_against_a_value(self):
+        py = {"outcome": "success", "data": {"suggested_filename": None}}
+        ts = {"outcome": "success", "data": {"suggested_filename": "a.txt"}}
+        assert compare_views(py, ts, "shape") == [
+            "data.suggested_filename: python null, typescript string"
+        ]
+
+    def test_shape_compares_the_message(self):
+        py = {"outcome": "success", "message": "Uploaded file from URL 'u'"}
+        ts = {"outcome": "success", "message": "Submitted URL upload to history <h.id>"}
+        (diff,) = compare_views(py, ts, "shape")
+        assert diff.startswith("message: python")
 
     def test_shape_reports_key_differences(self):
         py = {"outcome": "success", "data": {"note": "x", "file_size": 0}}

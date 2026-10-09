@@ -67,20 +67,16 @@ def test_schema_is_current():
     assert not problems, _report(problems)
 
 
-def _require_all_packs(contract):
+def test_every_pack_is_present(contract):
     absent = missing_packs(contract)
-    if absent:
-        # Phase 2 of the plan: the packs land in parallel. Remove this once all four are in.
-        pytest.skip(f"pending packs {absent} (of {list(EXPECTED_PACKS)})")
+    assert not absent, f"missing packs {absent} (expected {list(EXPECTED_PACKS)})"
 
 
 def test_packs_partition_the_manifest(contract):
-    _require_all_packs(contract)
     problems = check_partition(contract)
     assert not problems, _report(problems)
 
 
 def test_every_legacy_live_test_is_ported(contract):
-    _require_all_packs(contract)
     problems = check_ports(contract)
     assert not problems, _report(problems)

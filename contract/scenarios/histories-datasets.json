@@ -545,12 +545,14 @@
             {"path": "data.dataset_info.state", "equals": "ok"},
             {"path": "data.dataset_info.file_size", "equals": "${src.size}"},
             {"path": "data.content_available", "equals": true},
+            {"path": "data.suggested_filename", "equals": null},
             {"path": "message", "equals": "Downloaded dataset '${up}'"}
           ],
           "divergences": [
             "live/download_dataset :: data.note :: shape-mismatch",
             "live/download_dataset :: data.file_size :: shape-mismatch",
             "live/download_dataset :: data.content_available :: value-mismatch",
+            "live/download_dataset :: data.suggested_filename :: value-mismatch",
             "live/download_dataset :: message :: value-mismatch"
           ]
         },
@@ -604,8 +606,10 @@
             {"path": "data.outputs.0.name", "equals": "hd-1.bed"},
             {"path": "data.outputs.0.history_id", "equals": "${h.id}"},
             {"path": "data.jobs", "length": {"eq": 1}},
-            {"path": "data.jobs.0.tool_id", "equals": "upload1"}
+            {"path": "data.jobs.0.tool_id", "equals": "upload1"},
+            {"path": "message", "equals": "URL upload submitted"}
           ],
+          "divergences": ["live/upload_file_from_url :: message :: value-mismatch"],
           "save": {"fetched": "data.outputs.0.id"}
         },
         {"wait": {"dataset": "${fetched}", "state": "ok", "timeout": 240}},
@@ -634,7 +638,8 @@
             "file_type": "tabular",
             "dbkey": "hg19"
           },
-          "expect": [{"path": "data.outputs", "length": {"eq": 1}}],
+          "expect": [{"path": "data.outputs", "length": {"eq": 1}}, {"path": "message", "equals": "URL upload submitted"}],
+          "divergences": ["live/upload_file_from_url :: message :: value-mismatch"],
           "save": {"typed": "data.outputs.0.id"}
         },
         {"wait": {"dataset": "${typed}", "state": "ok", "timeout": 240}},
@@ -699,7 +704,8 @@
             "url": "https://raw.githubusercontent.com/galaxyproject/galaxy/dev/test-data/mcp-live-does-not-exist.bed",
             "history_id": "${h.id}"
           },
-          "expect": [{"path": "data.outputs", "length": {"eq": 1}}],
+          "expect": [{"path": "data.outputs", "length": {"eq": 1}}, {"path": "message", "equals": "URL upload submitted"}],
+          "divergences": ["live/upload_file_from_url :: message :: value-mismatch"],
           "save": {"broken": "data.outputs.0.id"}
         },
         {"wait": {"dataset": "${broken}", "state": "error", "timeout": 240}},

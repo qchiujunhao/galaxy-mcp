@@ -64,15 +64,17 @@ def test_scenario(
         if need.skip:
             live_ctx.skipped[key] = need.message
             pytest.skip(need.message)
-    for need in unmet:
-        if need.waiver in live_ctx.waivers:
-            live_ctx.skipped[key] = f"waived {need.waiver}: {need.message}"
-            pytest.skip(live_ctx.skipped[key])
-    if unmet:
+    # A waiver only skips when it covers every unmet requirement; one it does not cover
+    # still fails the run.
+    unwaived = [n for n in unmet if n.waiver not in live_ctx.waivers]
+    if unwaived:
         pytest.fail(
             "unmet requirements: "
-            + "; ".join(f"{n.message} (--live-waive {n.waiver} to skip)" for n in unmet)
+            + "; ".join(f"{n.message} (--live-waive {n.waiver} to skip)" for n in unwaived)
         )
+    if unmet:
+        live_ctx.skipped[key] = "; ".join(f"waived {n.waiver}: {n.message}" for n in unmet)
+        pytest.skip(live_ctx.skipped[key])
 
     # The message says which step and why; the harness's own frames add nothing, so these
     # are reported without a traceback (and outside the except, so without the chain).
@@ -84,14 +86,15 @@ def test_scenario(
     except (HarnessError, FindingError) as exc:
         failure = f"{type(exc).__name__}: {exc}"
     except AssertionError as exc:
-        failure = str(exc)
-    if failure:
-        # galaxy.api_key is a binding, so a tool that echoes its arguments could print it.
-        failure = failure.replace(live_ctx.api_key, "<api_key>")
-    if failure and failure.startswith("xfail: "):
+        # A bare assert outside a test module has no message; it is still a failure.
+        failure = str(exc) or f"{type(exc).__name__} with no message: {exc!r}"
+    if failure is None:
+        return
+    # galaxy.api_key is a binding, so a tool that echoes its arguments could print it.
+    failure = failure.replace(live_ctx.api_key, "<api_key>")
+    if failure.startswith("xfail: "):
         pytest.xfail(failure[len("xfail: ") :])
-    if failure:
-        pytest.fail(failure, pytrace=False)
+    pytest.fail(failure, pytrace=False)
 
 
 def test_parity(live_parity_case: tuple[Pack, Scenario], live_ctx: LiveContext) -> None:

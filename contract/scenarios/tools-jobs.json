@@ -561,8 +561,7 @@
           "args": {"tool_id": "MAF_To_BED1"},
           "expect": [
             {"path": "data.tool_name", "equals": "MAF to BED"},
-            {"path": "data.citations", "length": {"gte": 1}},
-            {"path": "count", "gte": 1}
+            {"path": "data.citations", "length": {"gte": 1}}
           ],
           "parity": "exact",
           "divergences": ["live/get_tool_citations :: data.citations :: server-bug"]

@@ -406,8 +406,39 @@ def _verify(
     view, stale, expect_row = _adapt(view, step_rows, scen_rows, rows)
     failures = evaluate_all(view, resolve_assertions(step.expect, bindings))
     _conclude(
-        where, f"verify {step.verify.kind} {target}", view, failures, stale, expect_row, rows.server
+        where,
+        f"verify {step.verify.kind} {target}",
+        view,
+        failures,
+        stale,
+        expect_row,
+        rows.server,
+        whole_file=step.verify.kind == "file",
     )
+
+
+def _bare_path(path: str) -> str:
+    """A view path without list indexes or a `where` bracket qualifier."""
+    path = re.sub(r"\[[^\]]*\]$", "", path)
+    return ".".join(seg for seg in path.split(".") if not seg.isdigit())
+
+
+def unexplained_failures(failures: list[str], row: LiveRow, whole_file: bool) -> list[str]:
+    """The failures an expect-failure row does not account for.
+
+    A row explains failures at its own `where` (or below it); anything else on the step --
+    an outcome flip, a missing `creates`, another assertion -- is a new problem that must not
+    hide behind the known one. `where: file` covers a whole verify:file view.
+    """
+    if row.where == "file" and whole_file:
+        return []
+    where = _bare_path(row.where)
+    out = []
+    for failure in failures:
+        path = _bare_path(failure.split(": ", 1)[0])
+        if not (path == where or path.startswith(where + ".")):
+            out.append(failure)
+    return out
 
 
 def _conclude(
@@ -418,8 +449,15 @@ def _conclude(
     stale: list[str],
     expect_row: LiveRow | None,
     server: str,
+    whole_file: bool = False,
 ) -> None:
     if expect_row is not None:
+        other = unexplained_failures(failures, expect_row, whole_file)
+        if other:
+            raise AssertionError(
+                f"{where} {what} cites live/{expect_row.key}, which expects a failure at "
+                f"{expect_row.where}, but it also failed elsewhere:\n  " + "\n  ".join(other)
+            )
         if failures:
             raise ExpectedFailureError(
                 f"{where} {what} failed as live/{expect_row.key} expects ({expect_row.status}): "

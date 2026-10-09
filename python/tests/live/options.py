@@ -9,6 +9,7 @@ would otherwise fill GALAXY_URL / GALAXY_API_KEY from a stray .env.
 from __future__ import annotations
 
 import os
+import re
 
 import pytest
 
@@ -59,3 +60,17 @@ def snapshot_live_env(config: pytest.Config) -> None:
 def selected_servers(config: pytest.Config) -> list[str]:
     choice = config.getoption("--live-server")
     return ["python", "typescript"] if choice == "both" else [choice]
+
+
+def deselect_unrequested_live(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Keep live tests out unless the -m expression names `live`.
+
+    addopts' -m "not live" is replaced by any -m on the command line, so `-m "not slow"` on
+    its own would otherwise run the live suite against whatever GALAXY_URL is exported.
+    """
+    if re.search(r"\blive\b", config.getoption("markexpr") or ""):
+        return
+    drop = [item for item in items if item.get_closest_marker("live")]
+    if drop:
+        config.hook.pytest_deselected(items=drop)
+        items[:] = [item for item in items if not item.get_closest_marker("live")]

@@ -264,11 +264,10 @@
           "creates": {"page": "data.id"},
           "expect": [
             {"path": "data.history_id", "equals": "${h.id}"},
-            {"path": "data.title", "type": "string"},
+            {"path": "data.title", "matches": "\\S"},
             {"path": "data.content_format", "equals": "markdown"}
           ],
-          "parity": "exact",
-          "mask": [{"path": "data.title", "pattern": "^.+$"}]
+          "parity": "exact"
         }
       ]
     },
@@ -522,7 +521,7 @@
     },
     {
       "id": "collections.list.element_metadata",
-      "note": "Each element reports its datatype and the collection its state. Both servers read element.object.extension and collection.state, which Galaxy 26.2 never sends (it sends file_ext and populated_state), so both report '' and 'unknown' -- one shared bug, recorded as a row per server under one key.",
+      "note": "Each element reports its datatype. Both servers read element.object.extension, which Galaxy 26.2 never sends (it sends file_ext), so both report '' -- one shared bug, recorded as a row per server under one key. The collection's state has the same cause and is in collections.list.state, so each expected failure explains only its own path.",
       "fixtures": [
         {"as": "h", "history": {}},
         {"as": "c", "collection": {"history": "${h.id}", "type": "list", "name": "typed", "elements": [{"name": "plain", "content": "a\n"}, {"name": "table", "content": "x\ty\n", "ext": "tabular"}]}}
@@ -532,11 +531,26 @@
           "call": "get_collection_details",
           "args": {"collection_id": "${c.id}"},
           "expect": [
-            {"path": "data.collection.state", "equals": "ok"},
             {"path": "data.elements.0.extension", "equals": "txt"},
             {"path": "data.elements.1.extension", "equals": "tabular"}
           ],
           "divergences": ["live/get_collection_details :: data.elements.extension :: server-bug"]
+        }
+      ]
+    },
+    {
+      "id": "collections.list.state",
+      "note": "A populated collection of ok datasets reports state ok. Both servers read collection.state, which Galaxy 26.2 never sends (it sends populated_state), so both report 'unknown'.",
+      "fixtures": [
+        {"as": "h", "history": {}},
+        {"as": "c", "collection": {"history": "${h.id}", "type": "list", "name": "stated", "elements": [{"name": "one", "content": "a\n"}]}}
+      ],
+      "steps": [
+        {
+          "call": "get_collection_details",
+          "args": {"collection_id": "${c.id}"},
+          "expect": [{"path": "data.collection.state", "equals": "ok"}],
+          "divergences": ["live/get_collection_details :: data.collection.state :: server-bug"]
         }
       ]
     },

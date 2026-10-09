@@ -577,7 +577,7 @@
     "$comment": "Differences only a live run can see: how each server answers the same call against a real Galaxy, as the live scenarios in contract/scenarios/ record them. Each row rewrites ONE server's answer (`server`) into the other's spelling, and only on the steps that cite it as live/<tool> :: <where> :: <kind>; that is a presentation choice, not a ruling on who is right -- the status and reason carry the ruling, with the same statuses as the rest of this file. An adapter that stops changing anything fails the live run as stale, and an {\"expect\": \"failure\"} row (a known server bug) fails it once the step starts passing, so a row cannot outlive what it describes. A bug both servers share is two rows under one key, one per server, and a single citation applies whichever is about the server under test. Format and runner: python/tests/live/.",
     "ratchet": {
       "$comment": "How many unreviewed-gap rows and rules this section holds, held in both directions by the offline check in python/tests/test_live_scenario_files.py, the same way the ratchet above works for the static rows.",
-      "unreviewedGaps": 25
+      "unreviewedGaps": 30
     },
     "normalization": {
       "argumentValidationText": {
@@ -807,6 +807,42 @@
         "reason": "galaxy-ops classifyHttp (errors.ts) turns every 401/403 into 'Unauthorized (<status>)' and every 404 into 'Not found (404)', discarding Galaxy's err_msg, and upload_file_from_url has no `failure` spec to word it otherwise. A fetch refused by Galaxy's URL allowlist therefore reads as a rejected API key, and the reason Galaxy gave is lost. Python keeps the err_msg. The same mapping applies to the other ops without a failure spec (upload_file, download_dataset)."
       },
       {
+        "tool": "upload_file_from_url",
+        "where": "message",
+        "kind": "value-mismatch",
+        "server": "python",
+        "observed": "python: \"Uploaded file from URL '<url>'\"; typescript: \"Submitted URL upload to history <history_id>\"",
+        "adapter": {
+          "sub": [
+            {
+              "path": "message",
+              "pattern": "^Uploaded file from URL '.+'$",
+              "replace": "URL upload submitted"
+            }
+          ]
+        },
+        "status": "unreviewed-gap",
+        "reason": "The confirmations carry different facts -- Python the URL, TS the history id -- so neither can be rewritten into the other. This row and the typescript row under the same key each rewrite one spelling to the neutral sentence 'URL upload submitted', which the steps assert, so either server changing its wording fails as stale or as an assertion. No golden case covers the success path."
+      },
+      {
+        "tool": "upload_file_from_url",
+        "where": "message",
+        "kind": "value-mismatch",
+        "server": "typescript",
+        "observed": "typescript: \"Submitted URL upload to history <history_id>\"; python: \"Uploaded file from URL '<url>'\"",
+        "adapter": {
+          "sub": [
+            {
+              "path": "message",
+              "pattern": "^Submitted URL upload to history [0-9a-f]+$",
+              "replace": "URL upload submitted"
+            }
+          ]
+        },
+        "status": "unreviewed-gap",
+        "reason": "The other half of the python row under the same key; see its reason."
+      },
+      {
         "tool": "invoke_workflow",
         "where": "failure.sentence",
         "kind": "failure-text-mismatch",
@@ -875,6 +911,20 @@
         },
         "status": "unreviewed-gap",
         "reason": "download-dataset.ts returns content_available false in its file_path branch and true in the in-memory one; Python's server.py reports true in both. A client deciding whether the download worked reads opposite answers from the two servers. No golden case covers download_dataset."
+      },
+      {
+        "tool": "download_dataset",
+        "where": "data.suggested_filename",
+        "kind": "value-mismatch",
+        "server": "typescript",
+        "observed": "with file_path: python returns suggested_filename null; typescript returns the dataset's name (\"hd-upload.txt\"). Without file_path both return the name.",
+        "adapter": {
+          "set": {
+            "data.suggested_filename": null
+          }
+        },
+        "status": "unreviewed-gap",
+        "reason": "server.py sets suggested_filename to None in its file_path branch; download-dataset.ts fills it in both branches. A client that names a saved copy from suggested_filename gets nothing from Python after a download to disk. Shape parity used to let a null match any value, which is how this went unrecorded."
       },
       {
         "tool": "get_tool_citations",
@@ -946,24 +996,48 @@
         "where": "data.elements.extension",
         "kind": "server-bug",
         "server": "python",
-        "observed": "python reports extension '' for every element and collection.state 'unknown' against Galaxy 26.2, whose element objects carry file_ext and whose HDCA carries populated_state",
+        "observed": "python reports extension '' for every element against Galaxy 26.2, whose element objects carry file_ext",
         "adapter": {
           "expect": "failure"
         },
         "status": "unreviewed-gap",
-        "reason": "server.py get_collection_details reads element.object.extension and collection.state; Galaxy sends file_ext and populated_state, so both fields are always their defaults. The unit tests and the golden canned replies (contract/envelopes/get_collection_details/*.galaxy.json) mock the keys Galaxy never sends, so only a live run sees it. The typescript row under the same key is the same bug."
+        "reason": "server.py get_collection_details reads element.object.extension; Galaxy sends file_ext, so the field is always its default. The unit tests and the golden canned replies (contract/envelopes/get_collection_details/*.galaxy.json) mock a key Galaxy never sends, so only a live run sees it. The typescript row under the same key is the same bug; data.collection.state has the same cause and its own rows."
       },
       {
         "tool": "get_collection_details",
         "where": "data.elements.extension",
         "kind": "server-bug",
         "server": "typescript",
-        "observed": "typescript reports extension '' for every element and collection.state 'unknown' against Galaxy 26.2",
+        "observed": "typescript reports extension '' for every element against Galaxy 26.2",
         "adapter": {
           "expect": "failure"
         },
         "status": "unreviewed-gap",
-        "reason": "galaxy-ops get-collection-details.ts mirrors server.py: normalizeElement reads object.extension and the projection reads record.state where Galaxy sends file_ext and populated_state."
+        "reason": "galaxy-ops get-collection-details.ts mirrors server.py: normalizeElement reads object.extension where Galaxy sends file_ext."
+      },
+      {
+        "tool": "get_collection_details",
+        "where": "data.collection.state",
+        "kind": "server-bug",
+        "server": "python",
+        "observed": "python reports collection.state 'unknown' for a populated, ok collection against Galaxy 26.2, whose HDCA carries populated_state",
+        "adapter": {
+          "expect": "failure"
+        },
+        "status": "unreviewed-gap",
+        "reason": "server.py get_collection_details reads collection.state; Galaxy sends populated_state, so the state is always 'unknown'. Mocked the same way as the extension rows, so only a live run sees it. Same bug on typescript, under the same key."
+      },
+      {
+        "tool": "get_collection_details",
+        "where": "data.collection.state",
+        "kind": "server-bug",
+        "server": "typescript",
+        "observed": "typescript reports collection.state 'unknown' for a populated, ok collection against Galaxy 26.2",
+        "adapter": {
+          "expect": "failure"
+        },
+        "status": "unreviewed-gap",
+        "reason": "galaxy-ops get-collection-details.ts reads record.state where Galaxy sends populated_state, mirroring server.py."
       }
     ]
   }
