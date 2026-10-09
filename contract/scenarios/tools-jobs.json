@@ -1,0 +1,815 @@
+{
+  "$comment": "Pack B: connection, server and user info, the tool catalogue (panel, search, details, templates, test cases, citations), running a tool and reading its job, and the biocontainer recommender. Every scenario that names Galaxy tools lists them in requires.tools; built-in sample tools only (upload1, cat1, sort1, plus MAF_To_BED1 for citations).",
+  "pack": "tools-jobs",
+  "tools": [
+    "connect",
+    "get_server_info",
+    "get_user",
+    "get_tool_panel",
+    "search_tools_by_name",
+    "search_tools_by_keywords",
+    "get_tool_details",
+    "get_tool_input_template",
+    "get_tool_run_examples",
+    "get_tool_citations",
+    "run_tool",
+    "get_job_details",
+    "recommend_biocontainer"
+  ],
+  "uncovered": [],
+  "scenarios": [
+    {
+      "id": "connection.connect.env_reuse",
+      "note": "With no arguments connect answers for the connection the server already made from GALAXY_URL / GALAXY_API_KEY, as the env user. Python only: TS takes its Galaxy when it is built and has no connect tool.",
+      "ports": ["TestRealConnection::test_connect_to_galaxy"],
+      "servers": ["python"],
+      "divergences": ["divergences/connect :: :: missing-ts-tool"],
+      "steps": [
+        {
+          "call": "connect",
+          "expect": [
+            {"path": "data.connected", "equals": true},
+            {"path": "data.url", "equals": "${galaxy.url}/"},
+            {"path": "data.auth", "in": ["global", "session"]},
+            {"path": "data.user.id", "equals": "${galaxy.user.id}"},
+            {"path": "data.user.email", "equals": "${galaxy.user.email}"},
+            {"path": "message", "matches": "^Connected to Galaxy at \\S+/ via (global|session)$"},
+            {"path": "message", "contains": "${galaxy.url}/"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "connection.connect.explicit_credentials",
+      "note": "An explicit url becomes this MCP session's connection, and the env key goes with it only because it is the configured URL. A wrong api_key is refused with the 401 advice, and the server keeps answering as the env user afterwards. Then url and the right api_key together connect with the key given rather than the env one.",
+      "servers": ["python"],
+      "divergences": ["divergences/connect :: :: missing-ts-tool"],
+      "steps": [
+        {
+          "call": "connect",
+          "args": {"url": "${galaxy.url}"},
+          "expect": [
+            {"path": "data.connected", "equals": true},
+            {"path": "data.url", "equals": "${galaxy.url}/"},
+            {"path": "data.auth", "equals": "session"},
+            {"path": "data.user.id", "equals": "${galaxy.user.id}"},
+            {"path": "message", "equals": "Connected to Galaxy at ${galaxy.url}/ for the current MCP session"}
+          ]
+        },
+        {
+          "call": "get_user",
+          "expect": [{"path": "data.id", "equals": "${galaxy.user.id}"}]
+        },
+        {
+          "call": "connect",
+          "args": {"url": "${galaxy.url}", "api_key": "mcp-live-not-a-real-api-key"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "Failed to connect to Galaxy at ${galaxy.url}/: "},
+            {"path": "failure.sentence", "contains": "401"},
+            {"path": "failure.sentence", "contains": "Check that your API key is valid and has the necessary permissions."}
+          ]
+        },
+        {
+          "call": "get_user",
+          "expect": [
+            {"path": "data.id", "equals": "${galaxy.user.id}"},
+            {"path": "data.email", "equals": "${galaxy.user.email}"}
+          ]
+        },
+        {
+          "call": "connect",
+          "args": {"url": "${galaxy.url}", "api_key": "${galaxy.api_key}"},
+          "expect": [
+            {"path": "data.connected", "equals": true},
+            {"path": "data.url", "equals": "${galaxy.url}/"},
+            {"path": "data.user.id", "equals": "${galaxy.user.id}"},
+            {"path": "message", "contains": "Connected to Galaxy at ${galaxy.url}/"}
+          ]
+        },
+        {
+          "call": "get_user",
+          "expect": [{"path": "data.id", "equals": "${galaxy.user.id}"}]
+        }
+      ]
+    },
+    {
+      "id": "connection.connect.foreign_url_refused",
+      "note": "The env key belongs to GALAXY_URL only: asking for another Galaxy without an api_key is refused before any request leaves. Over stdio this is the URL refusal that applies -- 'Galaxy URL is not allowed by this server.' is the HTTP-transport allowlist and cannot be reached from a stdio session.",
+      "servers": ["python"],
+      "divergences": ["divergences/connect :: :: missing-ts-tool"],
+      "steps": [
+        {
+          "call": "connect",
+          "args": {"url": "http://127.0.0.1:9"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "equals": "The configured GALAXY_API_KEY is only used with the configured GALAXY_URL. Pass api_key explicitly to connect to a different server."}
+          ]
+        },
+        {
+          "call": "get_user",
+          "expect": [{"path": "data.id", "equals": "${galaxy.user.id}"}]
+        }
+      ]
+    },
+    {
+      "id": "connection.server_info.reports_galaxy",
+      "note": "get_server_info names the Galaxy it was started against, its version as /api/version reports it, and that this version rules out no tool. Python's trailing slash is the cited value-mismatch rows; everything else must match exactly.",
+      "ports": ["TestRealConnection::test_get_server_info"],
+      "steps": [
+        {
+          "call": "get_server_info",
+          "expect": [
+            {"path": "data.url", "equals": "${galaxy.url}"},
+            {"path": "message", "equals": "Retrieved server info for ${galaxy.url}"},
+            {"path": "data", "keys_equal": ["url", "version", "version_known", "unsupported_tools", "config"]},
+            {"path": "data.version_known", "equals": true},
+            {"path": "data.version.version_major", "type": "string"},
+            {"path": "data.unsupported_tools", "equals": []},
+            {"path": "data.config", "keys_include": ["brand", "allow_user_creation", "enable_quotas", "ftp_upload_site"]}
+          ],
+          "parity": "exact",
+          "divergences": [
+            "live/get_server_info :: data.url :: value-mismatch",
+            "live/get_server_info :: message :: value-mismatch"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "connection.user.current",
+      "note": "get_user answers as the key's owner, passing Galaxy's /api/users/current through with a message naming the username.",
+      "ports": ["TestRealConnection::test_get_current_user"],
+      "steps": [
+        {
+          "call": "get_user",
+          "expect": [
+            {"path": "data.id", "equals": "${galaxy.user.id}"},
+            {"path": "data.email", "equals": "${galaxy.user.email}"},
+            {"path": "data.username", "equals": "${galaxy.user.username}"},
+            {"path": "data.is_admin", "type": "boolean"},
+            {"path": "data", "keys_include": ["total_disk_usage", "nice_total_disk_usage", "quota", "preferences"]},
+            {"path": "message", "equals": "Retrieved user info for '${galaxy.user.username}'"},
+            {"path": "count", "equals": null},
+            {"path": "pagination", "equals": null}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "tools.panel.browse",
+      "note": "The summary lists top-level entries without their tools; opening a section returns exactly as many slim tools as the summary advertised; paging the summary is consistent arithmetic.",
+      "ports": ["TestRealToolOperations::test_get_tool_panel"],
+      "steps": [
+        {
+          "call": "get_tool_panel",
+          "expect": [
+            {"path": "data", "keys_equal": ["entries"]},
+            {"path": "data.entries", "length": {"gte": 1}},
+            {"path": "data.entries", "each": [
+              {"path": "id", "type": "string"},
+              {"path": "name", "type": "string"},
+              {"path": "type", "in": ["section", "tool"]},
+              {"path": "", "keys_exclude": ["elems", "tools"]}
+            ]},
+            {"path": "data.entries.0.type", "equals": "section"},
+            {"path": "data.entries.0.tool_count", "gte": 1},
+            {"path": "count", "gte": {"path": "pagination.returned_items"}},
+            {"path": "count", "lte": {"path": "pagination.returned_items"}},
+            {"path": "pagination.total_items", "gte": {"path": "count"}},
+            {"path": "pagination.offset", "equals": 0},
+            {"path": "message", "matches": "^Retrieved \\d+ of \\d+ tool panel entries; pass section_id to list a section's tools$"}
+          ],
+          "parity": "exact",
+          "save": {"section": "data.entries.0.id", "section_count": "data.entries.0.tool_count"}
+        },
+        {
+          "call": "get_tool_panel",
+          "args": {"section_id": "${section}"},
+          "expect": [
+            {"path": "data.section_id", "equals": "${section}"},
+            {"path": "data.section_name", "type": "string"},
+            {"path": "pagination.total_items", "equals": "${section_count}"},
+            {"path": "data.tools", "length": {"gte": 1}},
+            {"path": "data.tools", "each": [
+              {"path": "", "keys_equal": ["id", "name", "description", "versions"]},
+              {"path": "id", "type": "string"},
+              {"path": "versions", "type": "list"}
+            ]},
+            {"path": "message", "matches": "^Retrieved \\d+ of \\d+ tools in section '"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "get_tool_panel",
+          "args": {"limit": 2, "offset": 1},
+          "expect": [
+            {"path": "count", "equals": 2},
+            {"path": "data.entries", "length": {"eq": 2}},
+            {"path": "pagination.limit", "equals": 2},
+            {"path": "pagination.offset", "equals": 1},
+            {"path": "pagination.has_previous", "equals": true},
+            {"path": "pagination.previous_offset", "equals": 0},
+            {"path": "pagination.total_items", "gt": 3},
+            {"path": "pagination.has_next", "equals": true},
+            {"path": "pagination.next_offset", "equals": 3}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "tools.panel.refusals",
+      "note": "An unknown section and out-of-range windows are refused by the server itself, with the same sentence from both.",
+      "steps": [
+        {
+          "call": "get_tool_panel",
+          "args": {"section_id": "mcp_live_no_such_section"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "equals": "Tool panel section 'mcp_live_no_such_section' not found. Call get_tool_panel() with no arguments to list the available section ids."}
+          ]
+        },
+        {
+          "call": "get_tool_panel",
+          "args": {"limit": 0},
+          "outcome": "failure",
+          "expect": [{"path": "failure.sentence", "equals": "limit must be at least 1 (got 0)"}]
+        },
+        {
+          "call": "get_tool_panel",
+          "args": {"limit": 501},
+          "outcome": "failure",
+          "expect": [{"path": "failure.sentence", "equals": "limit must be at most 500 (got 501); request 500 or fewer and use offset to page through the rest"}]
+        },
+        {
+          "call": "get_tool_panel",
+          "args": {"offset": -1},
+          "outcome": "failure",
+          "expect": [{"path": "failure.sentence", "equals": "offset must be 0 or greater (got -1)"}]
+        }
+      ]
+    },
+    {
+      "id": "tools.search_name.substring",
+      "note": "Substring search over id, name and description finds the built-ins it should, pages consistently, and an empty match is a successful empty page.",
+      "ports": ["TestRealToolOperations::test_search_tools_by_name"],
+      "requires": {"tools": ["upload1", "cat1"]},
+      "steps": [
+        {
+          "call": "search_tools_by_name",
+          "args": {"query": "upload"},
+          "expect": [
+            {"path": "data", "has_item": {"id": "upload1"}},
+            {"path": "count", "gte": 1},
+            {"path": "message", "matches": "^Found \\d+ tools matching 'upload', returning \\d+$"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "search_tools_by_name",
+          "args": {"query": "CAT"},
+          "expect": [
+            {"path": "data", "has_item": {"id": "cat1", "name": "Concatenate multiple datasets or collections"}},
+            {"path": "data", "each": [
+              {"path": "", "keys_include": ["id", "name", "version", "description", "panel_section_id"]}
+            ]},
+            {"path": "count", "gte": {"path": "pagination.returned_items"}},
+            {"path": "count", "lte": {"path": "pagination.returned_items"}},
+            {"path": "pagination.total_items", "gte": 2},
+            {"path": "pagination.limit", "equals": 25}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "search_tools_by_name",
+          "args": {"query": "cat", "limit": 1, "offset": 1},
+          "expect": [
+            {"path": "count", "equals": 1},
+            {"path": "data", "length": {"eq": 1}},
+            {"path": "pagination.offset", "equals": 1},
+            {"path": "pagination.has_previous", "equals": true},
+            {"path": "pagination.previous_offset", "equals": 0}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "search_tools_by_name",
+          "args": {"query": "${run.tag}"},
+          "expect": [
+            {"path": "data", "equals": []},
+            {"path": "count", "equals": 0},
+            {"path": "pagination.total_items", "equals": 0},
+            {"path": "pagination.has_next", "equals": false},
+            {"path": "message", "equals": "Found 0 tools matching '${run.tag}', returning 0"}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "tools.search_name.refusals",
+      "note": "A window above the cap is the tool's own refusal; a limit that is not an integer never reaches the tool (only the failure kind is comparable, live.normalization.argumentValidationText).",
+      "steps": [
+        {
+          "call": "search_tools_by_name",
+          "args": {"query": "cat", "limit": 101},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "equals": "limit must be at most 100 (got 101); request 100 or fewer and use offset to page through the rest"}
+          ]
+        },
+        {
+          "call": "search_tools_by_name",
+          "args": {"query": "cat", "limit": "abc"},
+          "outcome": "failure",
+          "expect": [{"path": "failure.kind", "equals": "arguments"}]
+        },
+        {
+          "call": "search_tools_by_name",
+          "args": {"limit": 5},
+          "outcome": "failure",
+          "expect": [{"path": "failure.kind", "equals": "arguments"}]
+        }
+      ]
+    },
+    {
+      "id": "tools.search_keywords.match",
+      "note": "Keyword search matches names and descriptions first and accepted input formats after, in panel order, so the same page comes back from both servers. The format-matching pass is the expensive one (a detail lookup per tool), so the second step pins it with exact parity.",
+      "requires": {"tools": ["cat1"]},
+      "steps": [
+        {
+          "call": "search_tools_by_keywords",
+          "args": {"keywords": ["Concatenate"]},
+          "expect": [
+            {"path": "data", "has_item": {"id": "cat1"}},
+            {"path": "data", "each": [
+              {"path": "", "keys_equal": ["id", "name", "description", "versions"]}
+            ]},
+            {"path": "message", "matches": "^Found \\d+ tools matching keywords: Concatenate, returning \\d+$"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "search_tools_by_keywords",
+          "args": {"keywords": ["tabular", "maf"], "limit": 5, "offset": 2},
+          "expect": [
+            {"path": "count", "equals": 5},
+            {"path": "pagination.offset", "equals": 2},
+            {"path": "pagination.has_next", "equals": true},
+            {"path": "pagination.total_items", "gt": 7},
+            {"path": "message", "matches": "^Found \\d+ tools matching keywords: tabular, maf, returning 5$"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "search_tools_by_keywords",
+          "args": {"keywords": ["${run.tag}"]},
+          "expect": [
+            {"path": "data", "equals": []},
+            {"path": "count", "equals": 0}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "tools.search_keywords.refusals",
+      "note": "Window checks run before the panel is fetched; keywords must be a list of strings.",
+      "steps": [
+        {
+          "call": "search_tools_by_keywords",
+          "args": {"keywords": ["cat"], "limit": 201},
+          "outcome": "failure",
+          "expect": [{"path": "failure.sentence", "equals": "limit must be at most 200 (got 201); request 200 or fewer and use offset to page through the rest"}]
+        },
+        {
+          "call": "search_tools_by_keywords",
+          "args": {"keywords": "cat"},
+          "outcome": "failure",
+          "expect": [{"path": "failure.kind", "equals": "arguments"}]
+        }
+      ]
+    },
+    {
+      "id": "tools.details.show",
+      "note": "Without io_details the tool show omits the parameter schema; with it, inputs and outputs are present. The panel section the tool reports opens to a list that contains the tool.",
+      "ports": ["TestRealToolOperations::test_get_tool_details"],
+      "requires": {"tools": ["upload1", "cat1"]},
+      "steps": [
+        {
+          "call": "get_tool_details",
+          "args": {"tool_id": "upload1"},
+          "expect": [
+            {"path": "data.id", "equals": "upload1"},
+            {"path": "data.name", "type": "string"},
+            {"path": "data.version", "type": "string"},
+            {"path": "data", "keys_exclude": ["inputs", "outputs"]},
+            {"path": "message", "equals": "Retrieved details for tool 'upload1'"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "get_tool_details",
+          "args": {"tool_id": "cat1", "io_details": true},
+          "expect": [
+            {"path": "data.id", "equals": "cat1"},
+            {"path": "data.inputs", "has_item": {"name": "input1", "type": "data"}},
+            {"path": "data.inputs", "has_item": {"name": "queries", "type": "repeat"}},
+            {"path": "data.outputs", "has_item": {"name": "out_file1"}},
+            {"path": "data.panel_section_id", "type": "string"}
+          ],
+          "parity": "exact",
+          "save": {"section": "data.panel_section_id"}
+        },
+        {
+          "call": "get_tool_panel",
+          "args": {"section_id": "${section}", "limit": 500},
+          "expect": [{"path": "data.tools", "has_item": {"id": "cat1"}}]
+        }
+      ]
+    },
+    {
+      "id": "tools.details.unknown_tool",
+      "note": "A tool id Galaxy does not know is a 404, reported with the same sentence by every tool that reads a tool's metadata.",
+      "steps": [
+        {
+          "call": "get_tool_details",
+          "args": {"tool_id": "mcp_live_no_such_tool"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "Get tool details failed: "},
+            {"path": "failure.sentence", "contains": "Could not find tool with id 'mcp_live_no_such_tool'"},
+            {"path": "failure.sentence", "contains": "(Resource not found - check IDs and URLs)"}
+          ]
+        },
+        {
+          "call": "get_tool_input_template",
+          "args": {"tool_id": "mcp_live_no_such_tool"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.sentence", "contains": "Get tool input template failed: "},
+            {"path": "failure.sentence", "contains": "Context: tool_id=mcp_live_no_such_tool"}
+          ]
+        },
+        {
+          "call": "get_tool_run_examples",
+          "args": {"tool_id": "mcp_live_no_such_tool"},
+          "outcome": "failure",
+          "expect": [{"path": "failure.sentence", "contains": "Get tool run examples failed: "}]
+        },
+        {
+          "call": "get_tool_citations",
+          "args": {"tool_id": "mcp_live_no_such_tool"},
+          "outcome": "failure",
+          "expect": [{"path": "failure.sentence", "contains": "Get tool citations failed: "}]
+        },
+        {
+          "call": "get_tool_details",
+          "args": {"io_details": true},
+          "outcome": "failure",
+          "expect": [{"path": "failure.kind", "equals": "arguments"}]
+        }
+      ]
+    },
+    {
+      "id": "tools.input_template.cat1",
+      "note": "The template uses the legacy flat keys run_tool takes (a repeat as name_0|param), with dataset placeholders, and the compact schema describes the same parameters.",
+      "requires": {"tools": ["cat1"]},
+      "steps": [
+        {
+          "call": "get_tool_input_template",
+          "args": {"tool_id": "cat1"},
+          "expect": [
+            {"path": "data.tool_id", "equals": "cat1"},
+            {"path": "data.inputs_template", "keys_equal": ["input1", "queries_0|input2"]},
+            {"path": "data.inputs_template.input1", "equals": {"src": "hda", "id": "<dataset_id>"}},
+            {"path": "data.parameters", "has_item": {"name": "input1", "type": "data", "optional": false}},
+            {"path": "data.parameters", "has_item": {"name": "queries", "type": "repeat", "repeat_key_hint": "queries_0|<param>"}},
+            {"path": "message", "equals": "Built an input template for tool 'cat1'. Replace placeholders (e.g. <dataset_id>) and pass the result as `inputs` to run_tool."}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "tools.run_examples.sort1",
+      "note": "The tool's own XML tests come back as Galaxy reports them: one entry per test, each naming the tool, with the count in `count`. tool_version '*' asks for every installed version.",
+      "requires": {"tools": ["sort1"]},
+      "steps": [
+        {
+          "call": "get_tool_run_examples",
+          "args": {"tool_id": "sort1"},
+          "expect": [
+            {"path": "data.tool_id", "equals": "sort1"},
+            {"path": "data.requested_version", "equals": null},
+            {"path": "data.test_cases", "length": {"gte": 1}},
+            {"path": "count", "gte": 1},
+            {"path": "data.test_cases", "each": [
+              {"path": "tool_id", "equals": "sort1"},
+              {"path": "", "keys_include": ["inputs", "outputs", "required_files", "test_index", "tool_version"]}
+            ]},
+            {"path": "message", "matches": "^Retrieved \\d+ test cases for tool 'sort1'$"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "get_tool_run_examples",
+          "args": {"tool_id": "sort1", "tool_version": "*"},
+          "expect": [
+            {"path": "data.requested_version", "equals": "*"},
+            {"path": "count", "gte": 1},
+            {"path": "data.test_cases", "has_item": {"tool_id": "sort1", "test_index": 0}}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "tools.citations.none_declared",
+      "note": "cat1 declares no citations: an empty list, count 0, and the tool's name and version alongside.",
+      "requires": {"tools": ["cat1"]},
+      "steps": [
+        {
+          "call": "get_tool_citations",
+          "args": {"tool_id": "cat1"},
+          "expect": [
+            {"path": "data.tool_name", "equals": "Concatenate multiple datasets or collections"},
+            {"path": "data.tool_version", "type": "string"},
+            {"path": "data.citations", "equals": []},
+            {"path": "count", "equals": 0},
+            {"path": "message", "equals": "Retrieved 0 citations for tool 'cat1'"}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "tools.citations.declared",
+      "note": "MAF_To_BED1 declares a bibtex citation (GET /api/tools/MAF_To_BED1/citations returns it), so get_tool_citations should report at least one.",
+      "requires": {"tools": ["MAF_To_BED1"]},
+      "steps": [
+        {
+          "call": "get_tool_citations",
+          "args": {"tool_id": "MAF_To_BED1"},
+          "expect": [
+            {"path": "data.tool_name", "equals": "MAF to BED"},
+            {"path": "data.citations", "length": {"gte": 1}},
+            {"path": "count", "gte": 1}
+          ],
+          "parity": "exact",
+          "divergences": ["live/get_tool_citations :: data.citations :: server-bug"]
+        }
+      ]
+    },
+    {
+      "id": "jobs.run_tool.cat1_concatenates",
+      "note": "run_tool submits cat1 over two datasets using the template's flat repeat key, answers with Galaxy's submission record straight away (outputs not yet ok), and the job it names finishes ok with exit code 0 and an output that is the two inputs end to end.",
+      "ports": ["TestRealToolExecution::test_run_simple_tool"],
+      "requires": {"tools": ["cat1"]},
+      "fixtures": [
+        {"as": "h", "history": {"name": "${run.tag}-tools-jobs"}},
+        {"as": "d1", "dataset": {"history": "${h.id}", "content": "line 1\nline 2\nline 3\n", "name": "first.txt"}},
+        {"as": "d2", "dataset": {"history": "${h.id}", "content": "line 4\n", "name": "second.txt"}}
+      ],
+      "steps": [
+        {
+          "call": "run_tool",
+          "args": {
+            "history_id": "${h.id}",
+            "tool_id": "cat1",
+            "inputs": {
+              "input1": {"src": "hda", "id": "${d1.id}"},
+              "queries_0|input2": {"src": "hda", "id": "${d2.id}"}
+            }
+          },
+          "expect": [
+            {"path": "message", "equals": "Started tool 'cat1' in history '${h.id}'"},
+            {"path": "data", "keys_include": ["outputs", "jobs", "output_collections", "implicit_collections"]},
+            {"path": "data.outputs", "length": {"eq": 1}},
+            {"path": "data.outputs.0.history_id", "equals": "${h.id}"},
+            {"path": "data.outputs.0.output_name", "equals": "out_file1"},
+            {"path": "data.outputs.0.state", "not_equals": "ok"},
+            {"path": "data.jobs", "length": {"eq": 1}},
+            {"path": "data.jobs.0.tool_id", "equals": "cat1"},
+            {"path": "data.jobs.0.tool_version", "type": "string"}
+          ],
+          "save": {"out": "data.outputs.0.id", "job": "data.jobs.0.id"}
+        },
+        {
+          "call": "get_job_details",
+          "args": {"dataset_id": "${out}", "history_id": "${h.id}"},
+          "until": {
+            "expect": [{"path": "data.job.state", "in": ["ok", "error", "failed", "deleted", "skipped", "paused"]}],
+            "timeout": 180,
+            "interval": 2
+          },
+          "expect": [
+            {"path": "data.job_id", "equals": "${job}"},
+            {"path": "data.dataset_id", "equals": "${out}"},
+            {"path": "data.job.id", "equals": "${job}"},
+            {"path": "data.job.tool_id", "equals": "cat1"},
+            {"path": "data.job.state", "equals": "ok"},
+            {"path": "data.job.exit_code", "equals": 0},
+            {"path": "data.job.history_id", "equals": "${h.id}"},
+            {"path": "message", "equals": "Retrieved job details for dataset '${out}'"}
+          ]
+        },
+        {"wait": {"dataset": "${out}", "state": "ok"}},
+        {
+          "verify": {"dataset_text": "${out}"},
+          "expect": [{"path": "content", "equals": "line 1\nline 2\nline 3\nline 4\n"}]
+        }
+      ]
+    },
+    {
+      "id": "jobs.run_tool.version_clause",
+      "note": "With tool_version the message says which version ran, read from the jobs Galaxy returned rather than echoed from the request: the installed version is confirmed, and a version that is not installed is reported as the one Galaxy fell back to.",
+      "requires": {"tools": ["cat1"]},
+      "fixtures": [
+        {"as": "h", "history": {"name": "${run.tag}-tools-jobs"}},
+        {"as": "d", "dataset": {"history": "${h.id}", "content": "v\n"}}
+      ],
+      "steps": [
+        {
+          "call": "get_tool_details",
+          "args": {"tool_id": "cat1"},
+          "expect": [{"path": "data.version", "type": "string"}],
+          "save": {"ver": "data.version"}
+        },
+        {
+          "call": "run_tool",
+          "args": {"history_id": "${h.id}", "tool_id": "cat1", "tool_version": "${ver}", "inputs": {"input1": {"src": "hda", "id": "${d.id}"}}},
+          "expect": [
+            {"path": "message", "equals": "Started tool 'cat1' at version ${ver} in history '${h.id}'"},
+            {"path": "data.jobs.0.tool_version", "equals": "${ver}"}
+          ],
+          "save": {"job1": "data.jobs.0.id"}
+        },
+        {
+          "call": "run_tool",
+          "args": {"history_id": "${h.id}", "tool_id": "cat1", "tool_version": "0.0.1-mcp-live", "inputs": {"input1": {"src": "hda", "id": "${d.id}"}}},
+          "expect": [
+            {"path": "message", "equals": "Started tool 'cat1' at version ${ver} (not the 0.0.1-mcp-live requested) in history '${h.id}' (inputs not pre-checked: Galaxy described version ${ver} of 'cat1' rather than the 0.0.1-mcp-live asked for, so its parameters are not the ones this run would use)"},
+            {"path": "data.jobs.0.tool_version", "equals": "${ver}"}
+          ],
+          "save": {"job2": "data.jobs.0.id"}
+        },
+        {"wait": {"job": "${job1}", "state": "ok"}},
+        {"wait": {"job": "${job2}", "state": "ok"}}
+      ]
+    },
+    {
+      "id": "jobs.run_tool.refusals",
+      "note": "Galaxy refuses an unknown tool; the input preflight refuses a collection where sort1 takes one dataset before anything is submitted, naming the fix.",
+      "requires": {"tools": ["sort1"]},
+      "fixtures": [
+        {"as": "h", "history": {"name": "${run.tag}-tools-jobs"}},
+        {"as": "c", "collection": {"history": "${h.id}", "type": "list", "elements": [
+          {"name": "a", "content": "b\t2\na\t1\n"},
+          {"name": "b", "content": "d\t4\nc\t3\n"}
+        ]}}
+      ],
+      "steps": [
+        {
+          "call": "run_tool",
+          "args": {"history_id": "${h.id}", "tool_id": "mcp_live_no_such_tool", "inputs": {}},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "mcp_live_no_such_tool"}
+          ]
+        },
+        {
+          "call": "run_tool",
+          "args": {"history_id": "${h.id}", "tool_id": "sort1", "inputs": {"input": {"src": "hdca", "id": "${c.id}"}}},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "collection"},
+            {"path": "failure.sentence", "contains": "input"}
+          ],
+          "divergences": ["live/run_tool :: failure.sentence :: failure-text-mismatch"]
+        },
+        {
+          "call": "run_tool",
+          "args": {"history_id": "${h.id}", "tool_id": "sort1"},
+          "outcome": "failure",
+          "expect": [{"path": "failure.kind", "equals": "arguments"}]
+        },
+        {
+          "verify": {"history": "${h.id}"},
+          "expect": [
+            {"path": "count", "equals": 3},
+            {"path": "state_details.ok", "equals": 2},
+            {"path": "state_ids.new", "equals": []},
+            {"path": "state_ids.queued", "equals": []},
+            {"path": "state_ids.running", "equals": []}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "jobs.job_details.upload",
+      "note": "A pasted dataset was made by an upload job, which get_job_details finds from the dataset alone (no history_id: the creating_job fallback) and reports finished ok.",
+      "fixtures": [
+        {"as": "h", "history": {"name": "${run.tag}-tools-jobs"}},
+        {"as": "d", "dataset": {"history": "${h.id}", "content": "x\n"}}
+      ],
+      "steps": [
+        {
+          "call": "get_job_details",
+          "args": {"dataset_id": "${d.id}"},
+          "expect": [
+            {"path": "data", "keys_equal": ["job", "dataset_id", "job_id"]},
+            {"path": "data.dataset_id", "equals": "${d.id}"},
+            {"path": "data.job_id", "matches": "^[0-9a-f]{16}$"},
+            {"path": "data.job.id", "matches": "^[0-9a-f]{16}$"},
+            {"path": "data.job.state", "equals": "ok"},
+            {"path": "data.job.tool_id", "in": ["__DATA_FETCH__", "upload1"]}
+          ],
+          "save": {"job": "data.job_id"}
+        },
+        {
+          "call": "get_job_details",
+          "args": {"dataset_id": "${d.id}", "history_id": "${h.id}"},
+          "expect": [{"path": "data.job_id", "equals": "${job}"}]
+        }
+      ]
+    },
+    {
+      "id": "jobs.job_details.refusals",
+      "note": "An id Galaxy cannot decode is refused with its 400 text and the dataset id as context, identically on both servers.",
+      "steps": [
+        {
+          "call": "get_job_details",
+          "args": {"dataset_id": "0123456789abcdef"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "Get job details failed: "},
+            {"path": "failure.sentence", "contains": "Context: dataset_id=0123456789abcdef"}
+          ]
+        },
+        {
+          "call": "get_job_details",
+          "args": {},
+          "outcome": "failure",
+          "expect": [{"path": "failure.kind", "equals": "arguments"}]
+        }
+      ]
+    },
+    {
+      "id": "tools.biocontainer.samtools",
+      "note": "A pinned single package resolves to its quay.io/biocontainers image, verified against quay.io. Needs the network and, on Python, the container-recommend extra (without it the tool is not registered and test_surface fails).",
+      "requires": {"capabilities": ["network"]},
+      "steps": [
+        {
+          "call": "recommend_biocontainer",
+          "args": {"packages": ["samtools=1.17"]},
+          "expect": [
+            {"path": "data.image", "matches": "^quay\\.io/biocontainers/samtools:1\\.17--"},
+            {"path": "data.found", "equals": true},
+            {"path": "data.match_quality", "equals": "exact_version"},
+            {"path": "data.verified", "equals": true},
+            {"path": "data", "keys_equal": ["image", "found", "match_quality", "source", "notes", "verified"]},
+            {"path": "message", "matches": "^Resolved quay\\.io/biocontainers/samtools:1\\.17--\\S+ \\(exact_version\\)$"}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "tools.biocontainer.refusals",
+      "note": "A package entry with no name is the tool's own refusal on both servers. An empty list is refused on both, but TS rejects it in its input schema and Python in the tool.",
+      "steps": [
+        {
+          "call": "recommend_biocontainer",
+          "args": {"packages": ["=1.0"]},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "equals": "invalid package entry '=1.0': expected 'name' or 'name=version'"}
+          ]
+        },
+        {
+          "call": "recommend_biocontainer",
+          "args": {"packages": []},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "equals": "packages must contain at least one conda package name"}
+          ],
+          "divergences": ["live/recommend_biocontainer :: failure.kind :: failure-text-mismatch"]
+        }
+      ]
+    }
+  ]
+}

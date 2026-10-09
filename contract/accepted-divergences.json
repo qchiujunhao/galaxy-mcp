@@ -577,7 +577,7 @@
     "$comment": "Differences only a live run can see: how each server answers the same call against a real Galaxy, as the live scenarios in contract/scenarios/ record them. Each row rewrites ONE server's answer (`server`) into the other's spelling, and only on the steps that cite it as live/<tool> :: <where> :: <kind>; that is a presentation choice, not a ruling on who is right -- the status and reason carry the ruling, with the same statuses as the rest of this file. An adapter that stops changing anything fails the live run as stale, and an {\"expect\": \"failure\"} row (a known server bug) fails it once the step starts passing, so a row cannot outlive what it describes. A bug both servers share is two rows under one key, one per server, and a single citation applies whichever is about the server under test. Format and runner: python/tests/live/.",
     "ratchet": {
       "$comment": "How many unreviewed-gap rows and rules this section holds, held in both directions by the offline check in python/tests/test_live_scenario_files.py, the same way the ratchet above works for the static rows.",
-      "unreviewedGaps": 3
+      "unreviewedGaps": 25
     },
     "normalization": {
       "argumentValidationText": {
@@ -620,6 +620,350 @@
         },
         "status": "unreviewed-gap",
         "reason": "The same trailing slash as data.url, repeated in the message."
+      },
+      {
+        "tool": "create_history",
+        "where": "outcome",
+        "kind": "outcome-mismatch",
+        "server": "typescript",
+        "observed": "history_name \"\": python succeeds and Galaxy names the history 'Unnamed history' (message \"Created history ''\"); typescript refuses before the tool runs with MCP error -32602 (too_small, minimum 1)",
+        "adapter": {
+          "expect": "failure"
+        },
+        "status": "unreviewed-gap",
+        "reason": "TS's zod input adds .min(1) to historyName, a constraint the manifest's create_history.inputSchema does not carry (history_name is a bare string) and Python does not apply. A client that sends an empty name gets a history from one server and an argument error from the other. Either the manifest gains minLength 1 (and Python refuses too) or TS drops the bound."
+      },
+      {
+        "tool": "upload_file",
+        "where": "message",
+        "kind": "value-mismatch",
+        "server": "python",
+        "observed": "python: \"Uploaded file '/tmp/.../hd-upload.txt'\"; typescript: \"Uploaded hd-upload.txt (1 job(s))\"",
+        "adapter": {
+          "sub": [
+            {
+              "path": "message",
+              "pattern": "^Uploaded file '(?:.*/)?([^/']*)'$",
+              "replace": "Uploaded \\1 (1 job(s))"
+            }
+          ]
+        },
+        "status": "unreviewed-gap",
+        "reason": "The two servers word the upload confirmation differently: Python quotes the full local path it was given, TS names the basename and counts the jobs Galaxy started. upload_file has no golden fixture, so only the live run sees it. The rewrite assumes Python's single upload job, which is all bioblend's upload_file ever starts."
+      },
+      {
+        "tool": "upload_file",
+        "where": "failure.sentence",
+        "kind": "failure-text-mismatch",
+        "server": "python",
+        "observed": "missing path: python \"Failed to upload file: File not found: '<p>' (absolute: '<p>'). Check that the file exists and you have read permissions.\"; typescript \"file not found: <p>\"",
+        "adapter": {
+          "sub": [
+            {
+              "path": "failure.sentence",
+              "pattern": "^Failed to upload file: File not found: '([^']*)' \\(absolute: '[^']*'\\)\\. Check that the file exists and you have read permissions\\.$",
+              "replace": "file not found: \\1"
+            }
+          ]
+        },
+        "status": "unreviewed-gap",
+        "reason": "upload_file's failure envelope was never pinned (no golden case), and the two servers refuse a missing local path in different words. TS's sentence drops the absolute path and the hint Python gives."
+      },
+      {
+        "tool": "download_dataset",
+        "where": "data.note",
+        "kind": "shape-mismatch",
+        "server": "python",
+        "observed": "python's data always carries `note` (\"Content downloaded to memory...\" or \"File saved to specified path.\"); typescript's never does",
+        "adapter": {
+          "drop": [
+            "data.note"
+          ]
+        },
+        "status": "unreviewed-gap",
+        "reason": "download_dataset has no golden fixture, so its success envelope was never held to one shape. Python adds a prose note in both modes; TS's DownloadDatasetResult has no such field."
+      },
+      {
+        "tool": "download_dataset",
+        "where": "data.file_path",
+        "kind": "shape-mismatch",
+        "server": "python",
+        "observed": "without file_path: python returns file_path: null; typescript omits the key",
+        "adapter": {
+          "drop": [
+            "data.file_path"
+          ]
+        },
+        "status": "unreviewed-gap",
+        "reason": "Python always emits file_path and sets it to None in the in-memory branch; TS only sets it when it wrote a file. A client testing `\"file_path\" in data` reads the two differently."
+      },
+      {
+        "tool": "download_dataset",
+        "where": "data.file_size",
+        "kind": "shape-mismatch",
+        "server": "python",
+        "observed": "with file_path: python returns file_size (the size of the file it wrote); typescript omits the key",
+        "adapter": {
+          "drop": [
+            "data.file_size"
+          ]
+        },
+        "status": "unreviewed-gap",
+        "reason": "Python reports the written file's size in the file_path branch; TS reports file_size only in the in-memory branch, so a client has no size from TS after a download to disk except dataset_info.file_size (Galaxy's own figure)."
+      },
+      {
+        "tool": "download_dataset",
+        "where": "data.file_size",
+        "kind": "server-bug",
+        "server": "python",
+        "observed": "without file_path, for a 17-byte ok dataset: python reports file_size 0 and content_available true; typescript reports file_size 17",
+        "adapter": {
+          "expect": "failure"
+        },
+        "status": "unreviewed-gap",
+        "reason": "galaxy_mcp.client.GalaxyInstance.make_get_request forces allow_redirects=False on every GET. bioblend downloads through /api/histories/{h}/contents/{d}/download, which Galaxy answers with a same-origin 302 to /api/datasets/{d}/display; raise_for_status() lets the 3xx through, so the empty redirect body is what Python measures. Plain bioblend gets the bytes."
+      },
+      {
+        "tool": "download_dataset",
+        "where": "file",
+        "kind": "server-bug",
+        "server": "python",
+        "observed": "with file_path, for a 54-byte ok dataset: python writes a 0-byte file and reports success; typescript writes the 54 bytes",
+        "adapter": {
+          "expect": "failure"
+        },
+        "status": "unreviewed-gap",
+        "reason": "The same allow_redirects=False in galaxy_mcp.client.GalaxyInstance: bioblend streams the body of Galaxy's 302 from /api/histories/{h}/contents/{d}/download to the file, which is empty. The tool reports success with content_available true, so nothing tells the caller the file is empty."
+      },
+      {
+        "tool": "download_dataset",
+        "where": "message",
+        "kind": "value-mismatch",
+        "server": "typescript",
+        "observed": "python: \"Downloaded dataset '<id>'\"; typescript: \"Dataset <id> (ok)\" or, with file_path, \"Dataset <id> (ok) -> <path>\"",
+        "adapter": {
+          "sub": [
+            {
+              "path": "message",
+              "pattern": "^Dataset ([0-9a-f]+) \\([a-z_]+\\)(?: -> .*)?$",
+              "replace": "Downloaded dataset '\\1'"
+            }
+          ]
+        },
+        "status": "unreviewed-gap",
+        "reason": "The confirmation sentence differs; TS's carries the dataset state and the path written, Python's only the id. No golden case pins it."
+      },
+      {
+        "tool": "download_dataset",
+        "where": "failure.sentence",
+        "kind": "failure-text-mismatch",
+        "server": "python",
+        "observed": "undecodable id: python \"Failed to download dataset '<id>': GET: error 400: b'{\\\"err_msg\\\":\\\"Wrong  id ( <id> ) specified, unable to decode.\\\",...}', 0 attempts left: {...}\"; typescript \"Wrong  id ( <id> ) specified, unable to decode.\"; dataset in state error: python \"Failed to download dataset '<id>': Dataset '<id>' is in state 'error', not 'ok'. Set require_ok_state=False to download anyway.\"; typescript \"dataset <id> not ready (state=error)\"",
+        "adapter": {
+          "sub": [
+            {
+              "path": "failure.sentence",
+              "pattern": "^Failed to download dataset '([0-9a-f]+)': Dataset '[0-9a-f]+' is in state '([a-z_]+)', not 'ok'\\. Set require_ok_state=False to download anyway\\.$",
+              "replace": "dataset \\1 not ready (state=\\2)"
+            },
+            {
+              "path": "failure.sentence",
+              "pattern": "^Failed to download dataset '[^']*': .*?\"err_msg\":\"((?:[^\"\\\\]|\\\\.)*)\".*$",
+              "replace": "\\1"
+            }
+          ]
+        },
+        "status": "unreviewed-gap",
+        "reason": "download_dataset's failure envelope was never pinned. Python wraps bioblend's whole ConnectionError text in its own 'Failed to download dataset' sentence (and has a 404 sentence of its own); TS's metadata GET throws classifyHttp's err_msg with no tool sentence around it."
+      },
+      {
+        "tool": "upload_file_from_url",
+        "where": "failure.sentence",
+        "kind": "failure-text-mismatch",
+        "server": "python",
+        "observed": "undecodable history_id: python \"Upload file from URL failed: Unexpected HTTP status code: 400: {\\\"err_msg\\\": \\\"Wrong  id ( <id> ) specified, unable to decode.\\\", \\\"err_code\\\": 400009}. Context: url=..., history_id=..., file_type=auto, dbkey=?, file_name=None\"; typescript \"Wrong  id ( <id> ) specified, unable to decode.\"",
+        "adapter": {
+          "sub": [
+            {
+              "path": "failure.sentence",
+              "pattern": "^Upload file from URL failed: .*?\"err_msg\": ?\"((?:[^\"\\\\]|\\\\.)*)\".*$",
+              "replace": "\\1"
+            }
+          ]
+        },
+        "status": "unreviewed-gap",
+        "reason": "upload_file_from_url has no golden failure case. Python runs Galaxy's refusal through format_error (action, status, body, and the call's arguments as context); TS's legacyPost throws Galaxy's err_msg with no tool sentence around it."
+      },
+      {
+        "tool": "upload_file_from_url",
+        "where": "failure.sentence",
+        "kind": "server-bug",
+        "server": "typescript",
+        "observed": "url http://127.0.0.1:9/...: Galaxy answers 403 {\"err_msg\": \"Access to this address in not permitted by server configuration\", \"err_code\": 403004}; python's sentence carries that err_msg, typescript's is only \"Unauthorized (403)\"",
+        "adapter": {
+          "expect": "failure"
+        },
+        "status": "unreviewed-gap",
+        "reason": "galaxy-ops classifyHttp (errors.ts) turns every 401/403 into 'Unauthorized (<status>)' and every 404 into 'Not found (404)', discarding Galaxy's err_msg, and upload_file_from_url has no `failure` spec to word it otherwise. A fetch refused by Galaxy's URL allowlist therefore reads as a rejected API key, and the reason Galaxy gave is lost. Python keeps the err_msg. The same mapping applies to the other ops without a failure spec (upload_file, download_dataset)."
+      },
+      {
+        "tool": "invoke_workflow",
+        "where": "failure.sentence",
+        "kind": "failure-text-mismatch",
+        "server": "python",
+        "observed": "Galaxy refused the run (400, \"input step '<n>' (text input) is not optional and no input provided\"): python's sentence ends \"... inputs_by=step_index\\n\\nWorkflow input slots:\\n[ {step_index, step_uuid, label, input_type, src, accepted_formats, collection_type, parameter_type, optional} ]\"; typescript's ends at \"inputs_by=step_index\"",
+        "adapter": {
+          "cut_from": {
+            "path": "failure.sentence",
+            "marker": "\n\nWorkflow input slots:"
+          }
+        },
+        "status": "unreviewed-gap",
+        "reason": "When Galaxy refuses an invocation, server.py's invoke_workflow re-resolves the workflow's slots and appends them as a retry hint (contextlib.suppress around _resolve_workflow_slots, so only when that lookup works -- it does against a live Galaxy and not in the golden replay, which is why only the live run sees it). The TS op words the refusal through its failure contract and appends nothing. The cut rewrites Python's sentence to TS's; whether TS should grow the hint (it already appends the same listing on its own preflight rejects) is the open ruling."
+      },
+      {
+        "tool": "invoke_workflow",
+        "where": "failure.sentence[preflight-src]",
+        "kind": "failure-text-mismatch",
+        "server": "python",
+        "observed": "a list collection passed as {src: hdca} to a data slot: python \"Slot expects a single dataset (src: hda, ldda, ld); got a dataset collection (hdca). Galaxy would map the workflow over its elements, but nothing here tells a map-over that was meant apart from the wrong reference pasted in, so a data slot wants one dataset.\"; typescript \"Slot expects a single dataset (hda); got a collection (hdca).\"",
+        "adapter": {
+          "sub": [
+            {
+              "path": "failure.sentence",
+              "pattern": "Slot expects a single dataset \\(src: hda, ldda, ld\\); got a dataset collection \\(hdca\\)\\. Galaxy would map the workflow over its elements, but nothing here tells a map-over that was meant apart from the wrong reference pasted in, so a data slot wants one dataset\\.",
+              "replace": "Slot expects a single dataset (hda); got a collection (hdca)."
+            }
+          ]
+        },
+        "status": "unreviewed-gap",
+        "reason": "The two preflight validators have drifted. python/src/galaxy_mcp/workflow_inputs.py accepts hda, ldda and ld for a data slot (with library-reference checks) and explains the declined map-over; typescript/packages/galaxy-ops/src/workflow-inputs.ts accepts hda only and calls anything else \"a collection\". So the wording differs here, and beyond what this row rewrites, TS refuses an {src: ldda|ld} input Python submits. No golden case covers a src reject, so only the live run shows it."
+      },
+      {
+        "tool": "invoke_workflow",
+        "where": "failure.sentence[json-string-inputs]",
+        "kind": "failure-text-mismatch",
+        "server": "python",
+        "observed": "inputs \"not json\": python \"inputs must be a JSON object string or a dict, but got invalid JSON: Expecting value: line 1 column 1 (char 0)\", typescript \"inputs must be a JSON object string or an object, but got invalid JSON: Unexpected token 'o', \\\"not json\\\" is not valid JSON\"; inputs \"[1, 2]\": python \"... but the string parsed to list.\", typescript \"... but the string parsed to an array.\"",
+        "adapter": {
+          "sub": [
+            {
+              "path": "failure.sentence",
+              "pattern": "JSON object string or a dict, but got invalid JSON",
+              "replace": "JSON object string or an object, but got invalid JSON"
+            },
+            {
+              "path": "failure.sentence",
+              "pattern": "but the string parsed to list\\.$",
+              "replace": "but the string parsed to an array."
+            }
+          ]
+        },
+        "status": "unreviewed-gap",
+        "reason": "server.py's _coerce_optional_json_dict and the TS op's coerceJsonObject refuse the same strings for the same reasons but word them in each runtime's vocabulary (dict / list vs object / array). The JSON parser's own complaint after \"invalid JSON: \" can never match across runtimes and is masked on the step, not adapted. No golden case covers either refusal. The same helper words params' refusals, so a fix covers both arguments."
+      },
+      {
+        "tool": "download_dataset",
+        "where": "data.content_available",
+        "kind": "value-mismatch",
+        "server": "typescript",
+        "observed": "with file_path, for an ok dataset written to disk: python reports content_available true, typescript false (typescript reports true for the same fetch without file_path)",
+        "adapter": {
+          "set": {
+            "data.content_available": true
+          }
+        },
+        "status": "unreviewed-gap",
+        "reason": "download-dataset.ts returns content_available false in its file_path branch and true in the in-memory one; Python's server.py reports true in both. A client deciding whether the download worked reads opposite answers from the two servers. No golden case covers download_dataset."
+      },
+      {
+        "tool": "get_tool_citations",
+        "where": "data.citations",
+        "kind": "server-bug",
+        "server": "python",
+        "observed": "python: get_tool_citations(MAF_To_BED1) -> data.citations [] and count 0, while GET /api/tools/MAF_To_BED1/citations on the same Galaxy returns one bibtex entry",
+        "adapter": {
+          "expect": "failure"
+        },
+        "status": "unreviewed-gap",
+        "reason": "server.py get_tool_citations reads `citations` out of gi.tools.show_tool(tool_id), but Galaxy's tool show (GET /api/tools/{id}, with or without io_details/link_details) never carries a citations key -- citations are served only by GET /api/tools/{id}/citations. So every tool reports 0 citations whatever it declares. The typescript row under the same key is the same bug."
+      },
+      {
+        "tool": "get_tool_citations",
+        "where": "data.citations",
+        "kind": "server-bug",
+        "server": "typescript",
+        "observed": "typescript: get_tool_citations(MAF_To_BED1) -> data.citations [] and count 0, while GET /api/tools/MAF_To_BED1/citations on the same Galaxy returns one bibtex entry",
+        "adapter": {
+          "expect": "failure"
+        },
+        "status": "unreviewed-gap",
+        "reason": "galaxy-ops get-tool-citations.ts ports the Python read (`payload.citations ?? []` from GET /api/tools/{id}), which Galaxy's tool show never fills, so the bug is shared rather than a divergence and parity alone cannot see it."
+      },
+      {
+        "tool": "run_tool",
+        "where": "failure.sentence",
+        "kind": "failure-text-mismatch",
+        "server": "typescript",
+        "observed": "sort1 with {input: {src: hdca}} -- python refuses before submitting: \"Tool inputs failed validation; not submitting to 'sort1': - input: expects a single dataset (hda); got a dataset collection (hdca). ...\"; typescript submits and relays Galaxy's 400: \"Run tool failed: Unexpected HTTP status code: 400: {\\\"err_msg\\\": \\\"Parameter 'input': dataset collection supplied to single input dataset parameter; ...\\\"} ... Expected input parameters for 'sort1' ...\". Neither creates a job.",
+        "adapter": {
+          "sub": [
+            {
+              "path": "failure.sentence",
+              "pattern": "^Run tool failed: Unexpected HTTP status code: 400: [\\s\\S]*dataset collection supplied to single input dataset parameter[\\s\\S]*$",
+              "replace": "Tool inputs failed validation; not submitting to 'sort1':\n  - input: expects a single dataset (hda); got a dataset collection (hdca). To run the tool once per element, pass {\"batch\": true, \"values\": [{\"src\": \"hdca\", \"id\": \"...\"}]}\n\nCall get_tool_input_template(tool_id) for the expected shape, then fix `inputs` and call the tool again."
+            }
+          ]
+        },
+        "status": "unreviewed-gap",
+        "reason": "Python's run_tool preflight (_preflight_tool_inputs) walks the tool's parameter model and refuses a collection where a single dataset is expected; TS ports only the bookkeeping around that check (tool-preflight.ts says so: where the Python server would refuse a run on its own evidence, TS submits it and lets Galaxy answer). The outcome is the same refusal and no job either way, but the sentence, and which side decided, differ."
+      },
+      {
+        "tool": "recommend_biocontainer",
+        "where": "failure.kind",
+        "kind": "failure-text-mismatch",
+        "server": "typescript",
+        "observed": "packages: [] -- python: tool failure \"packages must contain at least one conda package name\"; typescript: argument failure \"MCP error -32602: Input validation error: Invalid arguments for tool recommend_biocontainer: [ {\\\"code\\\": \\\"too_small\\\", ... \\\"message\\\": \\\"packages must contain at least one conda package name\\\"} ]\"",
+        "adapter": {
+          "sub": [
+            {
+              "path": "failure.kind",
+              "pattern": "^arguments$",
+              "replace": "tool"
+            },
+            {
+              "path": "failure.sentence",
+              "pattern": "^MCP error -32602: Input validation error: [\\s\\S]*packages must contain at least one conda package name[\\s\\S]*$",
+              "replace": "packages must contain at least one conda package name"
+            }
+          ]
+        },
+        "status": "unreviewed-gap",
+        "reason": "recommend-biocontainer.ts declares packages with zod .min(1), so its advertised input schema rejects an empty list before the tool runs (its own in-tool refusal with the same sentence is unreachable over MCP); Python's schema has no minItems and the tool refuses. mcp-surface.json declares no minItems, so the TS schema is stricter than the contract and the static schema comparison does not see it."
+      },
+      {
+        "tool": "get_collection_details",
+        "where": "data.elements.extension",
+        "kind": "server-bug",
+        "server": "python",
+        "observed": "python reports extension '' for every element and collection.state 'unknown' against Galaxy 26.2, whose element objects carry file_ext and whose HDCA carries populated_state",
+        "adapter": {
+          "expect": "failure"
+        },
+        "status": "unreviewed-gap",
+        "reason": "server.py get_collection_details reads element.object.extension and collection.state; Galaxy sends file_ext and populated_state, so both fields are always their defaults. The unit tests and the golden canned replies (contract/envelopes/get_collection_details/*.galaxy.json) mock the keys Galaxy never sends, so only a live run sees it. The typescript row under the same key is the same bug."
+      },
+      {
+        "tool": "get_collection_details",
+        "where": "data.elements.extension",
+        "kind": "server-bug",
+        "server": "typescript",
+        "observed": "typescript reports extension '' for every element and collection.state 'unknown' against Galaxy 26.2",
+        "adapter": {
+          "expect": "failure"
+        },
+        "status": "unreviewed-gap",
+        "reason": "galaxy-ops get-collection-details.ts mirrors server.py: normalizeElement reads object.extension and the projection reads record.state where Galaxy sends file_ext and populated_state."
       }
     ]
   }

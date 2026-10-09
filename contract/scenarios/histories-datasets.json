@@ -1,0 +1,848 @@
+{
+  "$comment": "Pack A: histories and datasets. Every history and dataset here is the scenario's own (fixtures, or created through the tool and declared in `creates`), because other runs share the Galaxy user: listings are filtered by ${run.tag} names or checked with has_item, never by a global count. download_dataset and upload_file have no golden fixtures, so this pack is their only cross-server check.",
+  "pack": "histories-datasets",
+  "tools": [
+    "create_history",
+    "get_histories",
+    "list_history_ids",
+    "get_history_details",
+    "get_history_contents",
+    "update_history",
+    "upload_file",
+    "upload_file_from_url",
+    "download_dataset",
+    "get_dataset_details"
+  ],
+  "uncovered": [],
+  "scenarios": [
+    {
+      "id": "histories.create.named",
+      "note": "The history create_history reports is the one Galaxy holds, under the name asked for, and empty.",
+      "ports": ["TestRealHistoryOperations::test_create_history"],
+      "steps": [
+        {
+          "call": "create_history",
+          "args": {"history_name": "${run.tag}-made"},
+          "creates": {"history": "data.id"},
+          "expect": [
+            {"path": "data.id", "matches": "^[0-9a-f]{16}$"},
+            {"path": "data.name", "equals": "${run.tag}-made"},
+            {"path": "data.deleted", "equals": false},
+            {"path": "data.count", "equals": 0},
+            {"path": "message", "equals": "Created history '${run.tag}-made'"},
+            {"path": "count", "equals": null},
+            {"path": "pagination", "equals": null}
+          ],
+          "save": {"made": "data.id"},
+          "parity": "exact"
+        },
+        {
+          "verify": {"history": "${made}"},
+          "expect": [
+            {"path": "name", "equals": "${run.tag}-made"},
+            {"path": "deleted", "equals": false},
+            {"path": "count", "equals": 0}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "histories.create.empty_name",
+      "note": "The manifest's history_name is any string. Python passes an empty one to Galaxy, which names the history 'Unnamed history'; TS's input schema adds minLength 1 and refuses it before the tool runs.",
+      "steps": [
+        {
+          "call": "create_history",
+          "args": {"history_name": ""},
+          "creates": {"history": "data.id"},
+          "expect": [
+            {"path": "data.name", "equals": "Unnamed history"},
+            {"path": "message", "equals": "Created history ''"}
+          ],
+          "save": {"unnamed": "data.id"},
+          "divergences": ["live/create_history :: outcome :: outcome-mismatch"]
+        },
+        {
+          "verify": {"history": "${unnamed}"},
+          "expect": [{"path": "name", "equals": "Unnamed history"}]
+        }
+      ]
+    },
+    {
+      "id": "histories.list.by_name",
+      "note": "get_histories filters by exact name before it windows, so two histories sharing a run-tagged name page as two, and the unfiltered listing still holds them.",
+      "ports": ["TestRealHistoryOperations::test_get_histories"],
+      "fixtures": [
+        {"as": "a", "history": {"name": "${run.tag}-twin"}},
+        {"as": "b", "history": {"name": "${run.tag}-twin"}},
+        {"as": "other", "history": {"name": "${run.tag}-other"}}
+      ],
+      "steps": [
+        {
+          "call": "get_histories",
+          "args": {"name": "${run.tag}-twin"},
+          "expect": [
+            {"path": "count", "equals": 2},
+            {"path": "data", "length": {"eq": 2}},
+            {"path": "data", "each": [{"path": "name", "equals": "${run.tag}-twin"}]},
+            {"path": "data", "has_item": {"id": "${a.id}"}},
+            {"path": "data", "has_item": {"id": "${b.id}"}},
+            {"path": "message", "equals": "Retrieved 2 histories"},
+            {"path": "pagination", "equals": null}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "get_histories",
+          "args": {"name": "${run.tag}-twin", "limit": 1},
+          "expect": [
+            {"path": "count", "equals": 1},
+            {"path": "data.0.name", "equals": "${run.tag}-twin"},
+            {"path": "message", "equals": "Retrieved 1 of 2 histories"},
+            {"path": "pagination.total_items", "equals": 2},
+            {"path": "pagination.returned_items", "equals": 1},
+            {"path": "pagination.has_next", "equals": true},
+            {"path": "pagination.next_offset", "equals": 1}
+          ]
+        },
+        {
+          "call": "get_histories",
+          "args": {"name": "${run.tag}-twin", "limit": 1, "offset": 1},
+          "expect": [
+            {"path": "count", "equals": 1},
+            {"path": "data.0.name", "equals": "${run.tag}-twin"},
+            {"path": "pagination.has_next", "equals": false},
+            {"path": "pagination.has_previous", "equals": true},
+            {"path": "pagination.previous_offset", "equals": 0}
+          ]
+        },
+        {
+          "call": "get_histories",
+          "args": {"name": "${run.tag}-twin", "offset": 1},
+          "expect": [
+            {"path": "count", "equals": 1},
+            {"path": "data", "length": {"eq": 1}},
+            {"path": "pagination", "equals": null}
+          ]
+        },
+        {
+          "call": "get_histories",
+          "args": {"name": "${run.tag}-nobody"},
+          "expect": [{"path": "count", "equals": 0}, {"path": "data", "equals": []}],
+          "parity": "exact"
+        },
+        {
+          "call": "get_histories",
+          "expect": [
+            {"path": "data", "type": "list"},
+            {"path": "count", "gte": 3},
+            {"path": "data", "has_item": {"id": "${a.id}", "name": "${run.tag}-twin"}},
+            {"path": "data", "has_item": {"id": "${other.id}", "name": "${run.tag}-other"}}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "histories.arguments.wrong_types",
+      "note": "Arguments of the wrong JSON type are refused by the input schema on both servers, before any tool runs. Only the kind is comparable (live.normalization.argumentValidationText).",
+      "steps": [
+        {
+          "call": "create_history",
+          "args": {"history_name": 42},
+          "outcome": "failure",
+          "expect": [{"path": "failure.kind", "equals": "arguments"}]
+        },
+        {
+          "call": "get_histories",
+          "args": {"offset": "x"},
+          "outcome": "failure",
+          "expect": [{"path": "failure.kind", "equals": "arguments"}]
+        },
+        {
+          "call": "list_history_ids",
+          "args": {"limit": "abc"},
+          "outcome": "failure",
+          "expect": [{"path": "failure.kind", "equals": "arguments"}]
+        }
+      ]
+    },
+    {
+      "id": "histories.ids.page",
+      "note": "list_history_ids returns {id, name} rows for the user's own histories, and its pagination arithmetic holds on a one-row page. Other runs add histories concurrently, so totals are only bounded.",
+      "fixtures": [{"as": "a", "history": {}}, {"as": "b", "history": {}}],
+      "steps": [
+        {
+          "call": "list_history_ids",
+          "args": {"limit": 500},
+          "expect": [
+            {"path": "data", "has_item": {"id": "${a.id}", "name": "${a.name}"}},
+            {"path": "data", "has_item": {"id": "${b.id}", "name": "${b.name}"}},
+            {"path": "data", "each": [{"path": "", "keys_equal": ["id", "name"]}]},
+            {"path": "pagination.total_items", "gte": {"path": "count"}},
+            {"path": "pagination.offset", "equals": 0},
+            {"path": "pagination.limit", "equals": 500},
+            {"path": "pagination.returned_items", "gte": {"path": "count"}},
+            {"path": "pagination.returned_items", "lte": {"path": "count"}}
+          ]
+        },
+        {
+          "call": "list_history_ids",
+          "args": {"limit": 1},
+          "expect": [
+            {"path": "count", "equals": 1},
+            {"path": "data", "length": {"eq": 1}},
+            {"path": "pagination.total_items", "gte": 2},
+            {"path": "pagination.has_next", "equals": true},
+            {"path": "pagination.next_offset", "equals": 1},
+            {"path": "message", "matches": "^Found 1 of [0-9]+ histories$"}
+          ]
+        },
+        {
+          "call": "list_history_ids",
+          "args": {"limit": 1, "offset": 1},
+          "expect": [
+            {"path": "count", "equals": 1},
+            {"path": "pagination.offset", "equals": 1},
+            {"path": "pagination.has_previous", "equals": true},
+            {"path": "pagination.previous_offset", "equals": 0}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "histories.ids.limit_bounds",
+      "note": "A window outside 1..500 is refused with the same sentence on both servers.",
+      "steps": [
+        {
+          "call": "list_history_ids",
+          "args": {"limit": 0},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "equals": "limit must be at least 1 (got 0)"}
+          ]
+        },
+        {
+          "call": "list_history_ids",
+          "args": {"limit": 501},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.sentence", "contains": "limit must be at most 500 (got 501)"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "histories.details.counts",
+      "note": "get_history_details returns the history and a count of its contents, not the contents themselves.",
+      "ports": ["TestRealHistoryOperations::test_get_history_details"],
+      "fixtures": [
+        {"as": "h", "history": {}},
+        {"as": "d1", "dataset": {"history": "${h.id}", "content": "one\n", "name": "d1.txt"}},
+        {"as": "d2", "dataset": {"history": "${h.id}", "content": "two\n", "name": "d2.txt"}}
+      ],
+      "steps": [
+        {
+          "call": "get_history_details",
+          "args": {"history_id": "${h.id}"},
+          "expect": [
+            {"path": "data", "keys_equal": ["history", "contents_summary"]},
+            {"path": "data.history.id", "equals": "${h.id}"},
+            {"path": "data.history.name", "equals": "${h.name}"},
+            {"path": "data.history.deleted", "equals": false},
+            {"path": "data.contents_summary.total_items", "equals": 2},
+            {"path": "data.contents_summary.note", "contains": "get_history_contents"},
+            {"path": "count", "equals": 2},
+            {"path": "message", "equals": "Retrieved details for history '${h.name}'"}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "histories.contents.paging",
+      "note": "get_history_contents windows the datasets in hid order and says where the next page starts; hid-dsc reverses it. Each item is tagged with history_content_type.",
+      "ports": ["TestRealHistoryOperations::test_get_history_contents"],
+      "fixtures": [
+        {"as": "h", "history": {}},
+        {"as": "d1", "dataset": {"history": "${h.id}", "content": "one\n", "name": "d1.txt"}},
+        {"as": "d2", "dataset": {"history": "${h.id}", "content": "two\n", "name": "d2.txt"}},
+        {"as": "d3", "dataset": {"history": "${h.id}", "content": "three\n", "name": "d3.txt"}}
+      ],
+      "steps": [
+        {
+          "call": "get_history_contents",
+          "args": {"history_id": "${h.id}", "limit": 2},
+          "expect": [
+            {"path": "data.history_id", "equals": "${h.id}"},
+            {"path": "data.contents", "length": {"eq": 2}},
+            {"path": "data.contents.0.id", "equals": "${d1.id}"},
+            {"path": "data.contents.1.id", "equals": "${d2.id}"},
+            {
+              "path": "data.contents",
+              "each": [{"path": "history_content_type", "equals": "dataset"}]
+            },
+            {"path": "data.contents", "sorted": {"key": "hid", "order": "asc"}},
+            {"path": "count", "equals": 2},
+            {"path": "message", "equals": "Retrieved 2 items from history"},
+            {"path": "pagination.total_items", "equals": 3},
+            {"path": "pagination.has_next", "equals": true},
+            {"path": "pagination.next_offset", "equals": 2}
+          ],
+          "parity": "exact",
+          "mask": [{"path": "data.contents.*.dataset_id", "pattern": "^<[a-z0-9_.]+>$"}]
+        },
+        {
+          "call": "get_history_contents",
+          "args": {"history_id": "${h.id}", "limit": 2, "offset": 2},
+          "expect": [
+            {"path": "data.contents", "length": {"eq": 1}},
+            {"path": "data.contents.0.id", "equals": "${d3.id}"},
+            {"path": "data.contents.0.name", "equals": "d3.txt"},
+            {"path": "pagination.has_next", "equals": false},
+            {"path": "pagination.next_offset", "equals": null},
+            {"path": "pagination.previous_offset", "equals": 0}
+          ],
+          "parity": "exact",
+          "mask": [{"path": "data.contents.*.dataset_id", "pattern": "^<[a-z0-9_.]+>$"}]
+        },
+        {
+          "call": "get_history_contents",
+          "args": {"history_id": "${h.id}", "order": "hid-dsc"},
+          "expect": [
+            {"path": "data.contents", "length": {"eq": 3}},
+            {"path": "data.contents.0.id", "equals": "${d3.id}"},
+            {"path": "data.contents.2.id", "equals": "${d1.id}"},
+            {"path": "data.contents", "sorted": {"key": "hid", "order": "desc"}},
+            {"path": "pagination.has_next", "equals": false}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "histories.contents.empty",
+      "note": "A new history has no contents, and the answer still carries a pagination block.",
+      "fixtures": [{"as": "h", "history": {}}],
+      "steps": [
+        {
+          "call": "get_history_contents",
+          "args": {"history_id": "${h.id}"},
+          "expect": [
+            {"path": "data.history_id", "equals": "${h.id}"},
+            {"path": "data.contents", "equals": []},
+            {"path": "count", "equals": 0},
+            {"path": "pagination.total_items", "equals": 0},
+            {"path": "pagination.has_next", "equals": false}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "histories.read.refusals",
+      "note": "An undecodable history id is Galaxy's refusal, and an empty window is the tool's; both read the same on both servers.",
+      "fixtures": [{"as": "h", "history": {}}],
+      "steps": [
+        {
+          "call": "get_history_details",
+          "args": {"history_id": "0123456789abcdef"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "Get history details failed"},
+            {"path": "failure.sentence", "contains": "unable to decode"}
+          ]
+        },
+        {
+          "call": "get_history_contents",
+          "args": {"history_id": "0123456789abcdef"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "Get history contents failed"},
+            {"path": "failure.sentence", "contains": "Context: history_id=0123456789abcdef"}
+          ]
+        },
+        {
+          "call": "get_history_contents",
+          "args": {"history_id": "${h.id}", "limit": 0},
+          "outcome": "failure",
+          "expect": [{"path": "failure.sentence", "equals": "limit must be at least 1 (got 0)"}]
+        }
+      ]
+    },
+    {
+      "id": "histories.update.fields",
+      "note": "update_history changes what it says it changes: Galaxy's own copy of the history is checked after each call, not only the tool's report. Soft delete is undone again to show deleted=false restores.",
+      "fixtures": [{"as": "h", "history": {}}],
+      "steps": [
+        {
+          "call": "update_history",
+          "args": {
+            "history_id": "${h.id}",
+            "name": "${run.tag}-renamed",
+            "annotation": "annotated by the live suite",
+            "tags": ["mcp_live", "name:hd"]
+          },
+          "expect": [
+            {"path": "data.id", "equals": "${h.id}"},
+            {"path": "data.name", "equals": "${run.tag}-renamed"},
+            {"path": "data.annotation", "equals": "annotated by the live suite"},
+            {"path": "message", "equals": "Updated history ${h.id} (name, annotation, tags)"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "verify": {"history": "${h.id}"},
+          "expect": [
+            {"path": "name", "equals": "${run.tag}-renamed"},
+            {"path": "annotation", "equals": "annotated by the live suite"},
+            {"path": "tags", "length": {"eq": 2}},
+            {"path": "tags", "each": [{"path": "", "in": ["mcp_live", "name:hd"]}]}
+          ]
+        },
+        {
+          "call": "update_history",
+          "args": {"history_id": "${h.id}", "published": true},
+          "expect": [
+            {"path": "data.published", "equals": true},
+            {"path": "message", "equals": "Updated history ${h.id} (published)"}
+          ]
+        },
+        {
+          "verify": {"history": "${h.id}"},
+          "expect": [{"path": "published", "equals": true}, {"path": "importable", "equals": true}]
+        },
+        {
+          "call": "update_history",
+          "args": {"history_id": "${h.id}", "deleted": true, "published": false},
+          "expect": [
+            {"path": "data.deleted", "equals": true},
+            {"path": "message", "equals": "Updated history ${h.id} (deleted, published)"}
+          ]
+        },
+        {
+          "verify": {"history": "${h.id}"},
+          "expect": [
+            {"path": "deleted", "equals": true},
+            {"path": "published", "equals": false},
+            {"path": "purged", "equals": false}
+          ]
+        },
+        {
+          "call": "update_history",
+          "args": {"history_id": "${h.id}", "deleted": false},
+          "expect": [{"path": "data.deleted", "equals": false}]
+        },
+        {
+          "verify": {"history": "${h.id}"},
+          "expect": [
+            {"path": "deleted", "equals": false},
+            {"path": "name", "equals": "${run.tag}-renamed"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "histories.update.refusals",
+      "note": "A call with nothing to change is refused before Galaxy sees it, and an undecodable id is Galaxy's refusal; both read the same on both servers. A tags value that is not a list never reaches the tool.",
+      "fixtures": [{"as": "h", "history": {}}],
+      "steps": [
+        {
+          "call": "update_history",
+          "args": {"history_id": "${h.id}"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {
+              "path": "failure.sentence",
+              "equals": "No fields provided to update. Pass at least one of: name, annotation, tags, deleted, published."
+            }
+          ]
+        },
+        {
+          "call": "update_history",
+          "args": {"history_id": "0123456789abcdef", "name": "${run.tag}-never"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.sentence", "contains": "Update history failed"},
+            {"path": "failure.sentence", "contains": "unable to decode"}
+          ]
+        },
+        {
+          "call": "update_history",
+          "args": {"history_id": "${h.id}", "tags": "not-a-list"},
+          "outcome": "failure",
+          "expect": [{"path": "failure.kind", "equals": "arguments"}]
+        },
+        {
+          "verify": {"history": "${h.id}"},
+          "expect": [{"path": "name", "equals": "${h.name}"}, {"path": "tags", "equals": []}]
+        }
+      ]
+    },
+    {
+      "id": "datasets.upload.round_trip",
+      "note": "A local file uploaded through the tool lands in Galaxy byte for byte, the details tool previews it, and download_dataset writes the same bytes back to disk. Python writes an empty file (live/download_dataset :: file :: server-bug), which the bytes-on-disk check is there to catch.",
+      "ports": ["TestRealDatasetOperations::test_upload_and_download_file"],
+      "fixtures": [
+        {"as": "h", "history": {}},
+        {
+          "as": "src",
+          "local_file": {
+            "name": "hd-upload.txt",
+            "content": "Hello from Galaxy MCP integration test!\nLine 2\nLine 3\n"
+          }
+        },
+        {"as": "out", "temp_path": {"name": "hd-downloaded.txt"}}
+      ],
+      "steps": [
+        {
+          "call": "upload_file",
+          "args": {"path": "${src.path}", "history_id": "${h.id}"},
+          "expect": [
+            {"path": "data.outputs", "length": {"eq": 1}},
+            {"path": "data.outputs.0.name", "equals": "hd-upload.txt"},
+            {"path": "data.outputs.0.history_id", "equals": "${h.id}"},
+            {"path": "data.jobs", "length": {"eq": 1}},
+            {"path": "data.jobs.0.tool_id", "equals": "__DATA_FETCH__"},
+            {"path": "message", "equals": "Uploaded hd-upload.txt (1 job(s))"}
+          ],
+          "divergences": ["live/upload_file :: message :: value-mismatch"],
+          "save": {"up": "data.outputs.0.id"}
+        },
+        {"wait": {"dataset": "${up}", "state": "ok"}},
+        {
+          "verify": {"dataset_text": "${up}"},
+          "expect": [
+            {"path": "content", "equals": "${src.content}"},
+            {"path": "size", "equals": "${src.size}"}
+          ]
+        },
+        {
+          "call": "get_dataset_details",
+          "args": {"dataset_id": "${up}"},
+          "expect": [
+            {"path": "data.dataset_id", "equals": "${up}"},
+            {"path": "data.dataset.state", "equals": "ok"},
+            {"path": "data.dataset.name", "equals": "hd-upload.txt"},
+            {"path": "data.dataset.file_ext", "equals": "txt"},
+            {"path": "data.dataset.file_size", "equals": "${src.size}"},
+            {"path": "data.preview.lines", "equals": "${src.content}"},
+            {"path": "data.preview.preview_lines", "equals": 4},
+            {"path": "data.preview.truncated", "equals": false},
+            {"path": "data.preview.content_truncated_by_galaxy", "equals": false},
+            {"path": "message", "equals": "Retrieved details for dataset 'hd-upload.txt'"}
+          ]
+        },
+        {
+          "call": "download_dataset",
+          "args": {"dataset_id": "${up}", "file_path": "${out.path}"},
+          "expect": [
+            {"path": "data.dataset_id", "equals": "${up}"},
+            {"path": "data.file_path", "equals": "${out.path}"},
+            {"path": "data.dataset_info.name", "equals": "hd-upload.txt"},
+            {"path": "data.dataset_info.extension", "equals": "txt"},
+            {"path": "data.dataset_info.state", "equals": "ok"},
+            {"path": "data.dataset_info.file_size", "equals": "${src.size}"},
+            {"path": "data.content_available", "equals": true},
+            {"path": "message", "equals": "Downloaded dataset '${up}'"}
+          ],
+          "divergences": [
+            "live/download_dataset :: data.note :: shape-mismatch",
+            "live/download_dataset :: data.file_size :: shape-mismatch",
+            "live/download_dataset :: data.content_available :: value-mismatch",
+            "live/download_dataset :: message :: value-mismatch"
+          ]
+        },
+        {
+          "verify": {"file": "${out.path}"},
+          "expect": [
+            {"path": "exists", "equals": true},
+            {"path": "size", "equals": "${src.size}"},
+            {"path": "content", "equals": "${src.content}"}
+          ],
+          "divergences": ["live/download_dataset :: file :: server-bug"]
+        }
+      ]
+    },
+    {
+      "id": "datasets.upload.missing_file",
+      "note": "A path that does not exist is refused before anything reaches Galaxy, and the history stays empty.",
+      "fixtures": [
+        {"as": "h", "history": {}},
+        {"as": "nowhere", "temp_path": {"name": "hd-never-written.txt"}}
+      ],
+      "steps": [
+        {
+          "call": "upload_file",
+          "args": {"path": "${nowhere.path}", "history_id": "${h.id}"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "equals": "file not found: ${nowhere.path}"}
+          ],
+          "divergences": ["live/upload_file :: failure.sentence :: failure-text-mismatch"]
+        },
+        {"verify": {"history": "${h.id}"}, "expect": [{"path": "count", "equals": 0}]}
+      ]
+    },
+    {
+      "id": "datasets.upload.from_url",
+      "note": "Galaxy fetches a URL into the history under the name asked for and sniffs the format. The tool returns the upload job queued, so the dataset is waited for and then read back from Galaxy.",
+      "requires": {"capabilities": ["network"]},
+      "fixtures": [{"as": "h", "history": {}}],
+      "steps": [
+        {
+          "call": "upload_file_from_url",
+          "args": {
+            "url": "https://raw.githubusercontent.com/galaxyproject/galaxy/dev/test-data/1.bed",
+            "history_id": "${h.id}",
+            "file_name": "hd-1.bed"
+          },
+          "expect": [
+            {"path": "data.outputs", "length": {"eq": 1}},
+            {"path": "data.outputs.0.name", "equals": "hd-1.bed"},
+            {"path": "data.outputs.0.history_id", "equals": "${h.id}"},
+            {"path": "data.jobs", "length": {"eq": 1}},
+            {"path": "data.jobs.0.tool_id", "equals": "upload1"}
+          ],
+          "save": {"fetched": "data.outputs.0.id"}
+        },
+        {"wait": {"dataset": "${fetched}", "state": "ok", "timeout": 240}},
+        {
+          "verify": {"dataset": "${fetched}"},
+          "expect": [
+            {"path": "name", "equals": "hd-1.bed"},
+            {"path": "file_ext", "equals": "bed"},
+            {"path": "file_size", "equals": 4202},
+            {"path": "genome_build", "equals": "?"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "datasets.upload.from_url_typed",
+      "note": "An explicit file_type and dbkey are what Galaxy records, rather than what it would sniff.",
+      "requires": {"capabilities": ["network"]},
+      "fixtures": [{"as": "h", "history": {}}],
+      "steps": [
+        {
+          "call": "upload_file_from_url",
+          "args": {
+            "url": "https://raw.githubusercontent.com/galaxyproject/galaxy/dev/test-data/1.bed",
+            "history_id": "${h.id}",
+            "file_type": "tabular",
+            "dbkey": "hg19"
+          },
+          "expect": [{"path": "data.outputs", "length": {"eq": 1}}],
+          "save": {"typed": "data.outputs.0.id"}
+        },
+        {"wait": {"dataset": "${typed}", "state": "ok", "timeout": 240}},
+        {
+          "verify": {"dataset": "${typed}"},
+          "expect": [
+            {"path": "file_ext", "equals": "tabular"},
+            {"path": "genome_build", "equals": "hg19"},
+            {"path": "file_size", "equals": 4202}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "datasets.upload.from_url_refusals",
+      "note": "A history id Galaxy cannot decode is refused when the upload is submitted. Python wraps Galaxy's error body in format_error's sentence with the call's context; TS passes on Galaxy's err_msg alone (live/upload_file_from_url :: failure.sentence :: failure-text-mismatch).",
+      "steps": [
+        {
+          "call": "upload_file_from_url",
+          "args": {
+            "url": "https://raw.githubusercontent.com/galaxyproject/galaxy/dev/test-data/1.bed",
+            "history_id": "0123456789abcdef"
+          },
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {
+              "path": "failure.sentence",
+              "equals": "Wrong  id ( 0123456789abcdef ) specified, unable to decode."
+            }
+          ],
+          "divergences": ["live/upload_file_from_url :: failure.sentence :: failure-text-mismatch"]
+        }
+      ]
+    },
+    {
+      "id": "datasets.upload.from_url_private_address",
+      "note": "Galaxy refuses to fetch from a private address unless fetch_url_allowlist names it (the default), with a 403 whose err_msg says why. TS reports only 'Unauthorized (403)', which reads as a bad API key (live/upload_file_from_url :: failure.sentence :: server-bug). No outbound network is needed: Galaxy refuses before fetching.",
+      "fixtures": [{"as": "h", "history": {}}],
+      "steps": [
+        {
+          "call": "upload_file_from_url",
+          "args": {"url": "http://127.0.0.1:9/mcp-live-private", "history_id": "${h.id}"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "not permitted by server configuration"}
+          ],
+          "divergences": ["live/upload_file_from_url :: failure.sentence :: server-bug"]
+        }
+      ]
+    },
+    {
+      "id": "datasets.download.not_ok",
+      "note": "A URL that 404s is accepted when submitted and fails in the job, leaving a dataset in state error. The details tool shows the state and no preview; download_dataset refuses it under the default require_ok_state. Python and TS word the refusal differently (live/download_dataset :: failure.sentence :: failure-text-mismatch).",
+      "requires": {"capabilities": ["network"]},
+      "fixtures": [{"as": "h", "history": {}}],
+      "steps": [
+        {
+          "call": "upload_file_from_url",
+          "args": {
+            "url": "https://raw.githubusercontent.com/galaxyproject/galaxy/dev/test-data/mcp-live-does-not-exist.bed",
+            "history_id": "${h.id}"
+          },
+          "expect": [{"path": "data.outputs", "length": {"eq": 1}}],
+          "save": {"broken": "data.outputs.0.id"}
+        },
+        {"wait": {"dataset": "${broken}", "state": "error", "timeout": 240}},
+        {
+          "call": "get_dataset_details",
+          "args": {"dataset_id": "${broken}"},
+          "expect": [
+            {"path": "data.dataset.state", "equals": "error"},
+            {"path": "data", "keys_exclude": ["preview"]}
+          ]
+        },
+        {
+          "call": "download_dataset",
+          "args": {"dataset_id": "${broken}"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "equals": "dataset ${broken} not ready (state=error)"}
+          ],
+          "divergences": ["live/download_dataset :: failure.sentence :: failure-text-mismatch"]
+        }
+      ]
+    },
+    {
+      "id": "datasets.download.memory",
+      "note": "Without file_path the content is fetched and measured, not returned. The first call checks what both servers agree on; the second checks the measured size, which Python reports as 0 (live/download_dataset :: data.file_size :: server-bug).",
+      "fixtures": [
+        {"as": "h", "history": {}},
+        {
+          "as": "d",
+          "dataset": {"history": "${h.id}", "content": "alpha\nbeta\ngamma\n", "name": "hd-mem.txt"}
+        }
+      ],
+      "steps": [
+        {
+          "call": "download_dataset",
+          "args": {"dataset_id": "${d.id}"},
+          "expect": [
+            {"path": "data.dataset_id", "equals": "${d.id}"},
+            {"path": "data.suggested_filename", "equals": "hd-mem.txt"},
+            {"path": "data.content_available", "equals": true},
+            {"path": "data.file_size", "type": "number"},
+            {"path": "data", "keys_exclude": ["content"]},
+            {"path": "data.dataset_info.name", "equals": "hd-mem.txt"},
+            {"path": "data.dataset_info.state", "equals": "ok"},
+            {"path": "data.dataset_info.file_size", "equals": 17},
+            {"path": "message", "equals": "Downloaded dataset '${d.id}'"}
+          ],
+          "divergences": [
+            "live/download_dataset :: data.note :: shape-mismatch",
+            "live/download_dataset :: data.file_path :: shape-mismatch",
+            "live/download_dataset :: message :: value-mismatch"
+          ]
+        },
+        {
+          "call": "download_dataset",
+          "args": {"dataset_id": "${d.id}"},
+          "expect": [{"path": "data.file_size", "equals": 17}],
+          "divergences": [
+            "live/download_dataset :: data.note :: shape-mismatch",
+            "live/download_dataset :: data.file_path :: shape-mismatch",
+            "live/download_dataset :: message :: value-mismatch",
+            "live/download_dataset :: data.file_size :: server-bug"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "datasets.download.bad_id",
+      "note": "An undecodable dataset id is refused. Python wraps Galaxy's whole error body in its own sentence; TS passes on Galaxy's err_msg alone (live/download_dataset :: failure.sentence :: failure-text-mismatch).",
+      "steps": [
+        {
+          "call": "download_dataset",
+          "args": {"dataset_id": "0123456789abcdef"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {
+              "path": "failure.sentence",
+              "equals": "Wrong  id ( 0123456789abcdef ) specified, unable to decode."
+            }
+          ],
+          "divergences": ["live/download_dataset :: failure.sentence :: failure-text-mismatch"]
+        }
+      ]
+    },
+    {
+      "id": "datasets.details.preview",
+      "note": "The preview is Galaxy's text peek cut to preview_lines, flagged as truncated when lines were dropped, and absent when include_preview is false.",
+      "fixtures": [
+        {"as": "h", "history": {}},
+        {
+          "as": "d",
+          "dataset": {
+            "history": "${h.id}",
+            "content": "l1\nl2\nl3\nl4\nl5\n",
+            "name": "hd-lines.txt"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "call": "get_dataset_details",
+          "args": {"dataset_id": "${d.id}", "preview_lines": 2},
+          "expect": [
+            {"path": "data.preview.lines", "equals": "l1\nl2"},
+            {"path": "data.preview.preview_lines", "equals": 2},
+            {"path": "data.preview.truncated", "equals": true},
+            {"path": "data.dataset.hid", "equals": "${d.hid}"},
+            {"path": "data.dataset.history_id", "equals": "${h.id}"}
+          ]
+        },
+        {
+          "call": "get_dataset_details",
+          "args": {"dataset_id": "${d.id}", "include_preview": false},
+          "expect": [
+            {"path": "data", "keys_equal": ["dataset", "dataset_id"]},
+            {"path": "data.dataset.state", "equals": "ok"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "datasets.details.bad_id",
+      "note": "An undecodable dataset id is Galaxy's refusal, read the same on both servers; a non-integer preview_lines never reaches the tool.",
+      "steps": [
+        {
+          "call": "get_dataset_details",
+          "args": {"dataset_id": "0123456789abcdef"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "Get dataset details failed"},
+            {"path": "failure.sentence", "contains": "Context: dataset_id=0123456789abcdef"}
+          ]
+        },
+        {
+          "call": "get_dataset_details",
+          "args": {"dataset_id": "0123456789abcdef", "preview_lines": "ten"},
+          "outcome": "failure",
+          "expect": [{"path": "failure.kind", "equals": "arguments"}]
+        }
+      ]
+    }
+  ]
+}
