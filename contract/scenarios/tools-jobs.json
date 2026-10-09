@@ -1,5 +1,5 @@
 {
-  "$comment": "Pack B: connection, server and user info, the tool catalogue (panel, search, details, templates, test cases, citations), running a tool and reading its job, and the biocontainer recommender. Every scenario that names Galaxy tools lists them in requires.tools; built-in sample tools only (upload1, cat1, sort1, plus MAF_To_BED1 for citations).",
+  "$comment": "Pack B: connection, server and user info, the tool catalogue (panel, search, details, templates, test cases, citations), running a tool and reading its job, its logs and the job index, and the biocontainer recommender. Every scenario that names Galaxy tools lists them in requires.tools; built-in sample tools only (upload1, cat1, sort1, plus MAF_To_BED1 for citations and Filter1 for a job that writes stdout).",
   "pack": "tools-jobs",
   "tools": [
     "connect",
@@ -14,6 +14,8 @@
     "get_tool_citations",
     "run_tool",
     "get_job_details",
+    "get_job_logs",
+    "list_jobs",
     "recommend_biocontainer"
   ],
   "uncovered": [],
@@ -480,6 +482,60 @@
       ]
     },
     {
+      "id": "tools.details.tool_version",
+      "note": "tool_version pins the read to an installed version: the version Galaxy serves is answered with the version named in the message, with or without io_details. A version that is not installed is refused by name, because Galaxy quietly answers with its newest version instead; an unknown tool is still Galaxy's 404, with the version in the context.",
+      "requires": {"tools": ["cat1"]},
+      "steps": [
+        {
+          "call": "get_tool_details",
+          "args": {"tool_id": "cat1"},
+          "expect": [{"path": "data.version", "type": "string"}],
+          "save": {"ver": "data.version"}
+        },
+        {
+          "call": "get_tool_details",
+          "args": {"tool_id": "cat1", "tool_version": "${ver}"},
+          "expect": [
+            {"path": "data.id", "equals": "cat1"},
+            {"path": "data.version", "equals": "${ver}"},
+            {"path": "data", "keys_exclude": ["inputs", "outputs"]},
+            {"path": "message", "equals": "Retrieved details for tool 'cat1' at version ${ver}"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "get_tool_details",
+          "args": {"tool_id": "cat1", "tool_version": "${ver}", "io_details": true},
+          "expect": [
+            {"path": "data.version", "equals": "${ver}"},
+            {"path": "data.inputs", "has_item": {"name": "input1", "type": "data"}},
+            {"path": "data.outputs", "has_item": {"name": "out_file1"}},
+            {"path": "message", "equals": "Retrieved details for tool 'cat1' at version ${ver}"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "get_tool_details",
+          "args": {"tool_id": "cat1", "tool_version": "0.0.1-mcp-live"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "equals": "Galaxy described version ${ver} of tool 'cat1' rather than the 0.0.1-mcp-live asked for, so that version is not installed on this server. Call get_tool_details('cat1') without tool_version to see the version Galaxy serves for this id."}
+          ]
+        },
+        {
+          "call": "get_tool_details",
+          "args": {"tool_id": "mcp_live_no_such_tool", "tool_version": "1.0"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.sentence", "contains": "Get tool details failed: "},
+            {"path": "failure.sentence", "contains": "(Resource not found - check IDs and URLs)"},
+            {"path": "failure.sentence", "contains": "Context: tool_id=mcp_live_no_such_tool, io_details=False, tool_version=1.0"}
+          ]
+        }
+      ]
+    },
+    {
       "id": "tools.input_template.cat1",
       "note": "The template uses the legacy flat keys run_tool takes (a repeat as name_0|param), with dataset placeholders, and the compact schema describes the same parameters.",
       "requires": {"tools": ["cat1"]},
@@ -621,6 +677,49 @@
             {"path": "message", "equals": "Retrieved job details for dataset '${out}'"}
           ]
         },
+        {
+          "call": "get_job_details",
+          "args": {"job_id": "${job}"},
+          "expect": [
+            {"path": "data", "keys_equal": ["job", "dataset_id", "job_id"]},
+            {"path": "data.dataset_id", "equals": null},
+            {"path": "data.job_id", "equals": "${job}"},
+            {"path": "data.job.id", "equals": "${job}"},
+            {"path": "data.job.tool_id", "equals": "cat1"},
+            {"path": "data.job.state", "equals": "ok"},
+            {"path": "data.job.history_id", "equals": "${h.id}"},
+            {"path": "data.job.outputs.out_file1.id", "equals": "${out}"},
+            {"path": "data.job", "keys_include": ["params", "inputs", "outputs", "create_time", "update_time", "exit_code"]},
+            {"path": "data.job", "keys_exclude": ["stdout", "stderr", "tool_stdout", "tool_stderr", "job_stdout", "job_stderr"]},
+            {"path": "message", "equals": "Retrieved job details for job '${job}'"}
+          ]
+        },
+        {
+          "call": "get_job_logs",
+          "args": {"job_id": "${job}"},
+          "expect": [
+            {"path": "data", "keys_include": ["stdout", "stderr"]},
+            {"path": "data", "keys_exclude": ["id", "state", "tool_id", "params"]},
+            {"path": "data.stdout", "type": "string"},
+            {"path": "data.stderr", "type": "string"},
+            {"path": "count", "equals": null},
+            {"path": "message", "equals": "Retrieved job logs for job '${job}'"}
+          ]
+        },
+        {
+          "call": "list_jobs",
+          "args": {"history_id": "${h.id}"},
+          "expect": [
+            {"path": "data", "has_item": {"id": "${job}", "tool_id": "cat1", "state": "ok", "history_id": "${h.id}"}},
+            {"path": "data", "each": [
+              {"path": "history_id", "equals": "${h.id}"},
+              {"path": "", "keys_include": ["id", "state", "tool_id", "exit_code", "create_time", "update_time"]}
+            ]},
+            {"path": "count", "equals": 3},
+            {"path": "pagination", "equals": null},
+            {"path": "message", "equals": "Retrieved 3 jobs"}
+          ]
+        },
         {"wait": {"dataset": "${out}", "state": "ok"}},
         {
           "verify": {"dataset_text": "${out}"},
@@ -745,7 +844,7 @@
     },
     {
       "id": "jobs.job_details.refusals",
-      "note": "An id Galaxy cannot decode is refused with its 400 text and the dataset id as context, identically on both servers.",
+      "note": "A dataset id Galaxy cannot decode is refused with its 400 text and the dataset id as context. By job_id, Galaxy's 400 and 404 both read as not found, and a value that is not hex is refused before anything is sent. Giving neither id, or both, is the tool's own refusal now that dataset_id is optional. All identical on both servers.",
       "steps": [
         {
           "call": "get_job_details",
@@ -760,6 +859,303 @@
         {
           "call": "get_job_details",
           "args": {},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "equals": "get_job_details needs a dataset_id or a job_id; neither was given."}
+          ]
+        },
+        {
+          "call": "get_job_details",
+          "args": {"dataset_id": "0123456789abcdef", "job_id": "fedcba9876543210"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "equals": "get_job_details takes a dataset_id or a job_id, not both (got dataset_id '0123456789abcdef' and job_id 'fedcba9876543210')."}
+          ]
+        },
+        {
+          "call": "get_job_details",
+          "args": {"job_id": "0123456789abcdef"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "equals": "Job ID '0123456789abcdef' not found or not accessible. Make sure the job exists and you have permission to view it."}
+          ]
+        },
+        {
+          "call": "get_job_details",
+          "args": {"job_id": "../histories"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "equals": "Job ID '../histories' not found: that is not a Galaxy id. Galaxy's ids are hex strings, as list_jobs() reports them. Nothing was sent to Galaxy."}
+          ]
+        },
+        {
+          "call": "get_job_details",
+          "args": {"job_id": 7},
+          "outcome": "failure",
+          "expect": [{"path": "failure.kind", "equals": "arguments"}]
+        }
+      ]
+    },
+    {
+      "id": "jobs.job_logs.filter1_cut",
+      "note": "Filter1 writes a three-line report to stdout, which get_job_logs reads from the full job record as the six log fields and nothing else. The budget is per field in UTF-8 bytes: 0 and a budget far above the log both return it whole; a small one keeps the first and last half on line boundaries with an omitted-bytes line between, and an empty field stays empty. A negative budget is refused before anything is sent. Both servers cut the same bytes.",
+      "requires": {"tools": ["Filter1"]},
+      "fixtures": [
+        {"as": "h", "history": {"name": "${run.tag}-tools-jobs"}},
+        {"as": "d", "dataset": {"history": "${h.id}", "content": "1\n2\n3\nx\n5\n", "ext": "tabular"}}
+      ],
+      "steps": [
+        {
+          "call": "run_tool",
+          "args": {"history_id": "${h.id}", "tool_id": "Filter1", "inputs": {"input": {"src": "hda", "id": "${d.id}"}, "cond": "c1>1", "header_lines": "0"}},
+          "expect": [{"path": "data.jobs.0.tool_id", "equals": "Filter1"}],
+          "save": {"job": "data.jobs.0.id"}
+        },
+        {"wait": {"job": "${job}", "state": "ok"}},
+        {
+          "call": "get_job_logs",
+          "args": {"job_id": "${job}"},
+          "expect": [
+            {"path": "data", "keys_equal": ["tool_stdout", "tool_stderr", "job_stdout", "job_stderr", "stdout", "stderr"]},
+            {"path": "data.tool_stdout", "matches": "^Filtering with c1>1, \\n.*\\n.*\\n$"},
+            {"path": "data.tool_stdout", "not_contains": "bytes omitted"},
+            {"path": "data.tool_stderr", "equals": ""},
+            {"path": "data.stderr", "equals": ""},
+            {"path": "message", "equals": "Retrieved job logs for job '${job}'"},
+            {"path": "count", "equals": null},
+            {"path": "pagination", "equals": null}
+          ],
+          "parity": "exact",
+          "save": {"full": "data.tool_stdout"}
+        },
+        {
+          "call": "get_job_logs",
+          "args": {"job_id": "${job}"},
+          "expect": [{"path": "data.stdout", "equals": "${full}"}]
+        },
+        {
+          "call": "get_job_logs",
+          "args": {"job_id": "${job}", "log_bytes": 0},
+          "expect": [
+            {"path": "data.tool_stdout", "equals": "${full}"},
+            {"path": "data.stdout", "equals": "${full}"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "get_job_logs",
+          "args": {"job_id": "${job}", "log_bytes": 1000000000},
+          "expect": [
+            {"path": "data.tool_stdout", "equals": "${full}"},
+            {"path": "data.stdout", "equals": "${full}"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "get_job_logs",
+          "args": {"job_id": "${job}", "log_bytes": 40},
+          "expect": [
+            {"path": "data.tool_stdout", "matches": "^Filtering with c1>1,\\n\\[\\.\\.\\. \\d+ of \\d+ bytes omitted \\.\\.\\.\\]\\n$"},
+            {"path": "data.stdout", "matches": "^Filtering with c1>1,\\n\\[\\.\\.\\. \\d+ of \\d+ bytes omitted \\.\\.\\.\\]\\n$"},
+            {"path": "data.tool_stderr", "equals": ""},
+            {"path": "data.job_stdout", "equals": ""}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "get_job_logs",
+          "args": {"job_id": "${job}", "log_bytes": 110},
+          "expect": [
+            {"path": "data.tool_stdout", "matches": "^Filtering with c1>1, \\n\\[\\.\\.\\. \\d+ of \\d+ bytes omitted \\.\\.\\.\\]\\nSkipped \\d+ invalid line\\(s\\) starting at line #\\d+: \".*\"\\n$"},
+            {"path": "data.tool_stdout", "not_contains": "kept "}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "get_job_logs",
+          "args": {"job_id": "${job}", "log_bytes": -1},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "equals": "log_bytes must be 0 or greater (got -1)"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "jobs.job_logs.refusals",
+      "note": "get_job_logs refuses what get_job_details by job_id refuses, in the same words: a value that is not hex before anything is sent, and an id Galaxy cannot decode as not found. log_bytes is checked first.",
+      "steps": [
+        {
+          "call": "get_job_logs",
+          "args": {"job_id": "0123456789abcdef"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "equals": "Job ID '0123456789abcdef' not found or not accessible. Make sure the job exists and you have permission to view it."}
+          ]
+        },
+        {
+          "call": "get_job_logs",
+          "args": {"job_id": "not-hex"},
+          "outcome": "failure",
+          "expect": [{"path": "failure.sentence", "equals": "Job ID 'not-hex' not found: that is not a Galaxy id. Galaxy's ids are hex strings, as list_jobs() reports them. Nothing was sent to Galaxy."}]
+        },
+        {
+          "call": "get_job_logs",
+          "args": {"job_id": "not-hex", "log_bytes": -5},
+          "outcome": "failure",
+          "expect": [{"path": "failure.sentence", "equals": "log_bytes must be 0 or greater (got -5)"}]
+        },
+        {
+          "call": "get_job_logs",
+          "args": {"log_bytes": 10},
+          "outcome": "failure",
+          "expect": [{"path": "failure.kind", "equals": "arguments"}]
+        }
+      ]
+    },
+    {
+      "id": "jobs.list_jobs.filters",
+      "note": "Two pasted datasets are two upload jobs in a fresh history. The history filter finds exactly those, newest first; ordered by create time a one-job window walks them in order; a state, a time window or a future start that matches nothing is an empty page, not an error. The index reports no total, so there is a count and no pagination.",
+      "fixtures": [
+        {"as": "h", "history": {"name": "${run.tag}-tools-jobs"}},
+        {"as": "d1", "dataset": {"history": "${h.id}", "content": "first\n"}},
+        {"as": "d2", "dataset": {"history": "${h.id}", "content": "second\n"}}
+      ],
+      "steps": [
+        {
+          "call": "get_job_details",
+          "args": {"dataset_id": "${d1.id}"},
+          "save": {"j1": "data.job_id"}
+        },
+        {
+          "call": "get_job_details",
+          "args": {"dataset_id": "${d2.id}"},
+          "save": {"j2": "data.job_id"}
+        },
+        {
+          "call": "list_jobs",
+          "args": {"history_id": "${h.id}"},
+          "expect": [
+            {"path": "count", "equals": 2},
+            {"path": "data", "length": {"eq": 2}},
+            {"path": "data", "has_item": {"id": "${j1}", "state": "ok"}},
+            {"path": "data", "has_item": {"id": "${j2}", "state": "ok"}},
+            {"path": "data", "sorted": {"key": "update_time", "order": "desc"}},
+            {"path": "pagination", "equals": null},
+            {"path": "message", "equals": "Retrieved 2 jobs"}
+          ]
+        },
+        {
+          "call": "list_jobs",
+          "args": {"history_id": "${h.id}", "order_by": "create_time", "limit": 1},
+          "expect": [
+            {"path": "count", "equals": 1},
+            {"path": "data.0.id", "equals": "${j2}"},
+            {"path": "message", "equals": "Retrieved 1 jobs"}
+          ]
+        },
+        {
+          "call": "list_jobs",
+          "args": {"history_id": "${h.id}", "order_by": "create_time", "limit": 1, "offset": 1},
+          "expect": [
+            {"path": "count", "equals": 1},
+            {"path": "data.0.id", "equals": "${j1}"}
+          ]
+        },
+        {
+          "call": "list_jobs",
+          "args": {"history_id": "${h.id}", "order_by": "create_time", "limit": 1, "offset": 2},
+          "expect": [
+            {"path": "data", "equals": []},
+            {"path": "count", "equals": 0}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "list_jobs",
+          "args": {"history_id": "${h.id}", "state": "ok"},
+          "expect": [{"path": "count", "equals": 2}]
+        },
+        {
+          "call": "list_jobs",
+          "args": {"history_id": "${h.id}", "state": "error,paused"},
+          "expect": [
+            {"path": "data", "equals": []},
+            {"path": "count", "equals": 0},
+            {"path": "message", "equals": "Retrieved 0 jobs"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "list_jobs",
+          "args": {"history_id": "${h.id}", "date_range_min": "2999-01-01"},
+          "expect": [{"path": "data", "equals": []}],
+          "parity": "exact"
+        },
+        {
+          "call": "list_jobs",
+          "args": {"history_id": "${h.id}", "date_range_max": "2000-01-01T00:00:00"},
+          "expect": [{"path": "data", "equals": []}],
+          "parity": "exact"
+        },
+        {
+          "call": "list_jobs",
+          "args": {"history_id": "${h.id}", "date_range_min": "2000-01-01"},
+          "expect": [{"path": "count", "equals": 2}]
+        }
+      ]
+    },
+    {
+      "id": "jobs.list_jobs.refusals",
+      "note": "The window floor is the tool's own refusal; a history id Galaxy cannot decode is its 400, followed by the tool's hint that a missing history would have been an empty page instead. Identical on both servers.",
+      "steps": [
+        {
+          "call": "list_jobs",
+          "args": {"limit": 0},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "equals": "limit must be at least 1 (got 0)"}
+          ]
+        },
+        {
+          "call": "list_jobs",
+          "args": {"offset": -1},
+          "outcome": "failure",
+          "expect": [{"path": "failure.sentence", "equals": "offset must be 0 or greater (got -1)"}]
+        },
+        {
+          "call": "list_jobs",
+          "args": {"history_id": "0123456789abcdef"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "List jobs failed: "},
+            {"path": "failure.sentence", "contains": "unable to decode"},
+            {"path": "failure.sentence", "contains": "Context: history_id=0123456789abcdef. Galaxy could not read one of the filters: history_id has to be an encoded id, the dates ISO 8601, and state, order_by and view values Galaxy knows. A well-formed id of a history that does not exist is not refused this way -- it answers with an empty page"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "list_jobs",
+          "args": {"order_by": "nonsense"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.sentence", "contains": "List jobs failed: "},
+            {"path": "failure.sentence", "contains": "order_by"},
+            {"path": "failure.sentence", "contains": "Galaxy could not read one of the filters"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "list_jobs",
+          "args": {"limit": "ten"},
           "outcome": "failure",
           "expect": [{"path": "failure.kind", "equals": "arguments"}]
         }

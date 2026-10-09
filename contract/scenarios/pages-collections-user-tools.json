@@ -13,6 +13,7 @@
     "create_user_tool",
     "list_user_tools",
     "delete_user_tool",
+    "get_user_tool",
     "run_user_tool"
   ],
   "uncovered": [
@@ -839,6 +840,119 @@
             {"path": "failure.kind", "equals": "tool"},
             {"path": "failure.sentence", "contains": "Delete user tool failed"}
           ]
+        }
+      ]
+    },
+    {
+      "id": "user_tools.get.not_a_uuid",
+      "note": "get_user_tool refuses a value Galaxy's own uuid check would refuse before anything is sent, so this holds whatever the user's permissions, and with the same sentence from both servers.",
+      "steps": [
+        {
+          "call": "get_user_tool",
+          "args": {"uuid": "not-a-uuid"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "equals": "No user-defined tool found with UUID 'not-a-uuid': that is not a UUID. A user tool's UUID is 32 hex digits, as list_user_tools() reports it (hyphenated, bare, braced or urn:uuid: spellings all name the same tool). Nothing was sent to Galaxy."}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "get_user_tool",
+          "args": {"uuid": "00000000-0000-4000-8000-00000000000"},
+          "outcome": "failure",
+          "expect": [{"path": "failure.sentence", "contains": "that is not a UUID"}],
+          "parity": "exact"
+        },
+        {
+          "call": "get_user_tool",
+          "args": {},
+          "outcome": "failure",
+          "expect": [{"path": "failure.kind", "equals": "arguments"}]
+        }
+      ]
+    },
+    {
+      "id": "user_tools.refused.get_no_role",
+      "note": "Without the user_tool_execute role Galaxy refuses the single-tool read (403005) as it does list and delete, and both servers pass the refusal through. The braced spelling passes the uuid check and reaches Galaxy the same way.",
+      "requires": {"capabilities": ["!user-tool-role"]},
+      "steps": [
+        {
+          "call": "get_user_tool",
+          "args": {"uuid": "00000000-0000-4000-8000-000000000000"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "Get user tool failed: 403 Client Error"},
+            {"path": "failure.sentence", "contains": "(Permission denied - check your account permissions)"},
+            {"path": "failure.sentence", "contains": "Context: uuid=00000000-0000-4000-8000-000000000000"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "get_user_tool",
+          "args": {"uuid": "{00000000-0000-4000-8000-000000000000}"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.sentence", "contains": "Get user tool failed: 403 Client Error"},
+            {"path": "failure.sentence", "contains": "Context: uuid={00000000-0000-4000-8000-000000000000}"}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "user_tools.get.by_uuid",
+      "note": "With user tools enabled, a tool made through the bookkeeping client reads back by its uuid as Galaxy's record, representation included, with the tool id in the message; the braced spelling of the same uuid finds the same tool.",
+      "requires": {"capabilities": ["unprivileged-tools"]},
+      "fixtures": [
+        {"as": "ut", "user_tool": {"representation": {
+          "class": "GalaxyUserTool",
+          "id": "${run.tag}",
+          "version": "0.1.0",
+          "name": "${run.tag} cat",
+          "container": "busybox",
+          "shell_command": "cat '$(inputs.input.path)' > output.txt",
+          "inputs": [{"type": "data", "name": "input", "format": "txt"}],
+          "outputs": [{"type": "data", "name": "output", "format": "txt", "from_work_dir": "output.txt"}]
+        }}}
+      ],
+      "steps": [
+        {
+          "call": "get_user_tool",
+          "args": {"uuid": "${ut.uuid}"},
+          "expect": [
+            {"path": "data.uuid", "equals": "${ut.uuid}"},
+            {"path": "data.tool_id", "equals": "${run.tag}"},
+            {"path": "data.active", "equals": true},
+            {"path": "data.representation.name", "equals": "${run.tag} cat"},
+            {"path": "data.representation.container", "equals": "busybox"},
+            {"path": "message", "equals": "Retrieved user-defined tool '${run.tag}' (UUID: ${ut.uuid})"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "get_user_tool",
+          "args": {"uuid": "{${ut.uuid}}"},
+          "expect": [{"path": "data.uuid", "equals": "${ut.uuid}"}]
+        }
+      ]
+    },
+    {
+      "id": "user_tools.get.unknown_uuid",
+      "note": "With the role, a well-formed uuid the user has no tool for is Galaxy's 404, reported as a failure.",
+      "requires": {"capabilities": ["user-tool-role"]},
+      "steps": [
+        {
+          "call": "get_user_tool",
+          "args": {"uuid": "00000000-0000-4000-8000-000000000000"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "Get user tool failed: 404 Client Error"},
+            {"path": "failure.sentence", "contains": "Context: uuid=00000000-0000-4000-8000-000000000000"}
+          ],
+          "parity": "exact"
         }
       ]
     }
