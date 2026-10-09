@@ -628,7 +628,8 @@
         "server": "typescript",
         "observed": "history_name \"\": python succeeds and Galaxy names the history 'Unnamed history' (message \"Created history ''\"); typescript refuses before the tool runs with MCP error -32602 (too_small, minimum 1)",
         "adapter": {
-          "expect": "failure"
+          "expect": "failure",
+          "outcome": "failure:arguments"
         },
         "status": "unreviewed-gap",
         "reason": "TS's zod input adds .min(1) to historyName, a constraint the manifest's create_history.inputSchema does not carry (history_name is a bare string) and Python does not apply. A client that sends an empty name gets a history from one server and an argument error from the other. Either the manifest gains minLength 1 (and Python refuses too) or TS drops the bound."

@@ -96,6 +96,8 @@ Details that are easy to miss:
   The row only explains failures at its own `where` (or below it; `file` covers a whole
   verify:file view): an outcome flip, a missing `creates` or a failing assertion anywhere
   else on that step is a plain failure, so a new bug cannot hide behind a known one.
+  A row at `outcome` names the outcome it documents ({"expect": "failure", "outcome":
+  "failure:arguments"}); any other outcome or failure kind fails the step and parity.
   Cleanup that fails after an expected failure still fails the test.
 - Scenario-level citations apply to every step calling the row's tool and are stale only
   if they change nothing in the whole run; step-level ones are stale per step.

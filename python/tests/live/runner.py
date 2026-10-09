@@ -57,6 +57,8 @@ class StepRecord:
     # The `where` of an expect-failure row this step failed at: parity skips that path
     # (and below it) and still compares everything else on the step.
     excused: list[str] = field(default_factory=list)
+    # The outcome that row documents, when it names one: any other outcome is not excused.
+    excused_outcome: str | None = None
 
 
 @dataclass
@@ -464,6 +466,12 @@ def _conclude(
     whole_file: bool = False,
 ) -> None:
     if expect_row is not None:
+        documented = expect_row.documented_outcome
+        if documented and outcome_of(view) != documented:
+            raise AssertionError(
+                f"{where} {what} cites live/{expect_row.key}, which documents {documented} on "
+                f"{server}, but the step answered {outcome_of(view)}: {_failure_hint(view)}"
+            )
         other = unexplained_failures(failures, expect_row, whole_file)
         if other:
             raise AssertionError(
@@ -486,6 +494,21 @@ def _conclude(
         raise AssertionError(f"{where} {what}:\n  " + "\n  ".join(failures) + f"\nview:\n{shown}")
     if stale:
         raise AssertionError(f"{where} {what}: " + _stale_message(server, stale))
+
+
+def outcome_of(view: Any) -> str:
+    """ "success", "failure:<kind>", or "-" for a verify view."""
+    if not isinstance(view, dict) or "outcome" not in view:
+        return "-"
+    if view["outcome"] == "failure":
+        return f"failure:{view['failure']['kind']}"
+    return str(view["outcome"])
+
+
+def _failure_hint(view: Any) -> str:
+    if isinstance(view, dict) and view.get("outcome") == "failure":
+        return str(view["failure"]["sentence"])[:300]
+    return str(view.get("message") if isinstance(view, dict) else view)[:300]
 
 
 def _outcome_failures(step: CallStep, view: dict[str, Any]) -> list[str]:
@@ -552,16 +575,18 @@ def _call(
     if not failures:
         failures = evaluate_all(view, resolve_assertions(step.expect, bindings))
 
-    def keep(excused: list[str]) -> None:
+    def keep(excused: list[str], documented: str | None = None) -> None:
         masks = [(m.path, resolve(m.pattern, bindings)) for m in step.mask]
-        record.steps.append(StepRecord(index, step.call, view, step.parity, masks, excused))
+        record.steps.append(
+            StepRecord(index, step.call, view, step.parity, masks, excused, documented)
+        )
 
     try:
         _conclude(where, step.call, view, failures, stale, expect_row, session.server)
     except ExpectedFailureError:
         # Kept for parity, so the rest of the step's answer is still compared.
         assert expect_row is not None
-        keep([expect_row.where])
+        keep([expect_row.where], expect_row.documented_outcome)
         raise
 
     for name, path in step.save.items():
@@ -592,15 +617,29 @@ def _id_tokens(*records: RunRecord) -> frozenset[str]:
     )
 
 
-def _aliases(*records: RunRecord) -> frozenset[frozenset[str]]:
-    """Token pairs one run bound to the same value; _masked shows only the first of them."""
-    out: set[frozenset[str]] = set()
-    for record in records:
-        by_value: dict[str, set[str]] = {}
-        for value, token in record.bound:
-            by_value.setdefault(value, set()).add(token)
-        for tokens in by_value.values():
-            out.update(frozenset((a, b)) for a in tokens for b in tokens if a != b)
+def _same_value(record: RunRecord) -> dict[str, set[str]]:
+    """Each token, and every token this run bound to one of its values (itself included)."""
+    values: dict[str, set[str]] = {}
+    tokens: dict[str, set[str]] = {}
+    for value, token in record.bound:
+        values.setdefault(token, set()).add(value)
+        tokens.setdefault(value, set()).add(token)
+    return {t: {u for v in vs for u in tokens[v]} for t, vs in values.items()}
+
+
+def _aliases(py: RunRecord, ts: RunRecord) -> frozenset[tuple[str, str]]:
+    """(python token, typescript token) pairs that may name the same binding.
+
+    _masked shows a value under the first token bound to it, so when an HDA happens to share
+    an encoded id with a history, a correct answer can read <h.id> on one server and <gamma>
+    or <c.id> on the other. The two tokens match when some name N links them: python bound
+    N to the value its token stands for, and typescript bound N to the value its token
+    stands for. Tokens with no such N -- different values on both runs -- still differ.
+    """
+    py_same, ts_same = _same_value(py), _same_value(ts)
+    out: set[tuple[str, str]] = set()
+    for name in py_same.keys() & ts_same.keys():
+        out.update((x, y) for x in py_same[name] for y in ts_same[name])
     return frozenset(out)
 
 
@@ -623,6 +662,12 @@ def compare_runs(py: RunRecord, ts: RunRecord) -> list[str]:
                         f"step {p.index} {p.tool}: mask {pattern!r} at {path} matched on "
                         f"python {ph}x, typescript {th}x -- a mask must match on both servers"
                     )
+        for step, server in ((p, "python"), (t, "typescript")):
+            if step.excused_outcome and outcome_of(step.view) != step.excused_outcome:
+                problems.append(
+                    f"step {p.index} {p.tool}: {server} answered {outcome_of(step.view)}, but "
+                    f"its expect-failure row documents {step.excused_outcome}"
+                )
         excused = {_bare_path(w) for w in p.excused + t.excused}
         for diff in compare_views(pv, tv, p.parity, weak, aliases):
             if not _diff_excused(diff, excused):

@@ -558,3 +558,93 @@ def test_tokens_one_run_bound_to_the_same_value_compare_equal():
     assert compare_runs(py, ts) == [
         'step 0 t [exact] data.o: python "<gamma>", typescript "<h.id>"'
     ]
+
+
+class TestDocumentedOutcome:
+    """histories.create.empty_name: TS's documented answer is an argument rejection."""
+
+    def _row(self):
+        return _row(
+            tool="create_history",
+            where="outcome",
+            kind="outcome-mismatch",
+            server="typescript",
+            adapter={"expect": "failure", "outcome": "failure:arguments"},
+        )
+
+    @staticmethod
+    def _failure(kind, sentence):
+        return {"outcome": "failure", "failure": {"kind": kind, "sentence": sentence}}
+
+    def test_an_outcome_row_must_name_its_outcome(self):
+        with pytest.raises(ValueError, match="names the outcome"):
+            _row(where="outcome", kind="outcome-mismatch", adapter={"expect": "failure"})
+
+    def test_the_documented_rejection_is_an_xfail(self):
+        view = self._failure("arguments", "MCP error -32602: too_small")
+        failures = ["outcome: expected success, got failure: MCP error -32602: too_small"]
+        with pytest.raises(ExpectedFailureError):
+            _conclude("w", "create_history", view, failures, [], self._row(), "typescript")
+
+    def test_a_different_failure_kind_fails_the_step(self):
+        view = self._failure("tool", "service unavailable")
+        failures = ["outcome: expected success, got failure: service unavailable"]
+        with pytest.raises(AssertionError, match="documents failure:arguments") as info:
+            _conclude("w", "create_history", view, failures, [], self._row(), "typescript")
+        assert not isinstance(info.value, ExpectedFailureError)
+
+    def _runs(self, ts_view):
+        py_view = {"outcome": "success", "data": {"name": "Unnamed history"}, "message": "m"}
+        py = _run("python", [StepRecord(0, "create_history", py_view, "shape", [])])
+        ts = _run(
+            "typescript",
+            [
+                StepRecord(
+                    0, "create_history", ts_view, "shape", [], ["outcome"], "failure:arguments"
+                )
+            ],
+        )
+        return py, ts
+
+    def test_parity_accepts_the_documented_rejection(self):
+        assert compare_runs(*self._runs(self._failure("arguments", "-32602"))) == []
+
+    def test_parity_fails_a_different_failure_kind(self):
+        problems = compare_runs(*self._runs(self._failure("tool", "service unavailable")))
+        assert problems == [
+            "step 0 create_history: typescript answered failure:tool, but its expect-failure "
+            "row documents failure:arguments"
+        ]
+
+
+class TestAliasChains:
+    A, B, C, H, X = (c * 16 for c in "abcde")
+
+    def _pair(self, py_bound, ts_bound, py_value, ts_value):
+        py = _run("python", [])
+        ts = _run("typescript", [])
+        py.bound, ts.bound = py_bound, ts_bound
+        py.steps = [StepRecord(0, "t", {"outcome": "success", "o": py_value}, "exact", [])]
+        ts.steps = [StepRecord(0, "t", {"outcome": "success", "o": ts_value}, "exact", [])]
+        return py, ts
+
+    def test_two_names_linked_only_through_a_shared_name_match(self):
+        # python: h.id == gamma; typescript: c.id == gamma. Both answer gamma correctly, and
+        # it masks to <h.id> on one side and <c.id> on the other.
+        py, ts = self._pair(
+            [(self.A, "<h.id>"), (self.A, "<gamma>"), (self.C, "<c.id>")],
+            [(self.H, "<h.id>"), (self.B, "<c.id>"), (self.B, "<gamma>")],
+            self.A,
+            self.B,
+        )
+        assert compare_runs(py, ts) == []
+
+    def test_a_genuine_id_mismatch_still_fails(self):
+        # Same python run, but typescript's c.id is not gamma, and it answers c.id.
+        py, ts = self._pair(
+            [(self.A, "<h.id>"), (self.A, "<gamma>"), (self.C, "<c.id>")],
+            [(self.H, "<h.id>"), (self.C, "<c.id>"), (self.X, "<gamma>")],
+            self.A,
+            self.C,
+        )
+        assert compare_runs(py, ts) == ['step 0 t [exact] o: python "<h.id>", typescript "<c.id>"']

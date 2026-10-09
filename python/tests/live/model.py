@@ -509,6 +509,9 @@ class SetOp(_Strict):
 
 class ExpectFailureOp(_Strict):
     expect: Literal["failure"]
+    # What the server answers instead, as "success" or "failure:<kind>". Required on a row
+    # at `outcome`: that row excuses this one wrong outcome, not any outcome at all.
+    outcome: Literal["success", "failure:tool", "failure:arguments"] | None = None
 
 
 AdapterOp = Annotated[
@@ -552,10 +555,20 @@ class LiveRow(_Strict):
     def expects_failure(self) -> bool:
         return any(isinstance(op, ExpectFailureOp) for op in self.ops)
 
+    @property
+    def documented_outcome(self) -> str | None:
+        found = [op.outcome for op in self.ops if isinstance(op, ExpectFailureOp)]
+        return found[0] if found else None
+
     @model_validator(mode="after")
     def _expect_alone(self) -> LiveRow:
         if self.expects_failure and len(self.ops) != 1:
             raise ValueError(f"{self.key}: expect failure is an adapter on its own")
+        if self.expects_failure and self.where == "outcome" and not self.documented_outcome:
+            raise ValueError(
+                f"{self.key}: an expect-failure row at `outcome` names the outcome it "
+                'documents ("outcome": "success" | "failure:tool" | "failure:arguments")'
+            )
         return self
 
 

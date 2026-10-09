@@ -268,7 +268,8 @@ def shape_diff(a: Shape, b: Shape, path: str = "") -> list[str]:
 TOKEN = re.compile(r"(<[^<>]+>)")
 
 
-Aliases = frozenset[frozenset[str]]
+# (python token, typescript token) pairs that may stand for the same binding.
+Aliases = frozenset[tuple[str, str]]
 
 
 def _weak_equal(a: str, b: str, weak: frozenset[str], aliases: Aliases = frozenset()) -> bool:
@@ -278,10 +279,7 @@ def _weak_equal(a: str, b: str, weak: frozenset[str], aliases: Aliases = frozens
     if len(pa) != len(pb):
         return False
     return all(
-        x == y
-        or (x in weak and y == "<id>")
-        or (y in weak and x == "<id>")
-        or frozenset((x, y)) in aliases
+        x == y or (x in weak and y == "<id>") or (y in weak and x == "<id>") or (x, y) in aliases
         for x, y in zip(pa, pb, strict=True)
     )
 
@@ -298,8 +296,8 @@ def exact_diff(
     Galaxy encodes ids per table with one key, so an id from another table (a contents
     item's dataset_id) can spell the same as a bound HDA id on one server and not on the
     other. Comparing those tokens as <id> keeps the check from failing at random, and two
-    different binding tokens still differ -- unless `aliases` pairs them, because one run
-    bound the same value under both (an HDA and a history that happen to share an id).
+    different binding tokens still differ -- unless `aliases` pairs them, because the runs
+    bound a shared name to both values (an HDA and a history that happen to share an id).
     """
     where = path or "<root>"
     if isinstance(a, dict) and isinstance(b, dict):
