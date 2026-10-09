@@ -20,6 +20,8 @@ from typing import Any
 
 from bioblend.galaxy import GalaxyInstance
 
+from .options import production_refusal
+
 MARK = "mcp-live-"
 
 
@@ -72,6 +74,10 @@ def main(argv: list[str] | None = None) -> int:
     url, key = os.environ.get("GALAXY_URL"), os.environ.get("GALAXY_API_KEY")
     if not url or not key:
         print("GALAXY_URL and GALAXY_API_KEY must be set", file=sys.stderr)
+        return 2
+    refusal = production_refusal(url.rstrip("/"), os.environ.get("GALAXY_LIVE_ALLOW_PRODUCTION"))
+    if refusal:
+        print(f"sweep: {refusal}", file=sys.stderr)
         return 2
     for line in sweep(GalaxyInstance(url, key=key), args.hours, args.dry_run):
         print(("would purge " if args.dry_run else "purged ") + line)

@@ -54,6 +54,9 @@ class StepRecord:
     view: dict[str, Any]
     parity: str
     masks: list[tuple[str, str]]
+    # The `where` of an expect-failure row this step failed at: parity skips that path
+    # (and below it) and still compares everything else on the step.
+    excused: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -90,6 +93,9 @@ class LiveContext:
         return {
             "network": _network_ok(),
             "unprivileged-tools": self._can_create_user_tools(),
+            # Listing (and deleting) needs only the user_tool_execute role, not
+            # enable_beta_tool_formats.
+            "user-tool-role": self._status("unprivileged_tools") == 200,
             "admin": bool(self.user.get("is_admin")),
         }
 
@@ -386,8 +392,14 @@ def run_scenario(
         shutil.rmtree(tmp, ignore_errors=True)
         if errors:
             message = "cleanup left things on the shared Galaxy:\n  " + "\n  ".join(errors)
-            if primary is None:
-                raise AssertionError(message)
+            # A known server bug excuses the step, never a leak: an xfail turns into a
+            # failure here. A real failure is already failing the test, so it keeps its own
+            # message and the leak is printed beside it.
+            if primary is None or isinstance(primary, ExpectedFailureError):
+                if primary is not None:
+                    record.stopped_by = None
+                    message += f"\n(after an expected failure: {primary})"
+                raise AssertionError(message) from None
             print(message)
 
 
@@ -539,7 +551,18 @@ def _call(
     failures = missing + _outcome_failures(step, view)
     if not failures:
         failures = evaluate_all(view, resolve_assertions(step.expect, bindings))
-    _conclude(where, step.call, view, failures, stale, expect_row, session.server)
+
+    def keep(excused: list[str]) -> None:
+        masks = [(m.path, resolve(m.pattern, bindings)) for m in step.mask]
+        record.steps.append(StepRecord(index, step.call, view, step.parity, masks, excused))
+
+    try:
+        _conclude(where, step.call, view, failures, stale, expect_row, session.server)
+    except ExpectedFailureError:
+        # Kept for parity, so the rest of the step's answer is still compared.
+        assert expect_row is not None
+        keep([expect_row.where])
+        raise
 
     for name, path in step.save.items():
         value = get_path(view, path)
@@ -547,9 +570,7 @@ def _call(
             raise AssertionError(f"{where} {step.call}: save {name}: nothing at {path}")
         bindings[name] = value
         record.bound += _string_leaves(value, name)
-
-    masks = [(m.path, resolve(m.pattern, bindings)) for m in step.mask]
-    record.steps.append(StepRecord(index, step.call, view, step.parity, masks))
+    keep([])
 
 
 # --- parity ------------------------------------------------------------------------------
@@ -571,9 +592,22 @@ def _id_tokens(*records: RunRecord) -> frozenset[str]:
     )
 
 
+def _aliases(*records: RunRecord) -> frozenset[frozenset[str]]:
+    """Token pairs one run bound to the same value; _masked shows only the first of them."""
+    out: set[frozenset[str]] = set()
+    for record in records:
+        by_value: dict[str, set[str]] = {}
+        for value, token in record.bound:
+            by_value.setdefault(value, set()).add(token)
+        for tokens in by_value.values():
+            out.update(frozenset((a, b)) for a in tokens for b in tokens if a != b)
+    return frozenset(out)
+
+
 def compare_runs(py: RunRecord, ts: RunRecord) -> list[str]:
     problems: list[str] = []
     weak = _id_tokens(py, ts)
+    aliases = _aliases(py, ts)
     by_index = {s.index: s for s in ts.steps}
     for p in py.steps:
         t = by_index.get(p.index)
@@ -589,6 +623,14 @@ def compare_runs(py: RunRecord, ts: RunRecord) -> list[str]:
                         f"step {p.index} {p.tool}: mask {pattern!r} at {path} matched on "
                         f"python {ph}x, typescript {th}x -- a mask must match on both servers"
                     )
-        for diff in compare_views(pv, tv, p.parity, weak):
-            problems.append(f"step {p.index} {p.tool} [{p.parity}] {diff}")
+        excused = {_bare_path(w) for w in p.excused + t.excused}
+        for diff in compare_views(pv, tv, p.parity, weak, aliases):
+            if not _diff_excused(diff, excused):
+                problems.append(f"step {p.index} {p.tool} [{p.parity}] {diff}")
     return problems
+
+
+def _diff_excused(diff: str, excused: set[str]) -> bool:
+    path = diff.split(":", 1)[0].replace("[]", "")
+    path = _bare_path(path)
+    return any(path == w or path.startswith(w + ".") for w in excused)

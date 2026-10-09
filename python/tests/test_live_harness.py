@@ -23,7 +23,15 @@ from tests.live.normalise import (
     mask_value,
     to_view,
 )
-from tests.live.runner import _conclude, resolve, unexplained_failures
+from tests.live.runner import (
+    ExpectedFailureError,
+    RunRecord,
+    StepRecord,
+    _conclude,
+    compare_runs,
+    resolve,
+    unexplained_failures,
+)
 
 
 def _result(text, *, error=False, structured=None):
@@ -333,17 +341,34 @@ class TestIntegrationAdditions:
             tool="download_dataset",
             where="data.content_available",
             server="typescript",
-            adapter={"set": {"data.content_available": True}},
+            adapter={"set": [{"path": "data.content_available", "from": False, "to": True}]},
         )
         view = {"outcome": "success", "data": {"content_available": False}}
         assert apply_ops(view, row)["data"]["content_available"] is True
         already = {"outcome": "success", "data": {"content_available": True}}
         assert apply_ops(already, row) == already
 
+    def test_set_only_swaps_the_documented_value(self):
+        row = _row(
+            tool="download_dataset",
+            where="data.suggested_filename",
+            server="typescript",
+            adapter={"set": [{"path": "data.suggested_filename", "from": "a.txt", "to": None}]},
+        )
+        view = {"outcome": "success", "data": {"suggested_filename": "a.txt"}}
+        assert apply_ops(view, row)["data"]["suggested_filename"] is None
+        for wrong in (123, "wrong-name", 0, False):
+            other = {"outcome": "success", "data": {"suggested_filename": wrong}}
+            assert apply_ops(other, row) == other
+
     def test_set_never_adds_a_missing_key(self):
-        row = _row(adapter={"set": {"data.absent": 1}})
+        row = _row(adapter={"set": [{"path": "data.absent", "from": None, "to": 1}]})
         view = {"outcome": "success", "data": {}}
         assert apply_ops(view, row) == view
+
+    def test_set_needs_a_from(self):
+        with pytest.raises(ValueError, match="from"):
+            _row(adapter={"set": [{"path": "data.x", "to": 1}]})
 
     def test_bound_id_token_matches_a_plain_id_but_not_another_binding(self):
         py = {"outcome": "success", "data": {"a": "<id>", "b": "<d2.id>"}}
@@ -401,3 +426,135 @@ class TestIntegrationAdditions:
             "divergences/connect ::  :: missing-ts-tool",
         ):
             assert resolve_citation(spelling, registry) == row
+
+
+def _run(server, steps):
+    record = RunRecord("s.x", server, "tag", "/tmp/x", "http://g")
+    record.steps = steps
+    return record
+
+
+class TestExpectedFailureParity:
+    def _pair(self, ts_data, ts_message="m", excused=("data.citations",)):
+        py = {"outcome": "success", "data": {"citations": []}, "message": "m"}
+        ts = {"outcome": "success", "data": ts_data, "message": ts_message}
+        return (
+            _run("python", [StepRecord(0, "t", py, "exact", [], list(excused))]),
+            _run("typescript", [StepRecord(0, "t", ts, "exact", [], list(excused))]),
+        )
+
+    def test_the_excused_path_is_left_out(self):
+        py, ts = self._pair({"citations": [{"x": 1}]})
+        assert compare_runs(py, ts) == []
+
+    def test_everything_else_on_the_step_is_still_compared(self):
+        py, ts = self._pair({"citations": [], "extra": 1}, ts_message="other")
+        problems = compare_runs(py, ts)
+        assert any("keys only on" in p and "extra" in p for p in problems)
+        assert any("message" in p for p in problems)
+
+    def test_one_side_excused_covers_the_pair(self):
+        py, ts = self._pair({"citations": [{"x": 1}]}, excused=())
+        ts.steps[0].excused = ["data.citations[qualifier]"]
+        assert compare_runs(py, ts) == []
+
+
+class _FakeSession:
+    server = "python"
+
+    def ensure_alive(self):
+        pass
+
+
+class _LeakyLedger:
+    def __init__(self, gi):
+        pass
+
+    def cleanup(self):
+        return ["cleanup history abc: boom"]
+
+
+def _ctx():
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        gi=None,
+        galaxy_url="http://g",
+        api_key="k",
+        version="26.0",
+        user={},
+        contract=None,
+        results={},
+    )
+
+
+class TestCleanupFailures:
+    def _scenario(self):
+        from tests.live.model import Pack, Scenario
+
+        scenario = Scenario.model_validate(
+            {"id": "s.x", "note": "n", "steps": [{"call": "get_user"}]}
+        )
+        return Pack.model_validate({"pack": "p", "tools": []}), scenario
+
+    def test_cleanup_failure_turns_an_xfail_into_a_failure(self, monkeypatch):
+        from tests.live import runner
+
+        def boom(*a, **k):
+            raise ExpectedFailureError("known bug")
+
+        monkeypatch.setattr(runner, "Ledger", _LeakyLedger)
+        monkeypatch.setattr(runner, "_call", boom)
+        pack, scenario = self._scenario()
+        ctx = _ctx()
+        with pytest.raises(AssertionError, match="cleanup left things"):
+            runner.run_scenario(ctx, pack, scenario, _FakeSession())
+        assert ctx.results[("s.x", "python")].stopped_by is None
+
+    def test_cleanup_failure_fails_a_passing_run(self, monkeypatch):
+        from tests.live import runner
+
+        monkeypatch.setattr(runner, "Ledger", _LeakyLedger)
+        monkeypatch.setattr(runner, "_call", lambda *a, **k: None)
+        pack, scenario = self._scenario()
+        with pytest.raises(AssertionError, match="cleanup left things"):
+            runner.run_scenario(_ctx(), pack, scenario, _FakeSession())
+
+
+class TestProductionGuard:
+    def test_usegalaxy_is_refused_without_the_override(self):
+        from tests.live.options import production_refusal
+
+        assert production_refusal("https://usegalaxy.org", None)
+        assert production_refusal("https://usegalaxy.eu/", "0")
+        assert production_refusal("https://usegalaxy.org", "1") is None
+        assert production_refusal("http://localhost:8091", None) is None
+
+    def test_the_sweep_applies_it(self, monkeypatch, capsys):
+        from tests.live import sweep
+
+        monkeypatch.setenv("GALAXY_URL", "https://usegalaxy.org/")
+        monkeypatch.setenv("GALAXY_API_KEY", "k")
+        monkeypatch.delenv("GALAXY_LIVE_ALLOW_PRODUCTION", raising=False)
+        monkeypatch.setattr(sweep, "sweep", lambda *a: pytest.fail("swept production"))
+        assert sweep.main([]) == 2
+        assert "production Galaxy" in capsys.readouterr().err
+
+
+def test_tokens_one_run_bound_to_the_same_value_compare_equal():
+    # An HDA and a history can share an encoded id; whichever was bound first names it.
+    py = _run("python", [])
+    py.bound = [("aaaaaaaaaaaaaaaa", "<h.id>"), ("bbbbbbbbbbbbbbbb", "<gamma>")]
+    ts = _run("typescript", [])
+    ts.bound = [("cccccccccccccccc", "<h.id>"), ("cccccccccccccccc", "<gamma>")]
+    py.steps = [
+        StepRecord(0, "t", {"outcome": "success", "data": {"o": "bbbbbbbbbbbbbbbb"}}, "exact", [])
+    ]
+    ts.steps = [
+        StepRecord(0, "t", {"outcome": "success", "data": {"o": "cccccccccccccccc"}}, "exact", [])
+    ]
+    assert compare_runs(py, ts) == []
+    ts.bound = [("cccccccccccccccc", "<h.id>"), ("dddddddddddddddd", "<gamma>")]
+    assert compare_runs(py, ts) == [
+        'step 0 t [exact] data.o: python "<gamma>", typescript "<h.id>"'
+    ]

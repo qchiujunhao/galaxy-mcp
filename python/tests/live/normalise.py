@@ -148,9 +148,10 @@ def apply_ops(view: dict[str, Any], row: LiveRow) -> dict[str, Any]:
                 out, op.cut_from.path, lambda s, m=marker: s.split(m, 1)[0] if m in s else s
             )
         elif isinstance(op, SetOp):
-            for path, value in op.set.items():
-                for container, key in _places(out, path):
-                    container[key] = copy.deepcopy(value)
+            for swap in op.set:
+                for container, key in _places(out, swap.path):
+                    if json_equal(container[key], swap.from_):
+                        container[key] = copy.deepcopy(swap.to)
         elif isinstance(op, ExpectFailureOp):
             raise HarnessError(f"{row.key}: expect failure is not a rewrite")
     return out
@@ -267,25 +268,38 @@ def shape_diff(a: Shape, b: Shape, path: str = "") -> list[str]:
 TOKEN = re.compile(r"(<[^<>]+>)")
 
 
-def _weak_equal(a: str, b: str, weak: frozenset[str]) -> bool:
+Aliases = frozenset[frozenset[str]]
+
+
+def _weak_equal(a: str, b: str, weak: frozenset[str], aliases: Aliases = frozenset()) -> bool:
     if a == b:
         return True
     pa, pb = TOKEN.split(a), TOKEN.split(b)
     if len(pa) != len(pb):
         return False
     return all(
-        x == y or (x in weak and y == "<id>") or (y in weak and x == "<id>")
+        x == y
+        or (x in weak and y == "<id>")
+        or (y in weak and x == "<id>")
+        or frozenset((x, y)) in aliases
         for x, y in zip(pa, pb, strict=True)
     )
 
 
-def exact_diff(a: Any, b: Any, path: str = "", weak: frozenset[str] = frozenset()) -> list[str]:
+def exact_diff(
+    a: Any,
+    b: Any,
+    path: str = "",
+    weak: frozenset[str] = frozenset(),
+    aliases: Aliases = frozenset(),
+) -> list[str]:
     """Deep differences; `weak` binding tokens count as equal to a plain <id>.
 
     Galaxy encodes ids per table with one key, so an id from another table (a contents
     item's dataset_id) can spell the same as a bound HDA id on one server and not on the
     other. Comparing those tokens as <id> keeps the check from failing at random, and two
-    different binding tokens still differ.
+    different binding tokens still differ -- unless `aliases` pairs them, because one run
+    bound the same value under both (an HDA and a history that happen to share an id).
     """
     where = path or "<root>"
     if isinstance(a, dict) and isinstance(b, dict):
@@ -294,24 +308,28 @@ def exact_diff(a: Any, b: Any, path: str = "", weak: frozenset[str] = frozenset(
         if only_a or only_b:
             out.append(f"{where}: keys only on python {only_a}, only on typescript {only_b}")
         for key in sorted(set(a) & set(b)):
-            out += exact_diff(a[key], b[key], f"{path}.{key}" if path else key, weak)
+            out += exact_diff(a[key], b[key], f"{path}.{key}" if path else key, weak, aliases)
         return out
     if isinstance(a, list) and isinstance(b, list):
         if len(a) != len(b):
             return [f"{where}: python has {len(a)} elements, typescript {len(b)}"]
         out = []
         for i, (x, y) in enumerate(zip(a, b, strict=True)):
-            out += exact_diff(x, y, f"{path}.{i}" if path else str(i), weak)
+            out += exact_diff(x, y, f"{path}.{i}" if path else str(i), weak, aliases)
         return out
     if json_equal(a, b):
         return []
-    if isinstance(a, str) and isinstance(b, str) and _weak_equal(a, b, weak):
+    if isinstance(a, str) and isinstance(b, str) and _weak_equal(a, b, weak, aliases):
         return []
     return [f"{where}: python {json.dumps(a)[:200]}, typescript {json.dumps(b)[:200]}"]
 
 
 def compare_views(
-    py: dict[str, Any], ts: dict[str, Any], mode: str, weak: frozenset[str] = frozenset()
+    py: dict[str, Any],
+    ts: dict[str, Any],
+    mode: str,
+    weak: frozenset[str] = frozenset(),
+    aliases: Aliases = frozenset(),
 ) -> list[str]:
     if py.get("outcome") != ts.get("outcome"):
         return [
@@ -325,17 +343,18 @@ def compare_views(
         if pk == "arguments":
             return []
         ps, tsent = py["failure"]["sentence"], ts["failure"]["sentence"]
-        if _weak_equal(ps, tsent, weak):
+        if _weak_equal(ps, tsent, weak, aliases):
             return []
         return [f"failure.sentence:\n  python:     {ps}\n  typescript: {tsent}"]
     if mode == "exact":
-        return exact_diff(py, ts, weak=weak)
+        return exact_diff(py, ts, weak=weak, aliases=aliases)
     # The success message is the sentence a client shows, so shape holds it to the same
     # standard as a failure sentence.
     out = []
     pm, tm = py.get("message"), ts.get("message")
     if not (
-        pm == tm or (isinstance(pm, str) and isinstance(tm, str) and _weak_equal(pm, tm, weak))
+        pm == tm
+        or (isinstance(pm, str) and isinstance(tm, str) and _weak_equal(pm, tm, weak, aliases))
     ):
         out.append(f"message: python {json.dumps(pm)[:200]}, typescript {json.dumps(tm)[:200]}")
     return out + shape_diff(shape_of(py), shape_of(ts))

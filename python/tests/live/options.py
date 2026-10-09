@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import re
+from urllib.parse import urlparse
 
 import pytest
 
@@ -25,7 +26,26 @@ ENV_NAMES = (
     "HOME",
 )
 ENV_KEY = pytest.StashKey[dict[str, "str | None"]]()
-WAIVABLE = ("network", "unprivileged-tools", "admin", "galaxy-version", "tools")
+WAIVABLE = (
+    "network",
+    "unprivileged-tools",
+    "user-tool-role",
+    "admin",
+    "galaxy-version",
+    "tools",
+)
+PRODUCTION = re.compile(r"(^|\.)usegalaxy\.[a-z.]+$")
+
+
+def production_refusal(url: str, allow: str | None) -> str | None:
+    """Why `url` must not be used, or None; shared by the preflight and the sweep."""
+    host = urlparse(url).hostname or ""
+    if PRODUCTION.search(host) and allow != "1":
+        return (
+            f"{url} looks like a production Galaxy; the live suite creates and purges "
+            "histories, workflows and pages. Set GALAXY_LIVE_ALLOW_PRODUCTION=1 if you mean it"
+        )
+    return None
 
 
 def add_live_options(parser: pytest.Parser) -> None:

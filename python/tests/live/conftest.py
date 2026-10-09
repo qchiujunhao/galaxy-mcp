@@ -7,11 +7,9 @@ Galaxy and a current build or stops the whole run, saying which.
 
 from __future__ import annotations
 
-import re
 import tempfile
 from collections.abc import Iterator
 from pathlib import Path
-from urllib.parse import urlparse
 
 import pytest
 import requests
@@ -19,12 +17,11 @@ from bioblend.galaxy import GalaxyInstance
 
 from .loader import Contract, check_scenarios, load_contract
 from .model import Pack, Scenario
-from .options import ENV_KEY, selected_servers
+from .options import ENV_KEY, production_refusal, selected_servers
 from .runner import LiveContext
 from .servers import ServerPool, launch_spec, ts_build_problem
 
 EXIT_CODE = 4
-PRODUCTION = re.compile(r"(^|\.)usegalaxy\.[a-z.]+$")
 
 
 class _ContractBroken:
@@ -121,12 +118,9 @@ def live_ctx(
     # Handed to both servers without a trailing slash, so a difference in how a server
     # spells it back is the server's, not an accident of how someone exported the variable.
     url = url.rstrip("/")
-    host = urlparse(url).hostname or ""
-    if PRODUCTION.search(host) and env.get("GALAXY_LIVE_ALLOW_PRODUCTION") != "1":
-        _exit(
-            f"{url} looks like a production Galaxy; the live suite creates and purges "
-            "histories, workflows and pages. Set GALAXY_LIVE_ALLOW_PRODUCTION=1 if you mean it"
-        )
+    refusal = production_refusal(url, env.get("GALAXY_LIVE_ALLOW_PRODUCTION"))
+    if refusal:
+        _exit(refusal)
 
     api = url.rstrip("/") + "/api"
     try:

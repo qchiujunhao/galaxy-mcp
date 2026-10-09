@@ -905,9 +905,13 @@
         "server": "typescript",
         "observed": "with file_path, for an ok dataset written to disk: python reports content_available true, typescript false (typescript reports true for the same fetch without file_path)",
         "adapter": {
-          "set": {
-            "data.content_available": true
-          }
+          "set": [
+            {
+              "path": "data.content_available",
+              "from": false,
+              "to": true
+            }
+          ]
         },
         "status": "unreviewed-gap",
         "reason": "download-dataset.ts returns content_available false in its file_path branch and true in the in-memory one; Python's server.py reports true in both. A client deciding whether the download worked reads opposite answers from the two servers. No golden case covers download_dataset."
@@ -919,9 +923,13 @@
         "server": "typescript",
         "observed": "with file_path: python returns suggested_filename null; typescript returns the dataset's name (\"hd-upload.txt\"). Without file_path both return the name.",
         "adapter": {
-          "set": {
-            "data.suggested_filename": null
-          }
+          "set": [
+            {
+              "path": "data.suggested_filename",
+              "from": "hd-upload.txt",
+              "to": null
+            }
+          ]
         },
         "status": "unreviewed-gap",
         "reason": "server.py sets suggested_filename to None in its file_path branch; download-dataset.ts fills it in both branches. A client that names a saved copy from suggested_filename gets nothing from Python after a download to disk. Shape parity used to let a null match any value, which is how this went unrecorded."

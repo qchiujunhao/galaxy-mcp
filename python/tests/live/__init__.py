@@ -64,10 +64,11 @@ contract/scenarios/scenario.schema.json (regenerate with `uv run python -m tests
 - A Python/TS difference is either fixed in the server (separate PR) or recorded as a row
   in accepted-divergences.json -> live, status unreviewed-gap, and cited as
   "live/<tool> :: <where> :: <kind>" on the step (or scenario). Rows are one-sided
-  adapters (drop, rstrip, sub, cut_from, set -- the one op for a non-string value -- or
-  {"expect": "failure"} for a known server bug); an adapter that stops changing anything
-  fails the run as stale. Recount live.ratchet.unreviewedGaps when you add one -- the
-  offline check prints the number.
+  adapters (drop, rstrip, sub, cut_from, set -- the one op for a non-string value, which
+  swaps only a value equal to its `from` for its `to` -- or {"expect": "failure"} for a
+  known server bug); an adapter that stops changing anything fails the run as stale.
+  Recount live.ratchet.unreviewedGaps when you add one -- the offline check prints the
+  number.
 - A key has no server in it, so a bug both servers share is two rows (one per `server`)
   under one key, and one citation applies whichever row is about the server under test.
   When one tool has two unrelated divergences at the same path and kind, qualify the
@@ -90,10 +91,12 @@ Details that are easy to miss:
   citation does not stop another pack's run; the offline check covers them all.
 - Verify-step citations refer to the tool of the call step before it. An
   {"expect": "failure"} row must be cited on the step that fails, and the scenario stops
-  there on that server (reported as xfail); parity compares the steps both servers ran.
+  there on that server (reported as xfail); parity compares the steps both servers ran,
+  the failing one included with only the row's `where` left out of the comparison.
   The row only explains failures at its own `where` (or below it; `file` covers a whole
   verify:file view): an outcome flip, a missing `creates` or a failing assertion anywhere
   else on that step is a plain failure, so a new bug cannot hide behind a known one.
+  Cleanup that fails after an expected failure still fails the test.
 - Scenario-level citations apply to every step calling the row's tool and are stale only
   if they change nothing in the whole run; step-level ones are stale per step.
 - `parity: shape` (the default) compares the outcome, failure sentences, the success

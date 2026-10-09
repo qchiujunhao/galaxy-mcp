@@ -28,7 +28,7 @@ from pydantic import (
 )
 
 ID_PATTERN = r"^[a-z0-9_]+(\.[a-z0-9_]+)+$"
-CAPABILITIES = ("network", "unprivileged-tools", "admin")
+CAPABILITIES = ("network", "unprivileged-tools", "user-tool-role", "admin")
 LIVE_KINDS = (
     "value-mismatch",
     "shape-mismatch",
@@ -491,10 +491,20 @@ class CutFromOp(_Strict):
     cut_from: CutFromSpec
 
 
-class SetOp(_Strict):
-    """Overwrite values that exist; the only op that reaches a non-string."""
+class SetSpec(_Strict):
+    path: str
+    from_: Any = Field(alias="from")
+    to: Any
 
-    set: dict[str, Any] = Field(min_length=1)
+
+class SetOp(_Strict):
+    """Swap one documented value for another; the only op that reaches a non-string.
+
+    Only a value equal to `from` is rewritten, so a server that starts answering something
+    else entirely is not papered over: the step sees the new value (and the row goes stale).
+    """
+
+    set: list[SetSpec] = Field(min_length=1)
 
 
 class ExpectFailureOp(_Strict):

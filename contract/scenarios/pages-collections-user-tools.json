@@ -713,8 +713,8 @@
       ]
     },
     {
-      "id": "user_tools.refused.unavailable",
-      "note": "Where user tools are not available Galaxy refuses create (403004 when enable_beta_tool_formats is off, 403005 without the user_tool_execute role), list and delete, and both servers pass Galaxy's refusal through rather than reporting success -- delete_user_tool used to report a refused DELETE as a deactivation.",
+      "id": "user_tools.refused.create_unavailable",
+      "note": "Where this user cannot create user tools Galaxy refuses create (403004 when enable_beta_tool_formats is off, 403005 without the user_tool_execute role), and both servers pass Galaxy's refusal through.",
       "requires": {"capabilities": ["!unprivileged-tools"]},
       "steps": [
         {
@@ -742,7 +742,14 @@
               "matches": "User is not allowed to run unprivileged tools|enable_beta_tool_formats"
             }
           ]
-        },
+        }
+      ]
+    },
+    {
+      "id": "user_tools.refused.no_role",
+      "note": "Without the user_tool_execute role Galaxy refuses list and delete (403005) whatever enable_beta_tool_formats says, and both servers pass the refusal through rather than reporting success -- delete_user_tool used to report a refused DELETE as a deactivation. With the role, listing works even where creating does not, so this is gated on the role, not on unprivileged-tools.",
+      "requires": {"capabilities": ["!user-tool-role"]},
+      "steps": [
         {
           "call": "list_user_tools",
           "outcome": "failure",

@@ -18,7 +18,7 @@ on:
         required: false
         default: ""
       waive:
-        description: "Space-separated requirements to skip instead of fail (network, unprivileged-tools, admin, galaxy-version, tools)"
+        description: "Space-separated requirements to skip instead of fail (network, unprivileged-tools, user-tool-role, admin, galaxy-version, tools)"
         required: false
         default: ""
 
@@ -87,6 +87,8 @@ jobs:
         # surface check fails without it.
         run: uv sync --all-extras
 
+      # The sweep refuses a usegalaxy.* URL (without GALAXY_LIVE_ALLOW_PRODUCTION=1) with the
+      # same check as the pytest preflight, so running first does not get it past the guard.
       - name: Purge what earlier crashed runs left behind
         working-directory: python
         env:
