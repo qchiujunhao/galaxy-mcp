@@ -41,18 +41,26 @@ class TestDatasetOperations:
 
     def test_upload_file(self, mock_galaxy_instance):
         """Test file upload to history"""
-        mock_galaxy_instance.tools.upload_file.return_value = {
+        mock_galaxy_instance.tools.post_to_fetch.return_value = {
             "outputs": [{"id": "new_dataset_1", "name": "test.txt"}]
         }
 
         with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
-            with patch("os.path.exists", return_value=True):
+            with (
+                patch("os.path.exists", return_value=True),
+                patch("galaxy_mcp.server.upload_via_tus", return_value="sess1") as tus,
+            ):
                 result = upload_file_fn("/path/to/test.txt", "test_history_1")
 
                 assert result.success is True
                 assert result.data["outputs"][0]["id"] == "new_dataset_1"
                 assert result.data["outputs"][0]["name"] == "test.txt"
-                mock_galaxy_instance.tools.upload_file.assert_called_once()
+                tus.assert_called_once_with(
+                    "http://localhost:8080", "test_key", "/path/to/test.txt"
+                )
+                mock_galaxy_instance.tools.post_to_fetch.assert_called_once_with(
+                    "/path/to/test.txt", "test_history_1", "sess1"
+                )
 
     def test_upload_file_not_found(self, mock_galaxy_instance):
         """Test upload with non-existent file"""

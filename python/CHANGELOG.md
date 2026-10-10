@@ -30,6 +30,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   directory). Symlinks to files are still written through. Because the finished file is moved into
   place rather than written in place, an existing file gets a new inode and owner and loses any hard
   links; its permission bits are kept.
+- Security: `upload_file`'s tus upload no longer follows redirects. tusclient sent its creation
+  POST, PATCH and HEAD with requests' default `allow_redirects=True`, so a 3xx re-sent the API key
+  to wherever `Location` pointed -- the last Python request that still did after 1.11.1. A 3xx
+  (other than 304) on any tus request is now a final error naming the stripped target and saying
+  to check `GALAXY_URL`, and it is never retried.
+- Security: the upload no longer dials the host Galaxy's tus `Location` names. Galaxy builds that
+  URL absolute from the Host it saw (or `X-Forwarded-Host`/`-Proto`), so behind a proxy it can be a
+  different host from `GALAXY_URL`. The raw `Location` must be this Galaxy's
+  `/api/upload/resumable_upload/<id>` route (one plain segment -- no `..`, escapes, backslashes
+  or extra segments) and every later request goes to the configured origin with that path, so the
+  key only ever reaches the configured Galaxy. Anything else is refused once, with no retry.
+- A 401 or 403 on the upload now carries the same authentication/permission hint as other tools.
 
 ## [1.11.1] - 2026-10-09
 
