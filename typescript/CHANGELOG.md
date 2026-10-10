@@ -49,6 +49,27 @@ sends neither there, so every element came back with `extension: ""` and the col
 replies behind the `get_collection_details` golden cases used the fake keys too, which is why
 replay never caught it -- they now carry the real shape.
 
+### `get_tool_citations` reads Galaxy's citations endpoint
+
+The op read `citations` off `GET /api/tools/{id}`, a key Galaxy never sends, so every tool
+came back with zero citations -- and the Python server did the same, which is why replay
+never caught it: the golden canned reply served the key both sides expected. Both now read
+`GET /api/tools/{id}/citations` after the show, and each citation is Galaxy's
+`{ format: "bibtex", content }`. The canned replies now match the real endpoint, and a new
+golden case, `get_tool_citations/citations_server_error`, covers the second read failing.
+
+`ToolCitationsResult.citations` narrows from `unknown[]` to the new exported `ToolCitation[]`,
+which a library caller typing against the old shape may notice.
+
+Galaxy answers 200 with a `{ format: "error", error, tool_id }` entry when its toolbox can't
+resolve the id. The show just resolved it, so that only happens in a race -- a toolbox reload,
+or another worker that hasn't loaded the tool -- and it's never one bad citation among good
+ones (a DOI that won't resolve comes back as a placeholder bibtex entry). Both servers now fail
+the call with Galaxy's own text, as not found, rather than counting the error as a citation;
+the golden case `get_tool_citations/error_entry` pins it. A 200 that isn't a list fails too,
+as `connection` (`get_tool_citations/citations_not_a_list`), where the op used to throw a raw
+`TypeError` out of the surface.
+
 ### `get_invocations` sends `step_details` for one invocation (#152)
 
 Given an `invocationId`, the op ignored `stepDetails` and Galaxy answered with every step's

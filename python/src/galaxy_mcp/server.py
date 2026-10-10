@@ -1727,17 +1727,32 @@ def get_tool_citations(tool_id: str) -> GalaxyResult:
         tool_id: ID of the tool
 
     Returns:
-        GalaxyResult with tool citation information in data field
+        GalaxyResult with tool citation information in data field. Each citation is
+        Galaxy's {"format": "bibtex", "content": "<bibtex entry>"}, for the tool's
+        default version.
     """
     state = ensure_connected()
     gi: GalaxyInstance = state["gi"]
 
     try:
-        # Get the tool information which includes citations
+        # The show payload has no citations; it's here for name/version and so an unknown id
+        # 404s -- the citations endpoint answers 200 with an error entry for one.
         tool_info = gi.tools.show_tool(tool_id)
-
-        # Extract citation information
-        citations = tool_info.get("citations", [])
+        # Galaxy takes no version here and resolves the default one, as show_tool did, so
+        # tool_version below is the version these citations belong to.
+        citations = gi.tools.get_citations(tool_id)
+        # Anything but a list is not a citations reply -- an unquoted id with a "?" in it lands
+        # the request on the show route, say -- and measuring it would count its keys.
+        if not isinstance(citations, list):
+            raise Exception("the citations reply was not a list")
+        # Galaxy writes an error entry only when its toolbox can't resolve the id; a DOI that
+        # won't resolve comes back as a placeholder bibtex instead. The show just resolved the
+        # same id the same way, so this is a race -- a toolbox reload, or another worker that
+        # hasn't loaded the tool -- and the whole answer is missing, not one citation.
+        refused = [c for c in citations if isinstance(c, dict) and c.get("format") == "error"]
+        if refused:
+            # Galaxy's sentence ends in a full stop and format_error adds ". Context:".
+            raise Exception(str(refused[0].get("error")).removesuffix("."))
 
         return GalaxyResult(
             data={

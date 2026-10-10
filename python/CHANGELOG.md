@@ -42,6 +42,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or extra segments) and every later request goes to the configured origin with that path, so the
   key only ever reaches the configured Galaxy. Anything else is refused once, with no retry.
 - A 401 or 403 on the upload now carries the same authentication/permission hint as other tools.
+- `get_tool_citations` always answered zero citations: it read a `citations` key from
+  `GET /api/tools/{id}`, which Galaxy never sends. It now reads `GET /api/tools/{id}/citations`,
+  and each citation is Galaxy's `{"format": "bibtex", "content": ...}`. The tool show is still
+  read first, for the name and version and so an unknown id still fails as not found. When
+  Galaxy answers with an error entry instead -- its toolbox lost the id between the two reads,
+  to a reload or another worker -- the call fails with Galaxy's text rather than counting it,
+  and a reply that isn't a list fails rather than having its keys counted as citations.
 
 ## [1.11.1] - 2026-10-09
 

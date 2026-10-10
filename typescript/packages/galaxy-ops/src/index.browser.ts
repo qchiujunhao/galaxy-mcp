@@ -76,7 +76,7 @@ export {
   type PanelEntry,
   type SlimTool,
 } from "./operations/get-tool-panel";
-export { getToolCitationsOp, getToolCitations, type ToolCitationsResult } from "./operations/get-tool-citations";
+export { getToolCitationsOp, getToolCitations, type ToolCitation, type ToolCitationsResult } from "./operations/get-tool-citations";
 export { getToolRunExamplesOp, getToolRunExamples, type ToolRunExamples } from "./operations/get-tool-run-examples";
 export { searchToolsByKeywordsOp, searchToolsByKeywords, type ToolKeywordMatch } from "./operations/search-tools-by-keywords";
 export { getJobDetailsOp, getJobDetails, type GetJobDetailsResult, type JobDetail } from "./operations/get-job-details";
