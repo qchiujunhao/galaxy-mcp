@@ -34,6 +34,13 @@ import { pyStr } from "./python-values";
  *   the status, the reason phrase, and the URL it could not read. This is the one shape whose
  *   text names the URL, so the two surfaces have to have asked the same question of Galaxy for
  *   it to read the same.
+ *
+ * None of the three is used for an unfollowed 3xx, which is a known divergence: both sides
+ * refuse the hop, but Python's text for it either quotes the body without the Location
+ * (bioblend) or is not a failure at all -- `raise_for_status()` passes a 3xx, so its
+ * raise-for-status ops go on to fail parsing the empty body ("Expecting value: line 1
+ * column 1 (char 0)"), and its `delete_user_tool` reports success. Here every op fails with
+ * `redirectRefusal`'s text inside the op's own action and context. No golden case has a 3xx.
  */
 export type PyRequestShape = "bioblend-get" | "bioblend-write" | "raise-for-status";
 
@@ -51,6 +58,12 @@ export interface HttpFailureFacts {
   reason?: string;
   /** What a runtime-level failure (no reply at all) said for itself. */
   transportMessage?: string;
+  /**
+   * Set on an unfollowed 3xx: where it pointed, resolved, or "" when it named nowhere. The
+   * sentence then uses our own redirect text in place of the library text -- see
+   * `redirectRefusal` -- and only the op's action and context stay Python's.
+   */
+  redirectedTo?: string;
 }
 
 /**

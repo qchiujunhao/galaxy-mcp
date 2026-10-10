@@ -125,6 +125,43 @@ export function classifyHttp(status: number, errorBody: unknown): GalaxyError {
 }
 
 /**
+ * What an unfollowed redirect says, on every surface.
+ *
+ * Its own text rather than the library's quote of the reply: a proxy's 301 body is HTML, and
+ * the Location -- the one fact that tells the caller what to fix -- is not in it.
+ */
+/** 304 is a cache answer to a conditional request, not a redirect: it stays a plain non-2xx. */
+export const isRedirectStatus = (status: number): boolean =>
+  status >= 300 && status < 400 && status !== 304;
+
+const REDIRECT_TARGET_MAX = 200;
+
+/**
+ * Where a redirect pointed, fit to show a user: resolved against the request, without
+ * userinfo, query or fragment (a presigned signature has no business in an error), and capped.
+ */
+export function redirectTarget(location: string, from: string): string {
+  let shown: string;
+  try {
+    const u = new URL(location, from);
+    u.username = "";
+    u.password = "";
+    u.search = "";
+    u.hash = "";
+    shown = u.href;
+  } catch {
+    shown = location.split(/[?#]/)[0]!;
+  }
+  return shown.length > REDIRECT_TARGET_MAX ? `${shown.slice(0, REDIRECT_TARGET_MAX)}...` : shown;
+}
+
+export function redirectRefusal(status: number | null, target: string | undefined): string {
+  const what = status === null ? "Galaxy answered with a redirect" : `Galaxy answered ${status}`;
+  const where = target ? `; Galaxy redirected to ${target}` : "";
+  return `${what} and redirects are not followed${where} -- check GALAXY_URL`;
+}
+
+/**
  * The error for a request that never completed: a refused connection, a DNS failure, an
  * abort. There is no status and no body, and what the runtime said for itself is the whole
  * text -- which is the shape the other server's failure is in too, and not the same words.
