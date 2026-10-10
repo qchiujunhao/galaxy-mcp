@@ -7,6 +7,8 @@ import inspect
 import json
 import logging
 import os
+import stat
+import tempfile
 import threading
 import time
 import types
@@ -16,7 +18,7 @@ from dataclasses import dataclass
 from functools import lru_cache, wraps
 from pathlib import Path
 from typing import Any, Literal, TypeVar, cast
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 import bioblend
 import pydantic_core
@@ -3093,6 +3095,124 @@ def get_collection_details(collection_id: str, max_elements: int = 100) -> Galax
         ) from e
 
 
+_DOWNLOAD_CHUNK_SIZE = 64 * 1024
+_PROXY_OFFLOAD_HEADERS = ("X-Accel-Redirect", "X-Sendfile")
+# Read once at import: os.umask can only be read by setting it, which races other threads.
+_UMASK = os.umask(0)
+os.umask(_UMASK)
+
+
+def _download_target(file_path: str) -> str:
+    """Resolve where a download lands, refusing what open() would have refused.
+
+    The bytes go to a temporary file that replaces the target only once complete, so
+    the checks open() used to make implicitly are made here, before anything is fetched.
+    Symlinks are followed, as open() did: the link keeps pointing at the new content.
+    """
+    if file_path.endswith(("/", os.sep)):
+        raise IsADirectoryError(f"'{file_path}' ends in a separator, so it names a directory.")
+    target = os.path.realpath(file_path)
+    if os.path.islink(target):
+        # realpath gives up on a loop (or too many hops) and hands back a link.
+        raise OSError(f"'{file_path}' is a symlink that does not resolve (a loop?).")
+    if os.path.isdir(target):
+        raise IsADirectoryError(f"'{file_path}' is a directory, not a file path.")
+    if os.path.exists(target) and not os.path.isfile(target):
+        # A device, FIFO or socket: open() would write into it, but the replace would
+        # swap the node itself for a regular file.
+        raise OSError(f"'{file_path}' exists and is not a regular file.")
+    if os.path.exists(target) and not os.access(target, os.W_OK):
+        raise PermissionError(f"'{file_path}' exists and is not writable.")
+    directory = os.path.dirname(target)
+    if not os.path.isdir(directory):
+        raise FileNotFoundError(f"The directory for '{file_path}' does not exist.")
+    if not os.access(directory, os.W_OK | os.X_OK):
+        # The temporary file is created beside the target, so the directory must be writable
+        # even when the file itself is.
+        raise PermissionError(f"The directory for '{file_path}' is not writable.")
+    return target
+
+
+def _display_failure(response: requests.Response) -> str:
+    status = response.status_code
+    message = f"Galaxy answered the display request with HTTP {status}"
+    if 300 <= status < 400:
+        message += " (redirects are not followed)"
+    if "json" in response.headers.get("Content-Type", ""):
+        try:
+            body = response.json()
+        except ValueError:
+            body = None
+        err_msg = body.get("err_msg") if isinstance(body, dict) else None
+        if isinstance(err_msg, str) and err_msg:
+            message += f": {err_msg[:500]}"
+    return message
+
+
+def _stream_to_file(response: requests.Response, target: str) -> int:
+    """Write the body beside target and move it into place only once it is complete.
+
+    On any failure only the temporary file is removed; whatever was at target is untouched.
+    """
+    fd, temporary = tempfile.mkstemp(
+        dir=os.path.dirname(target), prefix=".galaxy-mcp-download-", suffix=".part"
+    )
+    written = 0
+    try:
+        with os.fdopen(fd, "wb") as fp:
+            for chunk in response.iter_content(chunk_size=_DOWNLOAD_CHUNK_SIZE):
+                if chunk:
+                    fp.write(chunk)
+                    written += len(chunk)
+        # mkstemp creates 0600; give the file the mode open() would have.
+        mode = stat.S_IMODE(os.stat(target).st_mode) if os.path.exists(target) else 0o666 & ~_UMASK
+        os.chmod(temporary, mode)
+        os.replace(temporary, target)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(temporary)
+        raise
+    return written
+
+
+def _fetch_dataset_display(
+    gi: GalaxyInstance, dataset_id: str, ext: str, file_path: str | None
+) -> int:
+    """GET the dataset's /display endpoint and return its size, saving it to file_path if given.
+
+    Not bioblend's download_dataset: that goes through download_url, which on Galaxy 26.2+ is
+    the /download route and answers with a 302 -- to the display endpoint, or to a presigned
+    object-store URL. GETs never follow redirects (see client.py), and /display never
+    redirects, so anything but a 200 here is a failure rather than content.
+    """
+    target = _download_target(file_path) if file_path else None
+    # Streamed in both modes: the in-memory mode only reports the size, so there is no
+    # reason to hold the whole body (and the client lock) while it is read.
+    response = gi.make_get_request(
+        f"{gi.url}/datasets/{quote(dataset_id, safe='')}/display",
+        params={"to_ext": ext},
+        stream=True,
+    )
+    try:
+        if response.status_code != 200:
+            raise requests.HTTPError(_display_failure(response), response=response)
+        offload = next((h for h in _PROXY_OFFLOAD_HEADERS if h in response.headers), None)
+        if offload:
+            raise requests.HTTPError(
+                f"Galaxy handed this dataset to its web proxy to serve ({offload}), so the "
+                "address this server connects to answered with no content. Connect through "
+                "the proxy -- Galaxy's public URL -- instead of the application port.",
+                response=response,
+            )
+        if target is None:
+            return sum(
+                len(chunk) for chunk in response.iter_content(chunk_size=_DOWNLOAD_CHUNK_SIZE)
+            )
+        return _stream_to_file(response, target)
+    finally:
+        response.close()
+
+
 @mcp.tool(tags={"datasets", "read", "core"})
 def download_dataset(
     dataset_id: str,
@@ -3145,46 +3265,26 @@ def download_dataset(
                 "Set require_ok_state=False to download anyway."
             )
 
-        # Download the dataset
-        result_path: str | bytes
-        if file_path:
-            # Download to specific path
-            result_path = gi.datasets.download_dataset(
-                dataset_id,
-                file_path=file_path,
-                use_default_filename=False,
-                require_ok_state=require_ok_state,
-            )
-            download_path = file_path
+        if not require_ok_state:
+            # bioblend's download waited for a terminal state before fetching; keep that.
+            dataset_info = gi.datasets.wait_for_dataset(dataset_id, check=False)
 
-            # Get file size
-            import os
-
-            file_size = os.path.getsize(download_path) if os.path.exists(download_path) else None
-
-        else:
-            # Download content to memory (don't save to filesystem)
-            result_path = gi.datasets.download_dataset(
-                dataset_id,
-                use_default_filename=False,  # Get content in memory
-                require_ok_state=require_ok_state,
-            )
-
-            # Create suggested filename from dataset info
+        file_size = _fetch_dataset_display(
+            gi, dataset_id, dataset_info.get("file_ext") or "dat", file_path
+        )
+        download_path = file_path or None
+        if not file_path:
             filename = dataset_info.get("name", f"dataset_{dataset_id}")
             extension = dataset_info.get("extension", "")
             if extension and not filename.endswith(f".{extension}"):
                 filename = f"{filename}.{extension}"
-
-            download_path = None  # No file saved
-            file_size = len(result_path) if isinstance(result_path, bytes | str) else None
 
         return GalaxyResult(
             data={
                 "dataset_id": dataset_id,
                 "file_path": download_path,
                 "suggested_filename": filename if not file_path else None,
-                "content_available": result_path is not None,
+                "content_available": True,
                 "file_size": file_size,  # Keep consistent with existing API
                 "note": (
                     "Content downloaded to memory. Use file_path parameter to save to a location."

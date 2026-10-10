@@ -1,6 +1,6 @@
 """Tests for the HTTP transport guards."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from starlette.applications import Starlette
@@ -183,7 +183,7 @@ class TestLocalFileTools:
             pytest.raises(ValueError, match="disabled over HTTP"),
         ):
             download_dataset_fn("dataset_1", file_path="/tmp/out.txt")
-        mock_galaxy_instance.datasets.download_dataset.assert_not_called()
+        mock_galaxy_instance.make_get_request.assert_not_called()
 
     def test_download_to_memory_still_works_over_http(self, mock_galaxy_instance, monkeypatch):
         monkeypatch.delenv("GALAXY_MCP_ALLOW_LOCAL_FILES", raising=False)
@@ -193,7 +193,9 @@ class TestLocalFileTools:
             "extension": "txt",
             "state": "ok",
         }
-        mock_galaxy_instance.datasets.download_dataset.return_value = b"hello"
+        response = Mock(status_code=200, headers={})
+        response.iter_content.return_value = [b"hello"]
+        mock_galaxy_instance.make_get_request.return_value = response
         with (
             patch.object(http_security, "in_http_request", return_value=True),
             patch.dict(server.galaxy_state, {"connected": True, "gi": mock_galaxy_instance}),

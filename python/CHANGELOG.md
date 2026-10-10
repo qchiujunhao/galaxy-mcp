@@ -13,6 +13,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `state` as `'unknown'`. It read `extension` and `state`, which Galaxy never sends there; it now
   reads the element object's `file_ext` and the collection's `populated_state`. The TypeScript
   server had the same bug and is fixed alongside.
+- `download_dataset` returned empty content on Galaxy 26.2 and later. bioblend downloads through
+  the dataset's `download_url`, which there is the new `/download` route, and that route answers
+  with a 302. GETs stop following redirects since 1.11.1, so the tool saved the empty redirect body
+  and reported success. It now fetches `/api/datasets/{id}/display` directly, as the TypeScript op
+  does, and treats any status other than 200 as an error instead of content. No redirects are
+  followed. Released Galaxy versions serve `/display` as their `download_url` and were not affected.
+- `download_dataset(file_path=...)` writes to a temporary file beside the target and moves it into
+  place only once the download is complete, so a failed download leaves an existing file as it
+  was. A 200 that hands the file to the web proxy (`X-Accel-Redirect`/`X-Sendfile`, an empty body
+  when connected to Galaxy's application port) is now an error rather than an empty download.
+- `file_path` is checked before anything is fetched, and some paths that plain `open()` accepted
+  are now refused: anything that exists but is not a regular file (a device, FIFO or socket would
+  otherwise be swapped for a regular file), a path ending in a separator, a symlink that does not
+  resolve, and a writable file in a directory that is not writable (the temporary file needs that
+  directory). Symlinks to files are still written through. Because the finished file is moved into
+  place rather than written in place, an existing file gets a new inode and owner and loses any hard
+  links; its permission bits are kept.
 
 ## [1.11.1] - 2026-10-09
 
