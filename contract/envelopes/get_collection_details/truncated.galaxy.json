@@ -14,7 +14,7 @@
         "collection_type": "list",
         "element_count": 5,
         "populated": true,
-        "state": "ok",
+        "populated_state": "ok",
         "history_content_type": "dataset_collection",
         "elements": [
           {
@@ -27,7 +27,7 @@
               "id": "d0000",
               "name": "sample0.txt",
               "state": "ok",
-              "extension": "txt",
+              "file_ext": "txt",
               "file_size": 1024,
               "history_id": "h0000"
             }
@@ -42,7 +42,7 @@
               "id": "d0001",
               "name": "sample1.txt",
               "state": "ok",
-              "extension": "txt",
+              "file_ext": "txt",
               "file_size": 1024,
               "history_id": "h0000"
             }
@@ -57,7 +57,7 @@
               "id": "d0002",
               "name": "sample2.txt",
               "state": "ok",
-              "extension": "txt",
+              "file_ext": "txt",
               "file_size": 1024,
               "history_id": "h0000"
             }
@@ -72,7 +72,7 @@
               "id": "d0003",
               "name": "sample3.txt",
               "state": "ok",
-              "extension": "txt",
+              "file_ext": "txt",
               "file_size": 1024,
               "history_id": "h0000"
             }
@@ -87,7 +87,7 @@
               "id": "d0004",
               "name": "sample4.txt",
               "state": "ok",
-              "extension": "txt",
+              "file_ext": "txt",
               "file_size": 1024,
               "history_id": "h0000"
             }

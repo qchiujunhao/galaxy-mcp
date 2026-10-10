@@ -3037,7 +3037,9 @@ def get_collection_details(collection_id: str, max_elements: int = 100) -> Galax
             "collection_type": collection_info.get("collection_type"),
             "element_count": collection_info.get("element_count", 0),
             "populated": collection_info.get("populated", True),
-            "state": collection_info.get("state", "unknown"),
+            # Galaxy calls the collection's state populated_state, and a dataset's
+            # extension file_ext; the envelope keeps its own names.
+            "state": collection_info.get("populated_state", "unknown"),
         }
 
         # Extract and normalize elements
@@ -3058,7 +3060,7 @@ def get_collection_details(collection_id: str, max_elements: int = 100) -> Galax
                 "object_id": element_obj.get("id", ""),
                 "name": element_obj.get("name", ""),
                 "state": element_obj.get("state", ""),
-                "extension": element_obj.get("extension", ""),
+                "extension": element_obj.get("file_ext", ""),
                 "file_size": element_obj.get("file_size"),
             }
             normalized_elements.append(normalized_element)

@@ -364,7 +364,7 @@ class TestDatasetOperations:
             "collection_type": "list",
             "element_count": 3,
             "populated": True,
-            "state": "ok",
+            "populated_state": "ok",
             "elements": [
                 {
                     "element_identifier": "sample1",
@@ -373,7 +373,7 @@ class TestDatasetOperations:
                         "id": "dataset1",
                         "name": "sample1.fastq",
                         "state": "ok",
-                        "extension": "fastqsanger",
+                        "file_ext": "fastqsanger",
                         "file_size": 12345,
                     },
                 },
@@ -384,7 +384,7 @@ class TestDatasetOperations:
                         "id": "dataset2",
                         "name": "sample2.fastq",
                         "state": "ok",
-                        "extension": "fastqsanger",
+                        "file_ext": "fastqsanger",
                         "file_size": 23456,
                     },
                 },
@@ -395,7 +395,7 @@ class TestDatasetOperations:
                         "id": "dataset3",
                         "name": "sample3.fastq",
                         "state": "ok",
-                        "extension": "fastqsanger",
+                        "file_ext": "fastqsanger",
                         "file_size": 34567,
                     },
                 },
@@ -423,6 +423,8 @@ class TestDatasetOperations:
             assert result.data["elements"][0]["object_id"] == "dataset1"
             assert result.data["elements"][0]["name"] == "sample1.fastq"
             assert result.data["elements"][0]["state"] == "ok"
+            assert result.data["elements"][0]["extension"] == "fastqsanger"
+            assert result.data["collection"]["state"] == "ok"
 
             mock_galaxy_instance.dataset_collections.show_dataset_collection.assert_called_once_with(
                 collection_id, instance_type="history"
@@ -444,7 +446,7 @@ class TestDatasetOperations:
                         "id": f"dataset{i}",
                         "name": f"sample{i}.fastq",
                         "state": "ok",
-                        "extension": "fastqsanger",
+                        "file_ext": "fastqsanger",
                         "file_size": 10000 + i,
                     },
                 }
@@ -456,7 +458,7 @@ class TestDatasetOperations:
             "collection_type": "list",
             "element_count": 150,
             "populated": True,
-            "state": "ok",
+            "populated_state": "ok",
             "elements": elements,
         }
 

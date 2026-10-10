@@ -40,6 +40,15 @@ Any tus failure now comes back inside the envelope as `Failed to upload file: ..
 escaping as an unhandled error (a CLI stack trace and exit 70): `auth` (exit 77) for a 401 or
 403, `connection` otherwise.
 
+### `get_collection_details` reads Galaxy's own keys
+
+The op read `extension` off each element's object and `state` off the collection, and Galaxy
+sends neither there, so every element came back with `extension: ""` and the collection with
+`state: "unknown"`. The Python server did the same. Both now read `file_ext` and
+`populated_state`; the envelope keeps its `extension` and `state` names. The canned Galaxy
+replies behind the `get_collection_details` golden cases used the fake keys too, which is why
+replay never caught it -- they now carry the real shape.
+
 ### `get_invocations` sends `step_details` for one invocation (#152)
 
 Given an `invocationId`, the op ignored `stepDetails` and Galaxy answered with every step's
