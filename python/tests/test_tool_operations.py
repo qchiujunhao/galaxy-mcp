@@ -13,6 +13,7 @@ from galaxy_mcp.tool_inputs import check_tool_inputs
 
 from .test_helpers import (
     galaxy_state,
+    get_tool_citations_fn,
     get_tool_input_template_fn,
     get_tool_run_examples_fn,
     run_tool_fn,
@@ -1156,3 +1157,69 @@ class TestTheSkipNeverHidesAReject:
 
         assert _supplies_a_reference(reference) is False
         assert check_tool_inputs(schema, reference)["rejects"] == []
+
+
+class TestGetToolCitations:
+    """The show payload never carries citations; they come from their own endpoint."""
+
+    BIBTEX = {"format": "bibtex", "content": "@article{one,\n  title = {One}\n}"}
+
+    def test_reads_the_show_then_the_citations(self, mock_galaxy_instance):
+        tools = mock_galaxy_instance.tools
+        tools.show_tool.return_value = {"id": "cat1", "name": "Concatenate", "version": "1.0.0"}
+        tools.get_citations.return_value = [self.BIBTEX]
+        with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
+            result = get_tool_citations_fn("cat1")
+        # The show goes first so an unknown id fails as a 404 before the citations read,
+        # which would answer 200 with an error entry for it.
+        assert tools.mock_calls == [call.show_tool("cat1"), call.get_citations("cat1")]
+        assert result.data == {
+            "tool_name": "Concatenate",
+            "tool_version": "1.0.0",
+            "citations": [self.BIBTEX],
+        }
+        assert result.count == 1
+
+    def test_a_failed_show_never_reads_citations(self, mock_galaxy_instance):
+        tools = mock_galaxy_instance.tools
+        tools.show_tool.side_effect = bioblend.ConnectionError("not found", status_code=404)
+        with (
+            patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}),
+            pytest.raises(ValueError, match="Get tool citations failed"),
+        ):
+            get_tool_citations_fn("nosuchtool")
+        tools.get_citations.assert_not_called()
+
+    def test_an_error_entry_fails_the_call(self, mock_galaxy_instance):
+        tools = mock_galaxy_instance.tools
+        tools.show_tool.return_value = {"id": "cat1", "name": "Concatenate", "version": "1.0.0"}
+        said = "Tool 'cat1' not found. Citations for this tool may be missing."
+        tools.get_citations.return_value = [
+            self.BIBTEX,
+            {"format": "error", "error": said, "tool_id": "cat1"},
+        ]
+        with (
+            patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}),
+            pytest.raises(ValueError) as raised,
+        ):
+            get_tool_citations_fn("cat1")
+        # Galaxy's own full stop goes, so the context clause doesn't double it.
+        assert str(raised.value) == (
+            "Get tool citations failed: Tool 'cat1' not found. Citations for this tool may be "
+            "missing. Context: tool_id=cat1"
+        )
+
+    def test_a_reply_that_is_not_a_list_fails_the_call(self, mock_galaxy_instance):
+        # bioblend splices the id in unquoted, so "cat1?x=1" reads the show route instead,
+        # and its dict must not be counted as 19 citations.
+        tools = mock_galaxy_instance.tools
+        tools.show_tool.return_value = {"id": "cat1", "name": "Concatenate", "version": "1.0.0"}
+        tools.get_citations.return_value = {"id": "cat1", "name": "Concatenate"}
+        with (
+            patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}),
+            pytest.raises(ValueError) as raised,
+        ):
+            get_tool_citations_fn("cat1")
+        assert str(raised.value) == (
+            "Get tool citations failed: the citations reply was not a list. Context: tool_id=cat1"
+        )

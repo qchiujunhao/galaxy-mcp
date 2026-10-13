@@ -17,7 +17,7 @@ they disagree.
 | Galaxy built-in server | Galaxy 26.1+ | 44 tools at `/api/mcp`, behind `enable_mcp_server` |
 
 - **Python and TypeScript agree.** Two recorded differences, both intentional. Every open tool
-  is replayed through both surfaces against 224 golden results the Python server produced,
+  is replayed through both surfaces against 227 golden results the Python server produced,
   65 of them failures, and compared key for key.
 - **The built-in server is measured, not reconciled.** 54 differences are recorded in the third
   column of `PARITY.md` and held at that count. Reconciling them is a conversation with Galaxy.
@@ -205,7 +205,7 @@ set of opinions about how to use it, and a contract enforced in CI:
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/roadmap/parity-contract-dark.png">
-  <img alt="Parity contract: the Python MCP server generates mcp-surface.json and captures 224 golden results; both are compared against the TypeScript MCP server and CLI; every difference needs an entry in accepted-divergences.json; PARITY.md is generated from the result, with the built-in server snapshot as a third column. A nightly live suite (#119) is planned." src="docs/roadmap/parity-contract-light.png">
+  <img alt="Parity contract: the Python MCP server generates mcp-surface.json and captures 227 golden results; both are compared against the TypeScript MCP server and CLI; every difference needs an entry in accepted-divergences.json; PARITY.md is generated from the result, with the built-in server snapshot as a third column. A nightly live suite (#119) is planned." src="docs/roadmap/parity-contract-light.png">
 </picture>
 
 What that enforces today: which tools exist, their parameters, types, requiredness, declared
