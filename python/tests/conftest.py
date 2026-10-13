@@ -18,6 +18,8 @@ def mock_galaxy_instance():
     # Mock(spec=GalaxyInstance) does not have one. The routes that build their own
     # URL -- the dataset text preview among them -- read it.
     mock_gi.url = "http://localhost:8080/api"
+    mock_gi.base_url = "http://localhost:8080"
+    mock_gi.key = "test_key"
 
     # Mock histories
     mock_histories = Mock()

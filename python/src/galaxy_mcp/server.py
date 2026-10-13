@@ -66,6 +66,7 @@ from galaxy_mcp.tool_inputs import (
     schema_has_inputs,
     summarize_tool_inputs,
 )
+from galaxy_mcp.tus_upload import upload_via_tus
 from galaxy_mcp.version import (
     GalaxyVersion,
     GalaxyVersionError,
@@ -3375,15 +3376,26 @@ def upload_file(path: str, history_id: str | None = None) -> GalaxyResult:
                 "Check that the file exists and you have read permissions."
             )
 
-        # BioBlend accepts None for history_id and uses the most recently used history
-        result = gi.tools.upload_file(path, history_id=history_id)  # type: ignore[arg-type]
+        if gi.config.get_version()["version_major"] >= "22.01":
+            # Our own tus upload rather than bioblend's: tusclient follows redirects with the
+            # key attached and dials whatever host Galaxy's Location names.
+            session_id = upload_via_tus(gi.base_url, gi.key, path)
+            # BioBlend accepts None for history_id and uses the most recently used history
+            result = gi.tools.post_to_fetch(path, history_id, session_id)  # type: ignore[arg-type]
+        else:
+            # Pre-tus Galaxy: bioblend's multipart POST, which does not follow redirects.
+            result = gi.tools.upload_file(path, history_id=history_id)  # type: ignore[arg-type]
         return GalaxyResult(
             data=result,
             success=True,
             message=f"Uploaded file '{path}'",
         )
     except Exception as e:
-        raise ValueError(f"Failed to upload file: {str(e)}") from e
+        msg = f"Failed to upload file: {str(e)}"
+        status = getattr(e, "status_code", None)
+        if status in (401, 403):
+            msg += f" ({_STATUS_HINTS[status]})"
+        raise ValueError(msg) from e
 
 
 @mcp.tool(tags={"datasets", "write", "core"})

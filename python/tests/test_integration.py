@@ -33,11 +33,14 @@ class TestIntegration:
             assert history_result.data["id"] == "new_history_1"
 
             # 2. Upload a file
-            mock_galaxy_instance.tools.upload_file.return_value = {
+            mock_galaxy_instance.tools.post_to_fetch.return_value = {
                 "outputs": [{"id": "uploaded_dataset_1", "name": "input.fasta"}]
             }
 
-            with patch("os.path.exists", return_value=True):
+            with (
+                patch("os.path.exists", return_value=True),
+                patch("galaxy_mcp.server.upload_via_tus", return_value="sess1"),
+            ):
                 dataset_result = upload_file_fn("/path/to/input.fasta", history_result.data["id"])
                 assert dataset_result.success is True
                 assert dataset_result.data["outputs"][0]["id"] == "uploaded_dataset_1"
