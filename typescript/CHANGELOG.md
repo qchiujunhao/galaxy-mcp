@@ -4,7 +4,7 @@
 `@galaxyproject/galaxy-mcp` share a version and are published together, so one
 entry covers all three; where something only affects one surface, it says which.
 
-## 0.3.1 (unreleased)
+## 0.3.2 (unreleased)
 
 ### Redirects are no longer followed, so the API key cannot leak off-origin (security)
 
@@ -70,14 +70,6 @@ the golden case `get_tool_citations/error_entry` pins it. A 200 that isn't a lis
 as `connection` (`get_tool_citations/citations_not_a_list`), where the op used to throw a raw
 `TypeError` out of the surface.
 
-### `get_invocations` sends `step_details` for one invocation (#152)
-
-Given an `invocationId`, the op ignored `stepDetails` and Galaxy answered with every step's
-`jobs` list empty, which is what the Python server did too -- both now send `step_details`
-to `GET /api/invocations/{id}` when it is asked for, and the request is unchanged when it is
-not. A new golden case, `get_invocations/single_step_details`, is answered only when the flag
-arrives, so either surface dropping it again fails the replay.
-
 ### A 401, 403 or 404 keeps Galaxy's own message
 
 `classifyHttp` used to throw away Galaxy's `err_msg` on those three statuses and say only
@@ -91,6 +83,16 @@ already worded these the Python server's way and their failures are unchanged, a
 golden case. The one success-side change is `get_dataset_details`: when the preview read fails,
 `preview.error` now carries Galaxy's `err_msg` on a 401, 403 or 404 instead of the bare
 `Unauthorized (<status>)` or `Not found (404)`.
+
+## 0.3.1 (2026-10-04)
+
+### `get_invocations` sends `step_details` for one invocation (#152)
+
+Given an `invocationId`, the op ignored `stepDetails` and Galaxy answered with every step's
+`jobs` list empty, which is what the Python server did too -- both now send `step_details`
+to `GET /api/invocations/{id}` when it is asked for, and the request is unchanged when it is
+not. A new golden case, `get_invocations/single_step_details`, is answered only when the flag
+arrives, so either surface dropping it again fails the replay.
 
 ## 0.3.0 (2026-10-04)
 
