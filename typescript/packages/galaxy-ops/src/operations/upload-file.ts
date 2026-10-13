@@ -13,7 +13,8 @@ import { existsSync } from "node:fs";
 import { basename } from "node:path";
 import { z } from "zod";
 import type { GalaxyContext } from "../context";
-import { GalaxyConnectionError } from "../errors";
+import { DetailedError } from "tus-js-client";
+import { GalaxyAuthError, GalaxyConnectionError, GalaxyError } from "../errors";
 import { legacyPost } from "../legacy";
 import { tusUploadFile } from "../tus-upload";
 import { register, runOperation } from "./registry";
@@ -45,7 +46,23 @@ async function run(i: In, ctx: GalaxyContext): Promise<UploadFileResult> {
   const baseUrl = ctx.baseUrl;
   const apiKey = ctx.apiKey;
 
-  const sessionId = await tusUploadFile({ baseUrl, apiKey, path: i.path, signal: ctx.signal });
+  let sessionId: string;
+  try {
+    sessionId = await tusUploadFile({ baseUrl, apiKey, path: i.path, signal: ctx.signal });
+  } catch (err) {
+    // tus's own errors are not ours, so they used to escape the envelope as bugs. Worded the
+    // way the Python server wraps any upload failure; a cancellation stays a cancellation.
+    if ((err as Error)?.name === "AbortError") throw err;
+    const said = `Failed to upload file: ${err instanceof Error ? err.message : String(err)}`;
+    // Our own refusals keep their kind (a redirect is `validation`); a rejected key is `auth`.
+    if (err instanceof GalaxyError) {
+      err.message = said;
+      throw err;
+    }
+    const status = err instanceof DetailedError ? err.originalResponse?.getStatus() : undefined;
+    if (status === 401 || status === 403) throw new GalaxyAuthError(said);
+    throw new GalaxyConnectionError(said, status, err);
+  }
 
   const payload: Record<string, unknown> = {
     targets: [

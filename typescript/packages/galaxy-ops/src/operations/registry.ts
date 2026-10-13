@@ -1,6 +1,6 @@
 import type { ZodRawShape } from "zod";
 import type { EnvelopeFacts, GalaxyContext } from "../context";
-import { GalaxyError, GalaxyVersionError } from "../errors";
+import { GalaxyError, GalaxyVersionError, redirectRefusal } from "../errors";
 import { pyFormatError, pyLibraryText } from "../python-failure";
 import { parseRequirement, requirementSentence, satisfiesRequirement } from "../version";
 import { trimToBudget } from "./pagination";
@@ -187,7 +187,12 @@ export function pythonFailureSentence<Shape extends ZodRawShape, O>(
   const contract = op.failure;
   if (!facts || !contract) return err.message;
   const shape = typeof contract.shape === "function" ? contract.shape(facts) : contract.shape;
-  const text = pyLibraryText(shape, facts);
+  // An unfollowed 3xx is ours to word: Python's text for one quotes the body and never the
+  // Location, and its raise-for-status ops do not fail on a 3xx at all (see python-failure.ts).
+  const text =
+    facts.redirectedTo !== undefined
+      ? redirectRefusal(facts.status, facts.redirectedTo || undefined)
+      : pyLibraryText(shape, facts);
   const own = contract.sentence?.(text, facts.status, input);
   if (own !== undefined) return own;
   if (contract.action === undefined) return text;

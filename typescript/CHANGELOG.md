@@ -6,6 +6,40 @@ entry covers all three; where something only affects one surface, it says which.
 
 ## 0.3.1 (unreleased)
 
+### Redirects are no longer followed, so the API key cannot leak off-origin (security)
+
+The client followed any 3xx Galaxy (or anything in front of it) answered with, and re-sent
+`x-api-key` to wherever the `Location` pointed -- another origin, a protocol-relative URL, or
+a same-origin hop that then redirected away. Every request now goes out with
+`redirect: "manual"`, and a call can't opt back in, swap in its own `fetch` or `Request`, or
+point at another `baseUrl`. A 3xx (not 304) is an error, never content, and its kind is
+`validation` rather than `connection`: the redirect a real deployment sends is a proxy's
+http -> https hop, which is a `GALAXY_URL` to fix, so agents shouldn't retry it and the CLI
+exits 64 (`EX_USAGE`) instead of 69. The sentence names where it pointed (without userinfo,
+query or fragment, and capped at 200 characters):
+`Failed to get user: Galaxy answered 301 and redirects are not followed; Galaxy redirected to https://usegalaxy.org/api/users/current -- check GALAXY_URL`.
+
+The Python server refuses the same hops on its GETs (`allow_redirects=False` since 1.11.1)
+and on bioblend's writes, but its wording differs and is not copied: bioblend's text quotes
+the body and never the `Location`, and its raise-for-status ops don't fail on a 3xx at all --
+`get_page`, `list_pages`, `list_page_revisions`, `get_page_revision`, `list_user_tools`,
+`run_user_tool`'s lookup and `get_job_details` go on to fail parsing the empty body
+("Expecting value: line 1 column 1 (char 0)"), and `delete_user_tool` reports success. Here
+every op fails with the sentence above inside its usual action and context. Python's
+`upload_file` still follows redirects on its tus POST/PATCH with the key attached; that is a
+separate fix on the Python side.
+
+The tus upload no longer dials the creation reply's `Location` as given. Galaxy builds that
+`Location` from the Host it saw (or `X-Forwarded-Host`/`-Proto`), so it is absolute and can
+name a host the client never asked for. Its path must be the configured Galaxy's
+`/api/upload/resumable_upload/<id>` -- checked on the raw header, so no `..` or `%2e%2e` gets
+collapsed into something else -- and the upload is sent to the configured origin with that
+path and query. A `Location` that is not the upload route is refused once, with no tus retry,
+and a 3xx on any tus request is the same `validation` redirect refusal as everywhere else.
+Any tus failure now comes back inside the envelope as `Failed to upload file: ...` instead of
+escaping as an unhandled error (a CLI stack trace and exit 70): `auth` (exit 77) for a 401 or
+403, `connection` otherwise.
+
 ### `get_invocations` sends `step_details` for one invocation (#152)
 
 Given an `invocationId`, the op ignored `stepDetails` and Galaxy answered with every step's

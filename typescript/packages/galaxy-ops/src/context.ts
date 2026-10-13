@@ -1,5 +1,5 @@
 import { createGalaxyClient, type GalaxyClient } from "./client";
-import { httpError, GalaxyConnectionError, type GalaxyError } from "./errors";
+import { httpError, GalaxyConnectionError, GalaxyError } from "./errors";
 import { parseGalaxyVersion, type GalaxyVersion } from "./version";
 
 export interface PollPolicy {
@@ -163,8 +163,13 @@ function versionLookup(
       } catch (err) {
         // Unreachable, cancelled or too slow are all "unknown version", not a failed op -- but
         // a caller that has to report the server rather than guard against it needs the reason.
+        // One of ours already carries the facts its sentence is worded from (a refused
+        // redirect, a transport failure); rewrapping would drop them.
         return {
-          error: new GalaxyConnectionError((err as Error).message, undefined, err),
+          error:
+            err instanceof GalaxyError
+              ? err
+              : new GalaxyConnectionError((err as Error).message, undefined, err),
           source: "unknown",
         };
       } finally {
