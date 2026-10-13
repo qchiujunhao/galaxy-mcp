@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `get_collection_details` reported every element's `extension` as `''` and the collection's
+  `state` as `'unknown'`. It read `extension` and `state`, which Galaxy never sends there; it now
+  reads the element object's `file_ext` and the collection's `populated_state`. The TypeScript
+  server had the same bug and is fixed alongside.
+
 ## [1.11.1] - 2026-10-09
 
 ### Security

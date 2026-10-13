@@ -1402,7 +1402,7 @@ def cases() -> list[Case]:  # noqa: PLR0915 -- a flat table reads better than he
                 "id": f"d{index:04d}",
                 "name": f"sample{index}.txt",
                 "state": "ok",
-                "extension": "txt",
+                "file_ext": "txt",
                 "file_size": size,
                 "history_id": "h0000",
             },
@@ -1415,7 +1415,7 @@ def cases() -> list[Case]:  # noqa: PLR0915 -- a flat table reads better than he
             "collection_type": "list",
             "element_count": len(elements),
             "populated": True,
-            "state": "ok",
+            "populated_state": "ok",
             "history_content_type": "dataset_collection",
             "elements": elements,
         }
