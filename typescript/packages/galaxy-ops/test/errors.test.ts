@@ -20,6 +20,29 @@ describe("error classification", () => {
     expect(e).toBeInstanceOf(GalaxyConnectionError);
     expect((e as GalaxyConnectionError).status).toBe(500);
   });
+  it("keeps Galaxy's err_msg and err_code on a 403", () => {
+    // Galaxy's fetch allowlist refuses a private address with a 403 -- not a key problem.
+    const e = classifyHttp(403, {
+      err_msg: "Access to this address in not permitted by server configuration",
+      err_code: 403004,
+    });
+    expect(e).toBeInstanceOf(GalaxyAuthError);
+    expect(e.message).toBe("Access to this address in not permitted by server configuration");
+    expect(e.errCode).toBe(403004);
+  });
+  it("falls back to an auth sentence for a 401 with no body", () => {
+    const e = classifyHttp(401, undefined);
+    expect(e).toBeInstanceOf(GalaxyAuthError);
+    expect(e.message).toBe("Unauthorized (401)");
+    expect(e.errCode).toBeUndefined();
+  });
+  it("keeps Galaxy's err_msg on a 404", () => {
+    const e = classifyHttp(404, { err_msg: "History not found", err_code: 404001 });
+    expect(e).toBeInstanceOf(GalaxyNotFoundError);
+    expect(e.message).toBe("History not found");
+    expect(e.errCode).toBe(404001);
+    expect(classifyHttp(404, {}).message).toBe("Not found (404)");
+  });
   it("ToolRequestRejectedError carries toolId + err_msg", () => {
     const e = new ToolRequestRejectedError("fastqc/0.74", "could not expand");
     expect(e.toolId).toBe("fastqc/0.74");

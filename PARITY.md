@@ -99,7 +99,7 @@ A row per tool, then a row per parameter the surfaces disagree about. `--` means
 | `get_page_revision` |  | `4` | `read (tag), requires >=26.1` | `read (hint), requires >=26.1` | `write (mcp default)` |  |  |  |
 | `get_page_revision` | `include_rendered` |  | -- | -- | `type=boolean required=false default=false` | `vs built-in: missing-py-param` | `unreviewed-gap` | Galaxy's can return the rendered revision beside the editable one; ours returns the editable text and says which source it came from. |
 | `get_server_info` |  | `5` | `read (tag)` | `read (hint)` | `write (mcp default)` |  |  |  |
-| `get_tool_citations` |  | `3` | `read (tag)` | `read (hint)` | `write (mcp default)` |  |  |  |
+| `get_tool_citations` |  | `6` | `read (tag)` | `read (hint)` | `write (mcp default)` |  |  |  |
 | `get_tool_details` |  | `7` | `read (tag)` | `read (hint)` | `write (mcp default)` |  |  |  |
 | `get_tool_details` | `tool_version` |  | `type=string required=false default=none` | `type=string required=false default=none` | -- | `vs built-in: missing-builtin-param` | `intentional` | Ours can describe a tool at the version a template was frozen at, which is what GET /api/tools/{id}?tool_version= is for; Galaxy's describes whichever version the toolbox picks for the id. Kept: a caller pinning a version needs the answer to be about that version, and ours refuses when it is not. |
 | `get_tool_input_template` |  | `3` | `read (tag)` | `read (hint)` | -- | `vs built-in: missing-builtin-tool` | `unreviewed-gap` | Only here. Galaxy's server has no pre-flight skeleton for run_tool, so an agent there shapes `inputs` from get_tool_details(io_details=True) by hand. |

@@ -100,7 +100,8 @@ export async function schemaToCheck(
     // The reason quotes the exception, and the exception is the client library's: an
         // unversioned lookup goes through bioblend over there and a versioned one through
     // requests, which word a refusal differently.
-    const facts = err instanceof GalaxyError ? err.http : undefined;
+    // An unfollowed redirect keeps its own text, which names where it pointed.
+    const facts = err instanceof GalaxyError && err.http?.redirectedTo === undefined ? err.http : undefined;
     const said = facts
       ? pyLibraryText(toolVersion == null ? "bioblend-get" : "raise-for-status", facts)
       : err instanceof Error

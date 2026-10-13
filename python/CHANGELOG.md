@@ -87,6 +87,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   accepts what Galaxy's own `uuid.UUID()` does, so the bare 32-digit, braced and `urn:uuid:`
   spellings find the tool as they already do for `delete_user_tool` and `run_user_tool`.
 
+## [1.11.2] - 2026-10-12
+
+### Fixed
+
+- `get_collection_details` reported every element's `extension` as `''` and the collection's
+  `state` as `'unknown'`. It read `extension` and `state`, which Galaxy never sends there; it now
+  reads the element object's `file_ext` and the collection's `populated_state`. The TypeScript
+  server had the same bug and is fixed alongside.
+- `download_dataset` returned empty content on Galaxy 26.2 and later. bioblend downloads through
+  the dataset's `download_url`, which there is the new `/download` route, and that route answers
+  with a 302. GETs stop following redirects since 1.11.1, so the tool saved the empty redirect body
+  and reported success. It now fetches `/api/datasets/{id}/display` directly, as the TypeScript op
+  does, and treats any status other than 200 as an error instead of content. No redirects are
+  followed. Released Galaxy versions serve `/display` as their `download_url` and were not affected.
+- `download_dataset(file_path=...)` writes to a temporary file beside the target and moves it into
+  place only once the download is complete, so a failed download leaves an existing file as it
+  was. A 200 that hands the file to the web proxy (`X-Accel-Redirect`/`X-Sendfile`, an empty body
+  when connected to Galaxy's application port) is now an error rather than an empty download.
+- `file_path` is checked before anything is fetched, and some paths that plain `open()` accepted
+  are now refused: anything that exists but is not a regular file (a device, FIFO or socket would
+  otherwise be swapped for a regular file), a path ending in a separator, a symlink that does not
+  resolve, and a writable file in a directory that is not writable (the temporary file needs that
+  directory). Symlinks to files are still written through. Because the finished file is moved into
+  place rather than written in place, an existing file gets a new inode and owner and loses any hard
+  links; its permission bits are kept.
+- Security: `upload_file`'s tus upload no longer follows redirects. tusclient sent its creation
+  POST, PATCH and HEAD with requests' default `allow_redirects=True`, so a 3xx re-sent the API key
+  to wherever `Location` pointed -- the last Python request that still did after 1.11.1. A 3xx
+  (other than 304) on any tus request is now a final error naming the stripped target and saying
+  to check `GALAXY_URL`, and it is never retried.
+- Security: the upload no longer dials the host Galaxy's tus `Location` names. Galaxy builds that
+  URL absolute from the Host it saw (or `X-Forwarded-Host`/`-Proto`), so behind a proxy it can be a
+  different host from `GALAXY_URL`. The raw `Location` must be this Galaxy's
+  `/api/upload/resumable_upload/<id>` route (one plain segment -- no `..`, escapes, backslashes
+  or extra segments) and every later request goes to the configured origin with that path, so the
+  key only ever reaches the configured Galaxy. Anything else is refused once, with no retry.
+- A 401 or 403 on the upload now carries the same authentication/permission hint as other tools.
+- `get_tool_citations` always answered zero citations: it read a `citations` key from
+  `GET /api/tools/{id}`, which Galaxy never sends. It now reads `GET /api/tools/{id}/citations`,
+  and each citation is Galaxy's `{"format": "bibtex", "content": ...}`. The tool show is still
+  read first, for the name and version and so an unknown id still fails as not found. When
+  Galaxy answers with an error entry instead -- its toolbox lost the id between the two reads,
+  to a reload or another worker -- the call fails with Galaxy's text rather than counting it,
+  and a reply that isn't a list fails rather than having its keys counted as citations.
+
 ## [1.11.1] - 2026-10-09
 
 ### Security

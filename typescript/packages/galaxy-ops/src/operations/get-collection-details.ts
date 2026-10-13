@@ -54,7 +54,8 @@ function normalizeElement(element: unknown, index: number): Record<string, unkno
     object_id: pyGet(object, "id", ""),
     name: pyGet(object, "name", ""),
     state: pyGet(object, "state", ""),
-    extension: pyGet(object, "extension", ""),
+    // Galaxy names a dataset's extension file_ext; the envelope keeps its own name.
+    extension: pyGet(object, "file_ext", ""),
     file_size: pyGet(object, "file_size", null),
   };
 }
@@ -103,7 +104,8 @@ export const getCollectionDetailsOp: Operation<typeof input, CollectionDetail> =
       collection_type: pyGet(record, "collection_type", null),
       element_count: pyGet(record, "element_count", 0),
       populated: pyGet(record, "populated", true),
-      state: pyGet(record, "state", "unknown"),
+      // Galaxy names the collection's state populated_state.
+      state: pyGet(record, "populated_state", "unknown"),
     };
     return {
       data: {

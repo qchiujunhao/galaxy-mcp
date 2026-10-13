@@ -1,8 +1,8 @@
 {
   "$comment": "Generated golden envelopes from the Python MCP server -- do not edit by hand. Regenerate with `uv run python -m tests.envelope_fixtures`. `input` is spelled in the server's own parameter names, which is what the MCP wire takes. A case whose `outcome` is \"failure\" pins the tool result a failed call answers with instead of an envelope.",
   "source": "python/src/galaxy_mcp/server.py",
-  "caseCount": 267,
-  "failureCaseCount": 88,
+  "caseCount": 270,
+  "failureCaseCount": 91,
   "cases": [
     {
       "tool": "search_tools_by_name",
@@ -2502,6 +2502,39 @@
       },
       "envelope": "get_tool_citations/not_found.json",
       "replies": "get_tool_input_template/not_found.galaxy.json"
+    },
+    {
+      "tool": "get_tool_citations",
+      "case": "citations_server_error",
+      "note": "the tool is there, the citations read that follows it fails",
+      "outcome": "failure",
+      "input": {
+        "tool_id": "cat1"
+      },
+      "envelope": "get_tool_citations/citations_server_error.json",
+      "replies": "get_tool_citations/citations_server_error.galaxy.json"
+    },
+    {
+      "tool": "get_tool_citations",
+      "case": "error_entry",
+      "note": "the show resolved the id but the citations read, racing a toolbox reload or landing on another worker, did not: Galaxy answers 200 with an error entry rather than citations. The 404 in the id is on purpose -- the bare exception has no status, so the hint comes from a text search, and this pins it",
+      "outcome": "failure",
+      "input": {
+        "tool_id": "tool404"
+      },
+      "envelope": "get_tool_citations/error_entry.json",
+      "replies": "get_tool_citations/error_entry.galaxy.json"
+    },
+    {
+      "tool": "get_tool_citations",
+      "case": "citations_not_a_list",
+      "note": "a 200 from the citations read that is not a list is refused rather than measured",
+      "outcome": "failure",
+      "input": {
+        "tool_id": "cat1"
+      },
+      "envelope": "get_tool_citations/citations_not_a_list.json",
+      "replies": "get_tool_citations/citations_not_a_list.galaxy.json"
     },
     {
       "tool": "list_history_ids",

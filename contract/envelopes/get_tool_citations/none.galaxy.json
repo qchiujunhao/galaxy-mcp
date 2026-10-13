@@ -11,9 +11,16 @@
       "body": {
         "id": "cat1",
         "name": "Concatenate",
-        "version": "1.0.0",
-        "citations": []
+        "version": "1.0.0"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/api/tools/cat1/citations",
+      "query": {},
+      "status": 200,
+      "headers": {},
+      "body": []
     }
   ]
 }

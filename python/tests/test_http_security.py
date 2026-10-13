@@ -1,6 +1,6 @@
 """Tests for the HTTP transport guards."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from starlette.applications import Starlette
@@ -160,10 +160,12 @@ class TestLocalFileTools:
             patch.object(http_security, "in_http_request", return_value=True),
             patch("os.path.exists", return_value=True),
             patch.dict(server.galaxy_state, {"connected": True, "gi": mock_galaxy_instance}),
+            patch.object(server, "upload_via_tus") as tus,
             pytest.raises(ValueError, match="disabled over HTTP"),
         ):
             upload_file_fn("/etc/passwd", "history_1")
-        mock_galaxy_instance.tools.upload_file.assert_not_called()
+        tus.assert_not_called()
+        mock_galaxy_instance.tools.post_to_fetch.assert_not_called()
 
     def test_upload_opt_in_over_http(self, mock_galaxy_instance, monkeypatch):
         monkeypatch.setenv("GALAXY_MCP_ALLOW_LOCAL_FILES", "1")
@@ -171,9 +173,11 @@ class TestLocalFileTools:
             patch.object(http_security, "in_http_request", return_value=True),
             patch("os.path.exists", return_value=True),
             patch.dict(server.galaxy_state, {"connected": True, "gi": mock_galaxy_instance}),
+            patch.object(server, "upload_via_tus", return_value="sess1") as tus,
         ):
             upload_file_fn("/data/reads.fastq", "history_1")
-        mock_galaxy_instance.tools.upload_file.assert_called_once()
+        tus.assert_called_once()
+        mock_galaxy_instance.tools.post_to_fetch.assert_called_once()
 
     def test_download_to_path_blocked_over_http(self, mock_galaxy_instance, monkeypatch):
         monkeypatch.delenv("GALAXY_MCP_ALLOW_LOCAL_FILES", raising=False)
@@ -183,7 +187,7 @@ class TestLocalFileTools:
             pytest.raises(ValueError, match="disabled over HTTP"),
         ):
             download_dataset_fn("dataset_1", file_path="/tmp/out.txt")
-        mock_galaxy_instance.datasets.download_dataset.assert_not_called()
+        mock_galaxy_instance.make_get_request.assert_not_called()
 
     def test_download_to_memory_still_works_over_http(self, mock_galaxy_instance, monkeypatch):
         monkeypatch.delenv("GALAXY_MCP_ALLOW_LOCAL_FILES", raising=False)
@@ -193,7 +197,9 @@ class TestLocalFileTools:
             "extension": "txt",
             "state": "ok",
         }
-        mock_galaxy_instance.datasets.download_dataset.return_value = b"hello"
+        response = Mock(status_code=200, headers={})
+        response.iter_content.return_value = [b"hello"]
+        mock_galaxy_instance.make_get_request.return_value = response
         with (
             patch.object(http_security, "in_http_request", return_value=True),
             patch.dict(server.galaxy_state, {"connected": True, "gi": mock_galaxy_instance}),

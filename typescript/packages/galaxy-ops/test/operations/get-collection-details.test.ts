@@ -82,17 +82,34 @@ describe("get_collection_details", () => {
     const elements = Array.from({ length: 5 }, (_, k) => ({
       element_identifier: `s${k}`,
       element_type: "hda",
-      object: { id: `d${k}`, name: `s${k}.txt`, state: "ok", extension: "txt", file_size: 7 },
+      object: { id: `d${k}`, name: `s${k}.txt`, state: "ok", file_ext: "txt", file_size: 7 },
     }));
     const cut = await envelope({ id: "c1", elements }, { collectionId: "c1", maxElements: 2 });
     expect((cut.data as any).elements_truncated).toBe(true);
     expect((cut.data as any).elements).toHaveLength(2);
     expect((cut.data as any).elements[1].element_index).toBe(1);
+    expect((cut.data as any).elements[1].extension).toBe("txt");
     expect(cut.count).toBe(2);
 
     const whole = await envelope({ id: "c1", elements }, { collectionId: "c1", maxElements: 5 });
     expect((whole.data as any).elements_truncated).toBe(false);
     expect(whole.count).toBe(5);
+  });
+
+  /** Galaxy sends populated_state and file_ext, never state and extension, at these levels. */
+  it("reads the collection state and element extension from Galaxy's own keys", async () => {
+    const r = await envelope(
+      {
+        id: "c1",
+        populated_state: "ok",
+        elements: [
+          { element_identifier: "a", element_type: "hda", object: { id: "d1", state: "ok", file_ext: "txt" } },
+        ],
+      },
+      { collectionId: "c1" },
+    );
+    expect((r.data as any).collection.state).toBe("ok");
+    expect((r.data as any).elements[0]).toMatchObject({ state: "ok", extension: "txt" });
   });
 
   /** A nested collection is an element whose object is a collection, and stays one. */

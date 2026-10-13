@@ -11,18 +11,25 @@
       "body": {
         "id": "cat1",
         "name": "Concatenate",
-        "version": "1.0.0",
-        "citations": [
-          {
-            "type": "bibtex",
-            "content": "@article{one, title={One}}"
-          },
-          {
-            "type": "doi",
-            "content": "10.1000/two"
-          }
-        ]
+        "version": "1.0.0"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/api/tools/cat1/citations",
+      "query": {},
+      "status": 200,
+      "headers": {},
+      "body": [
+        {
+          "format": "bibtex",
+          "content": "@article{one,\n  title = {One}\n}"
+        },
+        {
+          "format": "bibtex",
+          "content": "@misc{two,\n  doi = {10.1000/two}\n}"
+        }
+      ]
     }
   ]
 }

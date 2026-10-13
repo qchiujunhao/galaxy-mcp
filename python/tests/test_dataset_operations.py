@@ -16,6 +16,12 @@ from .test_helpers import (
 )
 
 
+def _display_response(content):
+    response = Mock(status_code=200, headers={})
+    response.iter_content.return_value = [content]
+    return response
+
+
 def _serves_text(gi, item_data, truncated=False):
     """Galaxy's GET /api/datasets/{id}/get_content_as_text answer."""
     response = Mock()
@@ -35,18 +41,26 @@ class TestDatasetOperations:
 
     def test_upload_file(self, mock_galaxy_instance):
         """Test file upload to history"""
-        mock_galaxy_instance.tools.upload_file.return_value = {
+        mock_galaxy_instance.tools.post_to_fetch.return_value = {
             "outputs": [{"id": "new_dataset_1", "name": "test.txt"}]
         }
 
         with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
-            with patch("os.path.exists", return_value=True):
+            with (
+                patch("os.path.exists", return_value=True),
+                patch("galaxy_mcp.server.upload_via_tus", return_value="sess1") as tus,
+            ):
                 result = upload_file_fn("/path/to/test.txt", "test_history_1")
 
                 assert result.success is True
                 assert result.data["outputs"][0]["id"] == "new_dataset_1"
                 assert result.data["outputs"][0]["name"] == "test.txt"
-                mock_galaxy_instance.tools.upload_file.assert_called_once()
+                tus.assert_called_once_with(
+                    "http://localhost:8080", "test_key", "/path/to/test.txt"
+                )
+                mock_galaxy_instance.tools.post_to_fetch.assert_called_once_with(
+                    "/path/to/test.txt", "test_history_1", "sess1"
+                )
 
     def test_upload_file_not_found(self, mock_galaxy_instance):
         """Test upload with non-existent file"""
@@ -202,39 +216,40 @@ class TestDatasetOperations:
             assert result.data["preview"]["lines"] is None
             assert "text datatypes only" in result.data["preview"]["error"]
 
-    def test_download_dataset_with_file_path(self, mock_galaxy_instance):
+    def test_download_dataset_with_file_path(self, mock_galaxy_instance, tmp_path):
         """Test dataset download to specific file path"""
         dataset_id = "dataset123"
-        file_path = "/tmp/test_download.txt"
+        file_path = str(tmp_path / "test_download.txt")
 
         mock_dataset_info = {
             "id": dataset_id,
             "name": "test_data.txt",
             "state": "ok",
             "extension": "txt",
+            "file_ext": "txt",
             "file_size": 1024,
         }
 
         mock_galaxy_instance.datasets.show_dataset.return_value = mock_dataset_info
-        mock_galaxy_instance.datasets.download_dataset.return_value = file_path
+        mock_galaxy_instance.make_get_request.return_value = _display_response(b"x" * 1024)
 
         with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
-            with patch("os.path.exists", return_value=True):
-                with patch("os.path.getsize", return_value=1024):
-                    result = download_dataset_fn(dataset_id, file_path=file_path)
+            result = download_dataset_fn(dataset_id, file_path=file_path)
 
-                    assert result.success is True
-                    assert result.data["dataset_id"] == dataset_id
-                    assert result.data["file_path"] == file_path
-                    assert result.data["file_size"] == 1024
-                    assert result.data["dataset_info"]["name"] == "test_data.txt"
-
-                    mock_galaxy_instance.datasets.download_dataset.assert_called_once_with(
-                        dataset_id,
-                        file_path=file_path,
-                        use_default_filename=False,
-                        require_ok_state=True,
-                    )
+        assert result.success is True
+        assert result.data["dataset_id"] == dataset_id
+        assert result.data["file_path"] == file_path
+        assert result.data["file_size"] == 1024
+        assert result.data["dataset_info"]["name"] == "test_data.txt"
+        with open(file_path, "rb") as fp:
+            assert fp.read() == b"x" * 1024
+        mock_galaxy_instance.make_get_request.assert_called_once_with(
+            "http://localhost:8080/api/datasets/dataset123/display",
+            params={"to_ext": "txt"},
+            stream=True,
+        )
+        mock_galaxy_instance.datasets.download_dataset.assert_not_called()
+        assert [p.name for p in tmp_path.iterdir()] == ["test_download.txt"]
 
     def test_download_dataset_default_filename(self, mock_galaxy_instance):
         """Test dataset download to memory (no file path specified)"""
@@ -251,7 +266,7 @@ class TestDatasetOperations:
         mock_content = b"test file content"
 
         mock_galaxy_instance.datasets.show_dataset.return_value = mock_dataset_info
-        mock_galaxy_instance.datasets.download_dataset.return_value = mock_content
+        mock_galaxy_instance.make_get_request.return_value = _display_response(mock_content)
 
         with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
             result = download_dataset_fn(dataset_id)
@@ -265,9 +280,11 @@ class TestDatasetOperations:
             assert result.data["dataset_info"]["name"] == "test_data"
             assert "memory" in result.data["note"]
 
-            # Verify bioblend was called with use_default_filename=False
-            mock_galaxy_instance.datasets.download_dataset.assert_called_once_with(
-                dataset_id, use_default_filename=False, require_ok_state=True
+            # No file_ext on the record, so to_ext falls back to "dat" as the TS op does
+            mock_galaxy_instance.make_get_request.assert_called_once_with(
+                "http://localhost:8080/api/datasets/dataset123/display",
+                params={"to_ext": "dat"},
+                stream=True,
             )
 
     def test_download_dataset_not_ok_state(self, mock_galaxy_instance):
@@ -364,7 +381,7 @@ class TestDatasetOperations:
             "collection_type": "list",
             "element_count": 3,
             "populated": True,
-            "state": "ok",
+            "populated_state": "ok",
             "elements": [
                 {
                     "element_identifier": "sample1",
@@ -373,7 +390,7 @@ class TestDatasetOperations:
                         "id": "dataset1",
                         "name": "sample1.fastq",
                         "state": "ok",
-                        "extension": "fastqsanger",
+                        "file_ext": "fastqsanger",
                         "file_size": 12345,
                     },
                 },
@@ -384,7 +401,7 @@ class TestDatasetOperations:
                         "id": "dataset2",
                         "name": "sample2.fastq",
                         "state": "ok",
-                        "extension": "fastqsanger",
+                        "file_ext": "fastqsanger",
                         "file_size": 23456,
                     },
                 },
@@ -395,7 +412,7 @@ class TestDatasetOperations:
                         "id": "dataset3",
                         "name": "sample3.fastq",
                         "state": "ok",
-                        "extension": "fastqsanger",
+                        "file_ext": "fastqsanger",
                         "file_size": 34567,
                     },
                 },
@@ -423,6 +440,8 @@ class TestDatasetOperations:
             assert result.data["elements"][0]["object_id"] == "dataset1"
             assert result.data["elements"][0]["name"] == "sample1.fastq"
             assert result.data["elements"][0]["state"] == "ok"
+            assert result.data["elements"][0]["extension"] == "fastqsanger"
+            assert result.data["collection"]["state"] == "ok"
 
             mock_galaxy_instance.dataset_collections.show_dataset_collection.assert_called_once_with(
                 collection_id, instance_type="history"
@@ -444,7 +463,7 @@ class TestDatasetOperations:
                         "id": f"dataset{i}",
                         "name": f"sample{i}.fastq",
                         "state": "ok",
-                        "extension": "fastqsanger",
+                        "file_ext": "fastqsanger",
                         "file_size": 10000 + i,
                     },
                 }
@@ -456,7 +475,7 @@ class TestDatasetOperations:
             "collection_type": "list",
             "element_count": 150,
             "populated": True,
-            "state": "ok",
+            "populated_state": "ok",
             "elements": elements,
         }
 

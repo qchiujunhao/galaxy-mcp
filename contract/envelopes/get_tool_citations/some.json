@@ -4,12 +4,12 @@
     "tool_version": "1.0.0",
     "citations": [
       {
-        "type": "bibtex",
-        "content": "@article{one, title={One}}"
+        "format": "bibtex",
+        "content": "@article{one,\n  title = {One}\n}"
       },
       {
-        "type": "doi",
-        "content": "10.1000/two"
+        "format": "bibtex",
+        "content": "@misc{two,\n  doi = {10.1000/two}\n}"
       }
     ]
   },

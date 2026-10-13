@@ -1504,7 +1504,7 @@ def cases() -> list[Case]:  # noqa: PLR0915 -- a flat table reads better than he
                 "id": f"d{index:04d}",
                 "name": f"sample{index}.txt",
                 "state": "ok",
-                "extension": "txt",
+                "file_ext": "txt",
                 "file_size": size,
                 "history_id": "h0000",
             },
@@ -1517,7 +1517,7 @@ def cases() -> list[Case]:  # noqa: PLR0915 -- a flat table reads better than he
             "collection_type": "list",
             "element_count": len(elements),
             "populated": True,
-            "state": "ok",
+            "populated_state": "ok",
             "history_content_type": "dataset_collection",
             "elements": elements,
         }
@@ -1931,9 +1931,12 @@ def cases() -> list[Case]:  # noqa: PLR0915 -- a flat table reads better than he
     )
 
     # -- get_tool_citations --------------------------------------------------
+    # The show payload carries no citations key; Galaxy serves them from their own
+    # endpoint, as {"format": "bibtex", "content": ...} per entry.
+    cat1_show = {"id": "cat1", "name": "Concatenate", "version": "1.0.0"}
     citations = [
-        {"type": "bibtex", "content": "@article{one, title={One}}"},
-        {"type": "doi", "content": "10.1000/two"},
+        {"format": "bibtex", "content": "@article{one,\n  title = {One}\n}"},
+        {"format": "bibtex", "content": "@misc{two,\n  doi = {10.1000/two}\n}"},
     ]
     add(
         "get_tool_citations",
@@ -1941,12 +1944,7 @@ def cases() -> list[Case]:  # noqa: PLR0915 -- a flat table reads better than he
         "citations counted",
         {"tool_id": "cat1"},
         lambda: get_tool_citations_fn("cat1"),
-        [
-            route(
-                "/api/tools/cat1",
-                {"id": "cat1", "name": "Concatenate", "version": "1.0.0", "citations": citations},
-            )
-        ],
+        [route("/api/tools/cat1", cat1_show), route("/api/tools/cat1/citations", citations)],
     )
     add(
         "get_tool_citations",
@@ -1954,12 +1952,7 @@ def cases() -> list[Case]:  # noqa: PLR0915 -- a flat table reads better than he
         "a tool that cites nothing",
         {"tool_id": "cat1"},
         lambda: get_tool_citations_fn("cat1"),
-        [
-            route(
-                "/api/tools/cat1",
-                {"id": "cat1", "name": "Concatenate", "version": "1.0.0", "citations": []},
-            )
-        ],
+        [route("/api/tools/cat1", cat1_show), route("/api/tools/cat1/citations", [])],
     )
 
     single_record_cases(add)
@@ -4124,6 +4117,50 @@ def more_http_failure_cases(add: AddFailure) -> None:
         "the same record, read by another tool",
         {"tool_id": "nosuchtool"},
         [fail("/api/tools/nosuchtool", 404, MISSING)],
+    )
+    add(
+        "get_tool_citations",
+        "citations_server_error",
+        "the tool is there, the citations read that follows it fails",
+        {"tool_id": "cat1"},
+        [
+            route("/api/tools/cat1", {"id": "cat1", "name": "Concatenate", "version": "1.0.0"}),
+            fail("/api/tools/cat1/citations", 500, BROKEN),
+        ],
+    )
+    add(
+        "get_tool_citations",
+        "error_entry",
+        "the show resolved the id but the citations read, racing a toolbox reload or landing on "
+        "another worker, did not: Galaxy answers 200 with an error entry rather than citations. "
+        "The 404 in the id is on purpose -- the bare exception has no status, so the hint "
+        "comes from a text search, and this pins it",
+        {"tool_id": "tool404"},
+        [
+            route("/api/tools/tool404", {"id": "tool404", "name": "Gone", "version": "1.0.0"}),
+            route(
+                "/api/tools/tool404/citations",
+                [
+                    {
+                        "format": "error",
+                        "error": (
+                            "Tool 'tool404' not found. Citations for this tool may be missing."
+                        ),
+                        "tool_id": "tool404",
+                    }
+                ],
+            ),
+        ],
+    )
+    add(
+        "get_tool_citations",
+        "citations_not_a_list",
+        "a 200 from the citations read that is not a list is refused rather than measured",
+        {"tool_id": "cat1"},
+        [
+            route("/api/tools/cat1", {"id": "cat1", "name": "Concatenate", "version": "1.0.0"}),
+            route("/api/tools/cat1/citations", {"id": "cat1", "name": "Concatenate"}),
+        ],
     )
     add(
         "list_history_ids",

@@ -4,7 +4,7 @@
 `@galaxyproject/galaxy-mcp` share a version and are published together, so one
 entry covers all three; where something only affects one surface, it says which.
 
-## 0.3.1 (unreleased)
+## 0.4.0 (unreleased)
 
 ### `get_job_details` by job id (#TBD)
 
@@ -114,6 +114,88 @@ read as not found. The check accepts what Galaxy's own `uuid.UUID()` does, so th
 32-digit, braced and `urn:uuid:` spellings find the tool as they already do for
 `delete_user_tool` and `run_user_tool`. Four golden cases: `found`, `found_without_hyphens`,
 `not_found`, `malformed_uuid`.
+
+## 0.3.2 (2026-10-12)
+
+### Redirects are no longer followed, so the API key cannot leak off-origin (security)
+
+The client followed any 3xx Galaxy (or anything in front of it) answered with, and re-sent
+`x-api-key` to wherever the `Location` pointed -- another origin, a protocol-relative URL, or
+a same-origin hop that then redirected away. Every request now goes out with
+`redirect: "manual"`, and a call can't opt back in, swap in its own `fetch` or `Request`, or
+point at another `baseUrl`. A 3xx (not 304) is an error, never content, and its kind is
+`validation` rather than `connection`: the redirect a real deployment sends is a proxy's
+http -> https hop, which is a `GALAXY_URL` to fix, so agents shouldn't retry it and the CLI
+exits 64 (`EX_USAGE`) instead of 69. The sentence names where it pointed (without userinfo,
+query or fragment, and capped at 200 characters):
+`Failed to get user: Galaxy answered 301 and redirects are not followed; Galaxy redirected to https://usegalaxy.org/api/users/current -- check GALAXY_URL`.
+
+The Python server refuses the same hops on its GETs (`allow_redirects=False` since 1.11.1)
+and on bioblend's writes, but its wording differs and is not copied: bioblend's text quotes
+the body and never the `Location`, and its raise-for-status ops don't fail on a 3xx at all --
+`get_page`, `list_pages`, `list_page_revisions`, `get_page_revision`, `list_user_tools`,
+`run_user_tool`'s lookup and `get_job_details` go on to fail parsing the empty body
+("Expecting value: line 1 column 1 (char 0)"), and `delete_user_tool` reports success. Here
+every op fails with the sentence above inside its usual action and context. Python's
+`upload_file` still follows redirects on its tus POST/PATCH with the key attached; that is a
+separate fix on the Python side.
+
+The tus upload no longer dials the creation reply's `Location` as given. Galaxy builds that
+`Location` from the Host it saw (or `X-Forwarded-Host`/`-Proto`), so it is absolute and can
+name a host the client never asked for. Its path must be the configured Galaxy's
+`/api/upload/resumable_upload/<id>` -- checked on the raw header, so no `..` or `%2e%2e` gets
+collapsed into something else -- and the upload is sent to the configured origin with that
+path and query. A `Location` that is not the upload route is refused once, with no tus retry,
+and a 3xx on any tus request is the same `validation` redirect refusal as everywhere else.
+Any tus failure now comes back inside the envelope as `Failed to upload file: ...` instead of
+escaping as an unhandled error (a CLI stack trace and exit 70): `auth` (exit 77) for a 401 or
+403, `connection` otherwise.
+
+### `get_collection_details` reads Galaxy's own keys
+
+The op read `extension` off each element's object and `state` off the collection, and Galaxy
+sends neither there, so every element came back with `extension: ""` and the collection with
+`state: "unknown"`. The Python server did the same. Both now read `file_ext` and
+`populated_state`; the envelope keeps its `extension` and `state` names. The canned Galaxy
+replies behind the `get_collection_details` golden cases used the fake keys too, which is why
+replay never caught it -- they now carry the real shape.
+
+### `get_tool_citations` reads Galaxy's citations endpoint
+
+The op read `citations` off `GET /api/tools/{id}`, a key Galaxy never sends, so every tool
+came back with zero citations -- and the Python server did the same, which is why replay
+never caught it: the golden canned reply served the key both sides expected. Both now read
+`GET /api/tools/{id}/citations` after the show, and each citation is Galaxy's
+`{ format: "bibtex", content }`. The canned replies now match the real endpoint, and a new
+golden case, `get_tool_citations/citations_server_error`, covers the second read failing.
+
+`ToolCitationsResult.citations` narrows from `unknown[]` to the new exported `ToolCitation[]`,
+which a library caller typing against the old shape may notice.
+
+Galaxy answers 200 with a `{ format: "error", error, tool_id }` entry when its toolbox can't
+resolve the id. The show just resolved it, so that only happens in a race -- a toolbox reload,
+or another worker that hasn't loaded the tool -- and it's never one bad citation among good
+ones (a DOI that won't resolve comes back as a placeholder bibtex entry). Both servers now fail
+the call with Galaxy's own text, as not found, rather than counting the error as a citation;
+the golden case `get_tool_citations/error_entry` pins it. A 200 that isn't a list fails too,
+as `connection` (`get_tool_citations/citations_not_a_list`), where the op used to throw a raw
+`TypeError` out of the surface.
+
+### A 401, 403 or 404 keeps Galaxy's own message
+
+`classifyHttp` used to throw away Galaxy's `err_msg` on those three statuses and say only
+`Unauthorized (<status>)` or `Not found (404)`. That is what an op without a `failure` contract
+(`upload_file`, `upload_file_from_url`, `download_dataset`) reported, so a URL refused by
+Galaxy's fetch allowlist -- a 403 with "Access to this address in not permitted by server
+configuration" -- read like a bad API key. The status still picks the error kind; the text is
+now Galaxy's `err_msg` when the reply has one, with the old sentences as the fallback, and
+Galaxy's `err_code` rides along on the error as `errCode`. Ops with a `failure` contract
+already worded these the Python server's way and their failures are unchanged, as is every
+golden case. The one success-side change is `get_dataset_details`: when the preview read fails,
+`preview.error` now carries Galaxy's `err_msg` on a 401, 403 or 404 instead of the bare
+`Unauthorized (<status>)` or `Not found (404)`.
+
+## 0.3.1 (2026-10-04)
 
 ### `get_invocations` sends `step_details` for one invocation (#152)
 
