@@ -4,9 +4,9 @@
 `@galaxyproject/galaxy-mcp` share a version and are published together, so one
 entry covers all three; where something only affects one surface, it says which.
 
-## 0.4.0 (unreleased)
+## 0.4.0 (2026-10-19)
 
-### `get_job_details` by job id (#TBD)
+### `get_job_details` by job id (#167)
 
 The op takes `jobId` as an alternative to `datasetId` -- exactly one of the two, refused as
 `validation` (exit 64) when neither or both arrive. The read is the plain job record on either
@@ -20,7 +20,7 @@ as the positional it was as well, so `galaxy-cli get_job_details <id>` still run
 input shape is declared in the Python signature's order, `datasetId, historyId, jobId`, and
 `GetJobDetailsResult.dataset_id` is `null` when the job was asked for by id. Six golden cases
 pin it on both surfaces; every answer through a dataset is unchanged.
-### `get_job_logs` reads a job's stdout and stderr (#TBD)
+### `get_job_logs` reads a job's stdout and stderr (#167)
 
 A new op on all three surfaces, and the other half of the question `get_job_details` answers:
 `getJobLogs({ jobId, logBytes })` sends one `GET /api/jobs/{job_id}?full=true` and returns
@@ -38,7 +38,7 @@ answered-for-this-id check as `get_job_details`, so a malformed id or a 400/404 
 (exit 66) and a 200 that is not this job's record is `connection` (exit 69). On the CLI it is
 `galaxy-cli get_job_logs <jobId> [--log-bytes N]`. Ten golden cases pin it, and the multibyte
 one is replayed through `logEnds` directly so the two clamps are held to the same bytes.
-### A read by id answers for that id, or not at all (#TBD)
+### A read by id answers for that id, or not at all (#167)
 
 `get_job_details` by `jobId` and `get_invocations` by `invocationId` refuse a value that is not
 hex before sending anything (`not_found`, exit 66), and refuse a 200 whose body is not a record
@@ -67,7 +67,7 @@ the CLI) and an id Galaxy cannot decode a 400 (exit 69), which both surfaces fol
 sentence saying it is a filter Galaxy could not read. Nine golden cases under
 `contract/envelopes/list_jobs` hold the two surfaces to the Python server's answer, the
 empty page for an unknown history, those two refusals and the refusal of `limit` 0 among them.
-### `get_invocations` pages, sorts and filters the listing (#TBD)
+### `get_invocations` pages, sorts and filters the listing (#167)
 
 The op could only ever see the newest page: Galaxy caps `/api/invocations` at 100 rows, and
 there was no way to ask for the next 100. It now takes `offset`, `sortBy` (`create_time` or
