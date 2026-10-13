@@ -14,6 +14,20 @@ to `GET /api/invocations/{id}` when it is asked for, and the request is unchange
 not. A new golden case, `get_invocations/single_step_details`, is answered only when the flag
 arrives, so either surface dropping it again fails the replay.
 
+### A 401, 403 or 404 keeps Galaxy's own message
+
+`classifyHttp` used to throw away Galaxy's `err_msg` on those three statuses and say only
+`Unauthorized (<status>)` or `Not found (404)`. That is what an op without a `failure` contract
+(`upload_file`, `upload_file_from_url`, `download_dataset`) reported, so a URL refused by
+Galaxy's fetch allowlist -- a 403 with "Access to this address in not permitted by server
+configuration" -- read like a bad API key. The status still picks the error kind; the text is
+now Galaxy's `err_msg` when the reply has one, with the old sentences as the fallback, and
+Galaxy's `err_code` rides along on the error as `errCode`. Ops with a `failure` contract
+already worded these the Python server's way and their failures are unchanged, as is every
+golden case. The one success-side change is `get_dataset_details`: when the preview read fails,
+`preview.error` now carries Galaxy's `err_msg` on a 401, 403 or 404 instead of the bare
+`Unauthorized (<status>)` or `Not found (404)`.
+
 ## 0.3.0 (2026-10-04)
 
 Breaking on both surfaces. 0.2.0 was tagged but never reached npm, so this release

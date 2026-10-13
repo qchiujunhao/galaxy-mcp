@@ -23,6 +23,8 @@ export class GalaxyError extends Error {
    * reads the same short sentence it always did.
    */
   http?: HttpFailureFacts;
+  /** Galaxy's own `err_code` (e.g. 403004), when the reply carried one. */
+  errCode?: number;
 }
 
 export class GalaxyAuthError extends GalaxyError {
@@ -113,15 +115,30 @@ export function httpError(
   return error;
 }
 
-/** Classify an openapi-fetch failure on the HTTP status only -- never substring scans. */
+/** Galaxy's own `err_msg` and `err_code` off an error body, when it sent them. */
+function galaxyErrorFields(errorBody: unknown): { errMsg?: string; errCode?: number } {
+  if (!errorBody || typeof errorBody !== "object") return {};
+  const body = errorBody as { err_msg?: unknown; err_code?: unknown };
+  const errMsg = body.err_msg == null || body.err_msg === "" ? undefined : String(body.err_msg);
+  const errCode = typeof body.err_code === "number" ? body.err_code : undefined;
+  return { errMsg, errCode };
+}
+
+/**
+ * Classify an openapi-fetch failure on the HTTP status only -- never substring scans.
+ *
+ * The status picks the kind; Galaxy's err_msg, when there is one, is the text. A 403 is not
+ * always a bad key -- Galaxy refuses a URL its fetch allowlist does not name with a 403 too --
+ * so the generic auth sentence is only the fallback for a reply that says nothing itself.
+ */
 export function classifyHttp(status: number, errorBody: unknown): GalaxyError {
-  if (status === 401 || status === 403) return new GalaxyAuthError(`Unauthorized (${status})`);
-  if (status === 404) return new GalaxyNotFoundError("Not found (404)");
-  const msg =
-    errorBody && typeof errorBody === "object" && "err_msg" in errorBody
-      ? String((errorBody as { err_msg: unknown }).err_msg)
-      : `HTTP ${status}`;
-  return new GalaxyConnectionError(msg, status);
+  const { errMsg, errCode } = galaxyErrorFields(errorBody);
+  let error: GalaxyError;
+  if (status === 401 || status === 403) error = new GalaxyAuthError(errMsg ?? `Unauthorized (${status})`);
+  else if (status === 404) error = new GalaxyNotFoundError(errMsg ?? "Not found (404)");
+  else error = new GalaxyConnectionError(errMsg ?? `HTTP ${status}`, status);
+  if (errCode !== undefined) error.errCode = errCode;
+  return error;
 }
 
 /**
