@@ -5,28 +5,8 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.12.0] - 2026-10-19
 
-### Changed
-
-- `get_job_details` takes a `job_id` as an alternative to `dataset_id`, so an agent holding
-  the id of a job it started can read that job directly instead of going through one of its
-  outputs. Exactly one of the two is required, and the tool refuses a call that gives neither
-  or both before it asks Galaxy anything. The read is the plain job record on either path --
-  state, exit code, tool id and version, params, inputs and outputs -- and the description
-  now says so and points at `get_job_logs` for a job's stdout and stderr. A job id Galaxy
-  answers 400 or 404 to -- one it cannot decode, or one it has no job for -- reads as not
-  found, because the caller holding the id cannot act on the difference. Answers through a
-  dataset are unchanged byte for byte; `dataset_id` is now optional in the tool's schema
-  rather than required, and the signature is `dataset_id, history_id, job_id`, so a call that
-  passed the history id positionally still does what it did.
-- `get_job_details` by `job_id` and `get_invocations` by `invocation_id` refuse a value that is
-  not hex before anything is sent, and refuse a 200 whose body is not a record carrying the id
-  asked for. Galaxy's encoded ids are hex and it answers anything else with a 400 that both
-  tools already reported as not found, so no answer changes; what changes is that a value such
-  as `.` or `../histories`, which requests folds into `/api/jobs/` or `/api/histories`, is never
-  sent, and the listing those paths answer with can no longer come back as a job or an
-  invocation.
 ### Added
 
 - `get_job_logs(job_id, log_bytes=4096)` reads a job's stdout and stderr: one
@@ -54,14 +34,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for a reconcile that has to tell the two apart. A history the key cannot read is a 403, and
   an id Galaxy cannot decode a 400, which the tool follows with a hint of its own since the
   shared hint table has no 400 row.
-### Added
 
 - `get_invocations` can now walk a listing longer than one page. It takes `offset`, `sort_by`
   (`create_time` or `update_time`), `sort_desc` and `include_terminal`, all passed through to
   `/api/invocations`; the default request is unchanged. A `limit` above 100 is refused before
   anything is sent, with a sentence that names Galaxy's cap and the offset to page with, rather
   than letting Galaxy answer 400.
-### Added
 
 - `get_workflow_input_template` takes an optional `version`, counted the way `get_workflow_details`
   counts stored versions (0 is the oldest), and pins every read it makes to it -- the run model,
@@ -69,14 +47,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   be read without mixing its slots with the latest version's docs. Left out, nothing changes. A
   version Galaxy does not have is Galaxy's own 400; a negative one is refused before anything is
   sent, because Galaxy would quietly serve some other version for it.
-### Added
 
 - `get_tool_details` takes an optional `tool_version`, so a tool can be described at the
   version a template was pinned to rather than at whichever version Galaxy picks for the id.
   Galaxy serves its newest installed version when the one asked for is missing, as a 200 with
   no word about it, so the tool refuses that answer by name instead of passing another
   version's parameters off as the pinned one. Without `tool_version` nothing changes.
-### Added
 
 - `get_user_tool(uuid)` reads one user-defined tool back by its UUID, with its full
   representation, through Galaxy's single-tool endpoint. Before this a caller holding a UUID from
@@ -86,6 +62,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (older Galaxies with a 500 from the database driver), neither of which is a 404. The check
   accepts what Galaxy's own `uuid.UUID()` does, so the bare 32-digit, braced and `urn:uuid:`
   spellings find the tool as they already do for `delete_user_tool` and `run_user_tool`.
+
+### Changed
+
+- `get_job_details` takes a `job_id` as an alternative to `dataset_id`, so an agent holding
+  the id of a job it started can read that job directly instead of going through one of its
+  outputs. Exactly one of the two is required, and the tool refuses a call that gives neither
+  or both before it asks Galaxy anything. The read is the plain job record on either path --
+  state, exit code, tool id and version, params, inputs and outputs -- and the description
+  now says so and points at `get_job_logs` for a job's stdout and stderr. A job id Galaxy
+  answers 400 or 404 to -- one it cannot decode, or one it has no job for -- reads as not
+  found, because the caller holding the id cannot act on the difference. Answers through a
+  dataset are unchanged byte for byte; `dataset_id` is now optional in the tool's schema
+  rather than required, and the signature is `dataset_id, history_id, job_id`, so a call that
+  passed the history id positionally still does what it did.
+- `get_job_details` by `job_id` and `get_invocations` by `invocation_id` refuse a value that is
+  not hex before anything is sent, and refuse a 200 whose body is not a record carrying the id
+  asked for. Galaxy's encoded ids are hex and it answers anything else with a 400 that both
+  tools already reported as not found, so no answer changes; what changes is that a value such
+  as `.` or `../histories`, which requests folds into `/api/jobs/` or `/api/histories`, is never
+  sent, and the listing those paths answer with can no longer come back as a job or an
+  invocation.
 
 ## [1.11.2] - 2026-10-12
 
