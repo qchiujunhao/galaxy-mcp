@@ -2846,13 +2846,21 @@ def get_history_contents(
         # request goes out with a copy of them, read under the lock that guards them.
         with _gi_lock:
             headers = {**gi.json_headers, "Accept": _CONTENTS_WITH_STATS}
+        # The request carries the API key, so a redirect is refused rather than followed:
+        # the key must never travel to wherever a Location header points.
         response = requests.get(
             f"{gi.url}/histories/{history_id}/contents",
             params=params,
             headers=headers,
             timeout=gi.timeout,
             verify=gi.verify,
+            allow_redirects=False,
         )
+        if 300 <= response.status_code < 400:
+            raise ValueError(
+                f"Galaxy answered the contents request with HTTP {response.status_code} "
+                "(redirects are not followed)"
+            )
         response.raise_for_status()
         body = response.json()
         window = [_content_row(item) for item in body.get("contents") or []]

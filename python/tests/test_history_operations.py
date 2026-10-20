@@ -42,6 +42,7 @@ def galaxy_contents(rows):
         matching = sorted(matching, key=lambda row: row[field], reverse=direction == "dsc")
         offset, limit = params["offset"], params["limit"]
         response = Mock()
+        response.status_code = 200
         response.raise_for_status.return_value = None
         response.json.return_value = {
             "contents": matching[offset : offset + limit],
