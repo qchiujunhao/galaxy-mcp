@@ -1,0 +1,28 @@
+{
+  "data": [
+    {
+      "id": "cat1",
+      "name": "Concatenate",
+      "description": "count occurrences, then join"
+    },
+    {
+      "id": "count1",
+      "name": "Count",
+      "description": "occurrences of each record"
+    }
+  ],
+  "success": true,
+  "message": "Found 2 tools matching 'count occurrences', returning 2",
+  "count": 2,
+  "pagination": {
+    "total_items": 2,
+    "returned_items": 2,
+    "limit": 10,
+    "offset": 0,
+    "has_next": false,
+    "has_previous": false,
+    "next_offset": null,
+    "previous_offset": null,
+    "helper_text": "Showing 2 of 2 tools (offset 0). This is the last page."
+  }
+}

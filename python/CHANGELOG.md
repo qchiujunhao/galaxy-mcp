@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- `search_tools_by_name` also returns, after its substring matches, the tools whose
+  name, ID and description hold every word of the query between them. A phrase that is
+  no substring of any one of them, such as `count occurrences` for Count ("occurrences
+  of each record"), found nothing. Punctuation around a word is ignored; a query with a
+  single-character word finds no more.
+
 ## [1.12.0] - 2026-10-19
 
 ### Added

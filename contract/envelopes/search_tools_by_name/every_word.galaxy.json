@@ -1,0 +1,35 @@
+{
+  "$comment": "Canned Galaxy replies -- do not edit by hand. Regenerate with `uv run python -m tests.envelope_fixtures`. Matched by method and path; where a route declares a query, every declared parameter must match, and the most specific matching route wins.",
+  "baseUrl": "https://galaxy.example/",
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/api/tools",
+      "query": {},
+      "status": 200,
+      "headers": {},
+      "body": [
+        {
+          "id": "sort1",
+          "name": "Sort",
+          "description": "data by column"
+        },
+        {
+          "id": "count1",
+          "name": "Count",
+          "description": "occurrences of each record"
+        },
+        {
+          "id": "cat1",
+          "name": "Concatenate",
+          "description": "count occurrences, then join"
+        },
+        {
+          "id": "grep1",
+          "name": "Select",
+          "description": "matching lines, and count them"
+        }
+      ]
+    }
+  ]
+}

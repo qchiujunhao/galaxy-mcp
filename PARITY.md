@@ -148,7 +148,7 @@ A row per tool, then a row per parameter the surfaces disagree about. `--` means
 | `search_tools_by_keywords` |  | `5` | `read (tag)` | `read (hint)` | `write (mcp default)` |  |  |  |
 | `search_tools_by_keywords` | `limit` |  | `type=integer required=false default=50` | `type=integer required=false default=50` | -- | `vs built-in: missing-builtin-param` | `unreviewed-gap` | Ours pages the matches; Galaxy's returns them all. |
 | `search_tools_by_keywords` | `offset` |  | `type=integer required=false default=0` | `type=integer required=false default=0` | -- | `vs built-in: missing-builtin-param` | `unreviewed-gap` | The other half of that window; Galaxy's has none. |
-| `search_tools_by_name` |  | `7` | `read (tag)` | `read (hint)` | `write (mcp default)` |  |  |  |
+| `search_tools_by_name` |  | `8` | `read (tag)` | `read (hint)` | `write (mcp default)` |  |  |  |
 | `search_tools_by_name` | `limit` |  | `type=integer required=false default=25` | `type=integer required=false default=25` | -- | `vs built-in: missing-builtin-param` | `unreviewed-gap` | Ours pages the matches; Galaxy's returns them all. |
 | `search_tools_by_name` | `offset` |  | `type=integer required=false default=0` | `type=integer required=false default=0` | -- | `vs built-in: missing-builtin-param` | `unreviewed-gap` | The other half of that window; Galaxy's has none. |
 | `update_history` |  | `6` | `write (tag)` | `write (hint)` | -- | `vs built-in: missing-builtin-tool` | `unreviewed-gap` | Only here. Galaxy's server can create a history and read it, but cannot rename, annotate, tag, publish or delete one. |

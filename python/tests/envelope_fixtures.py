@@ -464,6 +464,37 @@ def cases() -> list[Case]:  # noqa: PLR0915 -- a flat table reads better than he
         [route("/api/tools", [{"id": "t", "name": "ᲊΣ", "description": ""}])],
     )
 
+    # "count occurrences" is a substring of one tool's description and of no field of
+    # Count, whose name and description hold the two words between them. The substring
+    # match comes first, the word match after it, and a tool holding only one of the
+    # words stays out.
+    add(
+        "search_tools_by_name",
+        "every_word",
+        "a phrase found as a substring first, then the tool holding every word of it",
+        {"query": "count occurrences", "limit": 10, "offset": 0},
+        lambda: search_tools_fn("count occurrences", limit=10, offset=0),
+        [
+            route(
+                "/api/tools",
+                [
+                    {"id": "sort1", "name": "Sort", "description": "data by column"},
+                    {"id": "count1", "name": "Count", "description": "occurrences of each record"},
+                    {
+                        "id": "cat1",
+                        "name": "Concatenate",
+                        "description": "count occurrences, then join",
+                    },
+                    {
+                        "id": "grep1",
+                        "name": "Select",
+                        "description": "matching lines, and count them",
+                    },
+                ],
+            )
+        ],
+    )
+
     # -- search_tools_by_keywords -------------------------------------------
     # Every tool matches on its description, so no detail lookup happens; the
     # keyword op's extension path needs one reply per tool and is not what these
