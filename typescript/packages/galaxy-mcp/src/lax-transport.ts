@@ -1,5 +1,6 @@
 import { isPlainObject, laxenLikePydantic, materializeOnce } from "@galaxyproject/galaxy-ops";
 import type { Transport, TransportSendOptions } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { getParseErrorMessage } from "@modelcontextprotocol/sdk/server/zod-compat.js";
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import type { JSONRPCMessage, MessageExtraInfo } from "@modelcontextprotocol/sdk/types.js";
 import { ZodError, type ZodRawShape } from "zod";
@@ -173,16 +174,12 @@ function readCall(message: JSONRPCMessage, shapes: Map<string, ZodRawShape>): Ca
       // A call that sends no arguments at all is a call with no arguments. MCP makes the field
       // optional, FastMCP reads a missing one as an empty mapping, and every tool here whose
       // parameters are all optional -- get_user takes none at all -- can be called that way on
-      // the other server. Without this the SDK validates `undefined` against the tool's object
-      // and answers "expected object, received undefined". A field that is present but not a
-      // plain object is a different thing: that is a malformed call, and it is handed on as read
-      // so the SDK refuses it exactly as it did before any of this.
-      //
-      // Absence is asked as absence: a transport that carries objects rather than JSON text can
-      // deliver `{name, arguments: undefined}`, where the peer said something about the field and
-      // what it said is not an argument list. Reading the value would have turned that into an
-      // empty one and run the tool.
-      if (argsField.present) return asRead();
+      // the other server. The SDK reads it the same way since 1.32 (`arguments ?? {}`), and a
+      // field that is there with `undefined` in it, which only a transport carrying objects can
+      // deliver, is the same call to it; so it is the same call here, and the empty list goes on
+      // as the one read of the field. A field that is present but not a plain object is a
+      // different thing: that is a malformed call, and it is handed on as read so the SDK
+      // refuses it exactly as it did before any of this.
       return { message: withArguments(given({})) };
     }
     // The one read of the caller's argument list, and the question of whether it IS one asked of
@@ -258,10 +255,11 @@ export function keysTheSdkDrops(args: Record<string, unknown>): string[] {
  *
  * The wording, the issue code and the wrapping are all borrowed rather than written: the
  * message is `unknownKeyMessage`, the same one the closed schema's error callback returns; the
- * JSON around it is `ZodError`'s own rendering of an `unrecognized_keys` issue; and the prefix
- * and error code are the SDK's `McpError`. What is left is one sentence of ours, and a test
- * that takes an ordinary unknown key's refusal, swaps the key name into it and demands this
- * one match character for character.
+ * issue is rendered by `getParseErrorMessage`, the formatter the SDK runs a schema's issues
+ * through before it answers (one line per issue, the path after it when there is one); and
+ * the prefix and error code are the SDK's `McpError`. What is left is one sentence of ours, and
+ * a test that takes an ordinary unknown key's refusal, swaps the key name into it and demands
+ * this one match character for character.
  */
 function droppedKeyRefusal(
   id: unknown,
@@ -272,14 +270,16 @@ function droppedKeyRefusal(
   const refusal = new McpError(
     ErrorCode.InvalidParams,
     `Input validation error: Invalid arguments for tool ${name}: ` +
-      new ZodError([
-        {
-          code: "unrecognized_keys",
-          keys: dropped,
-          path: [],
-          message: unknownKeyMessage(new Set(Object.keys(shape)), dropped),
-        },
-      ]).message,
+      getParseErrorMessage(
+        new ZodError([
+          {
+            code: "unrecognized_keys",
+            keys: dropped,
+            path: [],
+            message: unknownKeyMessage(new Set(Object.keys(shape)), dropped),
+          },
+        ]),
+      ),
   );
   return {
     jsonrpc: "2.0",

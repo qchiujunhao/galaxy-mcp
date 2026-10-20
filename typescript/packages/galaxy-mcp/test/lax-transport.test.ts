@@ -433,7 +433,7 @@ describe("a server behind it", () => {
     };
     expect(reply.id).toBe(7);
     expect(reply.result.isError).toBe(true);
-    expect(reply.result.content[0]!.text).toContain('Unrecognized parameter: \\"__proto__\\"');
+    expect(reply.result.content[0]!.text).toContain('Unrecognized parameter: "__proto__"');
     expect(fetched).toEqual([]);
     await server.close();
     vi.restoreAllMocks();

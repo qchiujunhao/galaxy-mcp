@@ -108,7 +108,6 @@ async function call(name: string, args?: Record<string, unknown>) {
  * A refusal message as it appears in what the client is handed: the SDK dumps the zod issues
  * as JSON into the error text, so the quotes around a parameter name arrive escaped.
  */
-const escaped = (message: string): string => JSON.stringify(message).slice(1, -1);
 
 const asked = (route: string): string => {
   const hit = sent.find((r) => r.url.includes(route));
@@ -306,7 +305,7 @@ describe("a tool call under the Python names", () => {
     const { isError, text } = await call("get_history_details", { historyId: "h1" });
     expect(isError).toBe(true);
     expect(text).toContain("Input validation error");
-    expect(text).toContain(escaped('Unrecognized parameter: "historyId" -- did you mean "history_id"?'));
+    expect(text).toContain('Unrecognized parameter: "historyId" -- did you mean "history_id"?');
     expect(sent.some((r) => r.url.includes("/api/histories/"))).toBe(false);
   });
 
@@ -318,21 +317,21 @@ describe("a tool call under the Python names", () => {
   it("refuses the library spelling of an optional one, rather than running without it", async () => {
     const { isError, text } = await call("get_tool_details", { tool_id: "t1", ioDetails: true });
     expect(isError).toBe(true);
-    expect(text).toContain(escaped('Unrecognized parameter: "ioDetails" -- did you mean "io_details"?'));
+    expect(text).toContain('Unrecognized parameter: "ioDetails" -- did you mean "io_details"?');
     expect(sent.some((r) => r.url.includes("/api/tools/"))).toBe(false);
   });
 
   it("refuses a name that is nobody's spelling of anything, without guessing", async () => {
     const { isError, text } = await call("get_tool_details", { tool_id: "t1", nope: 1 });
     expect(isError).toBe(true);
-    expect(text).toContain(escaped('Unrecognized parameter: "nope"'));
+    expect(text).toContain('Unrecognized parameter: "nope"');
     expect(text).not.toContain("did you mean");
   });
 
   it("refuses an unknown key on a tool that takes no parameters at all", async () => {
     const { isError, text } = await call("get_user", { limit: 1 });
     expect(isError).toBe(true);
-    expect(text).toContain(escaped('Unrecognized parameter: "limit"'));
+    expect(text).toContain('Unrecognized parameter: "limit"');
     expect(sent.some((r) => r.url.includes("/api/users"))).toBe(false);
   });
 
@@ -340,7 +339,7 @@ describe("a tool call under the Python names", () => {
     const { isError, text } = await call("list_pages", { historyId: "h1", nope: 1 });
     expect(isError).toBe(true);
     expect(text).toContain(
-      escaped('Unrecognized parameters: "historyId" -- did you mean "history_id"?, "nope"'),
+      'Unrecognized parameters: "historyId" -- did you mean "history_id"?, "nope"',
     );
   });
 
@@ -358,12 +357,12 @@ describe("a tool call under the Python names", () => {
     expect(Object.hasOwn(args, "__proto__")).toBe(true);
     const dropped = await rawCall({ name: "create_history", arguments: args });
     expect(dropped.result?.isError, rawText(dropped)).toBe(true);
-    expect(rawText(dropped)).toContain(escaped('Unrecognized parameter: "__proto__"'));
+    expect(rawText(dropped)).toContain('Unrecognized parameter: "__proto__"');
     expect(sent).toEqual([]);
 
     // The same call with an ordinary unknown key, refused by the closed schema through the SDK.
     // Nothing about the refusal above may differ from that one but the name inside it: same
-    // prefix, same error code, same issue code, same JSON.
+    // prefix, same error code, same rendering of the issue.
     const ordinary = await rawCall({
       name: "create_history",
       arguments: { history_name: "x", nope: {} },
@@ -423,7 +422,7 @@ describe("a tool call under the Python names", () => {
       const args = JSON.parse(`{"history_name":"x","${key}":{}}`) as Record<string, unknown>;
       const reply = await rawCall({ name: "create_history", arguments: args });
       expect(reply.result?.isError, key).toBe(true);
-      expect(rawText(reply)).toContain(escaped(`Unrecognized parameter: "${key}"`));
+      expect(rawText(reply)).toContain(`Unrecognized parameter: "${key}"`);
       expect(sent).toEqual([]);
     }
   });
@@ -481,16 +480,16 @@ describe("a tool call under the Python names", () => {
 
   /**
    * Present, and undefined. Only a transport that carries objects can deliver this -- JSON
-   * has no way to write it -- and it is not the same message as the one above: the peer put
-   * the field in and what it put there is not an argument list. Reading the value rather
-   * than asking whether the field is there would make it `{}` and run the tool, which for
-   * `get_user` means an unasked-for request going out over a real connection.
+   * has no way to write it -- and the SDK reads it as the message above since 1.32
+   * (`arguments ?? {}`), where it used to refuse it with "expected object, received
+   * undefined". This surface used to hand that field on as read so the SDK could; now it is
+   * the same call with no arguments, and goes on as one.
    */
-  it("refuses a raw call whose arguments field is there but undefined", async () => {
+  it("takes a raw call whose arguments field is there but undefined, as one with none", async () => {
     const reply = await rawCall({ name: "get_user", arguments: undefined });
-    expect(reply.result?.isError).toBe(true);
-    expect(JSON.stringify(reply)).toContain("expected object, received undefined");
-    expect(sent).toEqual([]);
+    expect(reply.error).toBeUndefined();
+    expect(reply.result?.isError, rawText(reply)).toBe(false);
+    expect(JSON.stringify(reply)).toContain("me@example.invalid");
   });
 
   it("hands an object-valued parameter over with its own keys untouched", async () => {

@@ -222,7 +222,7 @@ describe("a value that answers differently the second time it is read", () => {
     const reply = await rawCall(new Params());
 
     expect(reply?.result?.isError).toBe(true);
-    expect(rawText(reply)).toContain('Unrecognized parameter: \\"__proto__\\"');
+    expect(rawText(reply)).toContain('Unrecognized parameter: "__proto__"');
     expect(sent.filter((r) => r.method === "POST")).toEqual([]);
   });
 
@@ -248,11 +248,12 @@ describe("a value that answers differently the second time it is read", () => {
   /**
    * The fallback that forwarded the caller's object, and the third answer it let through.
    *
-   * `arguments` reads as `undefined`, which is a field the peer wrote and did not fill, so the
-   * call goes on without an argument list rather than with an empty one. What used to go on was
-   * the MESSAGE THAT ARRIVED -- so the SDK asked the accessor again, twice, and the answer it got
-   * carried a `__proto__` that its record dropped, running the tool on an argument list nobody
-   * here had ever seen. The copy goes on now, holding the one answer this read.
+   * `arguments` reads as `undefined`, which is a call with no arguments, and the empty list goes
+   * on in its place. What used to go on was the MESSAGE THAT ARRIVED -- so the SDK asked the
+   * accessor again, twice, and the answer it got carried a `__proto__` that its record dropped,
+   * running the tool on an argument list nobody here had ever seen. The copy goes on now,
+   * holding the one answer this read: the field is read once, and the tool runs on the empty
+   * list that answer stands for, not on anything the accessor would have said next.
    */
   it("hands on the arguments it read, not the object that would answer again", async () => {
     let reads = 0;
@@ -267,8 +268,9 @@ describe("a value that answers differently the second time it is read", () => {
     const reply = await rawCall(new Params());
 
     expect(reads).toBe(1);
-    expect(reply?.result?.isError === true || reply?.error !== undefined, rawText(reply)).toBe(true);
-    expect(asked("/api/histories")).toBe(false);
+    expect(reply?.error, rawText(reply)).toBeUndefined();
+    expect(reply?.result?.isError, rawText(reply)).toBe(false);
+    expect(asked("/api/histories")).toBe(true);
   });
 
   /**

@@ -6,6 +6,18 @@ entry covers all three; where something only affects one surface, it says which.
 
 ## Unreleased
 
+### galaxy-mcp on `@modelcontextprotocol/sdk` 1.32
+
+The MCP server's SDK range moves from `^1.29.0` to `^1.32.1`, which is what a fresh install
+was already resolving to. Two things the newer SDK does differently reach a caller. A refused
+argument list is now one plain line per problem, with the parameter's path after it when there
+is one (`Unrecognized parameter: "historyId" -- did you mean "history_id"?`), where it used to
+be a JSON array of zod issues; the refusal this surface writes itself, for a key the SDK's
+parser would otherwise drop, is rendered the same way. And a call whose `arguments` field is
+present but `undefined`, which only an in-process transport can deliver, now runs as a call
+with no arguments rather than being refused, as the SDK itself reads it. A symbol key inside an
+object-valued parameter is still refused, but the SDK's formatter cannot print its path, so
+the text is a TypeError's rather than the record's.
 
 ### `update_history` is marked destructive (#155)
 
