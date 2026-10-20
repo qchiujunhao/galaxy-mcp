@@ -6,6 +6,7 @@ entry covers all three; where something only affects one surface, it says which.
 
 ## Unreleased
 
+
 ### `update_history` is marked destructive (#155)
 
 It sets MCP's `destructiveHint`, since it deletes the history when `deleted` is true.
@@ -30,6 +31,7 @@ Given an invocation id, the answer adds `job_states` and `outcome` (`failing`, `
 `cancelled`, `completed`), read from its jobs summary with one more request: Galaxy's
 `state` describes scheduling and reports `completed` for a run whose jobs failed.
 Listings are unchanged. galaxy-ops exports `invocationOutcome`.
+
 ### `get_history_contents` pages with Galaxy's real total (#155)
 
 It asks Galaxy for one filtered, sorted window and the count it matched, instead of
@@ -44,6 +46,7 @@ rows are unchanged, and collection rows gain `type_id` and `store_times_summary`
 lose `model_class`, `populated` and `column_definitions`. Any `order` other than `hid`
 goes out with `hid-asc` behind it, since Galaxy sorts by exactly the keys it is given and
 a sort on a key rows share would otherwise put the same item on two pages.
+
 ### `get_page` answers with a content hash (#155)
 
 The answer carries `content_hash`, the hash Galaxy's page assistant uses over the editable

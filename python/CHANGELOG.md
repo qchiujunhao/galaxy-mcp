@@ -20,18 +20,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unchanged; collection rows gain `type_id` and `store_times_summary` and lose
   `model_class`, `populated` and `column_definitions`.
 
-### Changed
-
-- `get_history_contents` asks Galaxy for one filtered, sorted window and the count it
-  matched, instead of fetching the whole history; a page over the output budget is cut,
-  and its `pagination` names where to continue. A failure quotes the contents URL with
-  its query. Any `order` other than `hid` goes out with `hid-asc` behind it, since Galaxy
-  sorts by exactly the keys it is given and a sort on a key rows share would otherwise
-  put the same item on two pages.
-- `update_page` refuses content whose directives name an object by something other
-  than an encoded id (a hid, a name), which Galaxy cannot resolve, and a section edit
-  on a page authored as HTML.
-
 ### Added
 
 - `get_page` answers with `content_hash`, the hash Galaxy's page assistant uses over the
@@ -41,9 +29,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its heading line, as Galaxy's page editor does, and `expect_hash` to refuse a write
   when the page changed since it was read -- a read then the write, not one atomic
   request. The answer carries the page's new `content_hash`.
+- `get_invocations` given an invocation id adds `job_states` and `outcome` (`failing`,
+  `failed`, `cancelled`, `completed`), read from its jobs summary with one more request:
+  Galaxy's `state` describes scheduling and reports `completed` for a run whose jobs
+  failed. Listings are unchanged.
 
 ### Changed
 
+- `get_history_contents` asks Galaxy for one filtered, sorted window and the count it
+  matched, instead of fetching the whole history; a page over the output budget is cut,
+  and its `pagination` names where to continue. A failure quotes the contents URL with
+  its query. Any `order` other than `hid` goes out with `hid-asc` behind it, since Galaxy
+  sorts by exactly the keys it is given and a sort on a key rows share would otherwise
+  put the same item on two pages.
 - `update_page` refuses, before anything is sent, content whose directives name an
   object by something other than an encoded id (a hid, a name). Galaxy already refuses
   those with a 400 when the page is stored, so what changes is the message. A section
@@ -56,13 +54,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   no substring of any one of them, such as `count occurrences` for Count ("occurrences
   of each record"), found nothing. Punctuation around a word is ignored; a query with a
   single-character word finds no more.
-
-### Added
-
-- `get_invocations` given an invocation id adds `job_states` and `outcome` (`failing`,
-  `failed`, `cancelled`, `completed`), read from its jobs summary with one more request:
-  Galaxy's `state` describes scheduling and reports `completed` for a run whose jobs
-  failed. Listings are unchanged.
 
 ## [1.12.0] - 2026-10-19
 
