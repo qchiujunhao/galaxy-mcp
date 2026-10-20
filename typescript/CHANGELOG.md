@@ -17,6 +17,13 @@ hold every word of the query between them. A phrase that is no substring of any 
 them, such as `count occurrences` for Count ("occurrences of each record"), found nothing.
 Punctuation around a word is ignored; a query with a single-character word finds no more.
 
+### One list of settled job states (#155)
+
+galaxy-ops keeps one list of the job states that will not change again, read off Galaxy's
+`JobState`, and `isJobTerminal` reads it. Breaking for the library: `waitForJob` ends on a
+skipped or stopped job with `JobFailedError` instead of polling until the timeout. The state
+lists stay internal; `isJobTerminal` and `isJobSuccess` are still the exported reads.
+
 ## 0.4.0 (2026-10-19)
 
 ### `get_job_details` by job id (#167)
