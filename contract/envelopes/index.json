@@ -857,7 +857,7 @@
     {
       "tool": "get_invocations",
       "case": "completed_with_a_failed_job",
-      "note": "Galaxy says completed; the jobs summary counts one failed job",
+      "note": "Galaxy says completed; the jobs summary says one failed, so the outcome is failed",
       "outcome": "success",
       "input": {
         "invocation_id": "1e1d0c0b0a090807"

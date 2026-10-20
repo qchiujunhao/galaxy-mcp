@@ -5,6 +5,7 @@ import {
   getInvocations,
   type InvocationSummary,
 } from "../../src/operations/get-invocations";
+import { invocationOutcome } from "../../src/invocation-outcome";
 import { mockClient } from "../util/mock-client";
 import { DEFAULT_POLL } from "../../src/context";
 import { GalaxyAuthError, GalaxyConnectionError, GalaxyNotFoundError, GalaxyValidationError } from "../../src/errors";
@@ -471,7 +472,12 @@ describe("get_invocations job states", () => {
           : { data: { id: INV, state: "completed" }, response: { status: 200 } },
     });
     const out = await getInvocations({ invocationId: INV }, ctxWith(client));
-    expect(out).toEqual({ id: INV, state: "completed", job_states: { ok: 3, error: 1 } });
+    expect(out).toEqual({
+      id: INV,
+      state: "completed",
+      job_states: { ok: 3, error: 1 },
+      outcome: "failed",
+    });
   });
 
   it("leaves the invocation as sent when the summary cannot be read", async () => {
@@ -496,5 +502,18 @@ describe("get_invocations job states", () => {
     });
     expect(await getInvocations({}, ctxWith(client))).toEqual(listed);
     expect(asked).toEqual(["/api/invocations"]);
+  });
+});
+
+describe("get_invocations outcome", () => {
+  it.each([
+    ["completed", { ok: 3, error: 1 }, "failed"],
+    ["scheduled", { error: 1, running: 2 }, "failing"],
+    ["scheduled", { ok: 2, error: 1, paused: 3 }, "failed"],
+    ["scheduled", { ok: 2, paused: 1 }, "scheduled"],
+    ["scheduled", { ok: 2, skipped: 1 }, "completed"],
+    ["cancelled", { ok: 1 }, "cancelled"],
+  ])("calls %s with jobs %o %s", (state, jobStates, outcome) => {
+    expect(invocationOutcome(state, jobStates)).toBe(outcome);
   });
 });

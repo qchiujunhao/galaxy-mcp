@@ -9,7 +9,8 @@
     "job_states": {
       "ok": 3,
       "error": 1
-    }
+    },
+    "outcome": "failed"
   },
   "success": true,
   "message": "Retrieved invocation '1e1d0c0b0a090807'",

@@ -1314,7 +1314,7 @@ def cases() -> list[Case]:  # noqa: PLR0915 -- a flat table reads better than he
     add(
         "get_invocations",
         "completed_with_a_failed_job",
-        "Galaxy says completed; the jobs summary counts one failed job",
+        "Galaxy says completed; the jobs summary says one failed, so the outcome is failed",
         {"invocation_id": inv_hex},
         lambda: get_invocations_fn(invocation_id=inv_hex),
         [

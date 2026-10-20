@@ -12,6 +12,7 @@ from galaxy_mcp.server import (
     _DATATYPES_MAPPING_CACHE,
     _coerce_optional_json_dict,
     _get_datatypes_mapping,
+    _invocation_outcome,
     _resolve_workflow_slots,
     galaxy_state,
 )
@@ -1159,6 +1160,7 @@ class TestInvocationJobStates:
             "id": "1e1d0c0b0a090807",
             "state": "completed",
             "job_states": {"ok": 3, "error": 1},
+            "outcome": "failed",
         }
 
     def test_an_unreadable_summary_leaves_the_invocation_as_sent(self, mock_galaxy_instance):
@@ -1177,3 +1179,21 @@ class TestInvocationJobStates:
         with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
             assert get_invocations_fn().data == listed
         mock_galaxy_instance.invocations.get_invocation_summary.assert_not_called()
+
+
+class TestInvocationOutcome:
+    """What an invocation amounts to once its jobs are counted."""
+
+    @pytest.mark.parametrize(
+        ("state", "job_states", "outcome"),
+        [
+            ("completed", {"ok": 3, "error": 1}, "failed"),
+            ("scheduled", {"error": 1, "running": 2}, "failing"),
+            ("scheduled", {"ok": 2, "error": 1, "paused": 3}, "failed"),
+            ("scheduled", {"ok": 2, "paused": 1}, "scheduled"),
+            ("scheduled", {"ok": 2, "skipped": 1}, "completed"),
+            ("cancelled", {"ok": 1}, "cancelled"),
+        ],
+    )
+    def test_outcome(self, state, job_states, outcome):
+        assert _invocation_outcome(state, job_states) == outcome

@@ -17,10 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `get_invocations` given an invocation id adds `job_states`, how many of its jobs are in
-  each state, read from its jobs summary with one more request: Galaxy's `state` describes
-  scheduling and reports `completed` for a run whose jobs failed, so the jobs are where
-  what happened shows. Left out when the summary cannot be read; listings are unchanged.
+- `get_invocations` given an invocation id adds `job_states` and `outcome` (`failing`,
+  `failed`, `cancelled`, `completed`), read from its jobs summary with one more request:
+  Galaxy's `state` describes scheduling and reports `completed` for a run whose jobs
+  failed. Listings are unchanged.
 
 ## [1.12.0] - 2026-10-19
 
