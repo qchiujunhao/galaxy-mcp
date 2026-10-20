@@ -266,16 +266,19 @@ describe("a key at the top level of an object-valued parameter", () => {
    * `Reflect.ownKeys` finds it, `z.string()` says it is not a key of this record, and the call is
    * refused with that issue. A schema that took the value instead would run `create_user_tool`
    * with a key that vanishes at serialisation -- the quiet answer again, in the other direction.
+   *
+   * Refused, but not in the record's words: the SDK's issue formatter (1.30+) writes the issue's
+   * path into a template literal, and a symbol in a template literal is a TypeError, so what the
+   * caller reads is that TypeError's message. The refusal is the SDK's to word; what this pins is
+   * that the call is refused and nothing goes out.
    */
-  it("refuses a representation with a symbol key, in the record's words", async () => {
+  it("refuses a representation with a symbol key", async () => {
     mockGalaxy([VERSION]);
     const { representation } = JSON.parse(CASES[0]!.args) as { representation: object };
     // Enumerable, because a key the record cannot see is a key it never had to refuse.
     Object.defineProperty(representation, Symbol("unexpected"), { value: 123, enumerable: true });
     const reply = await rawCall({ name: "create_user_tool", arguments: { representation } });
     expect(reply.result?.isError, rawText(reply)).toBe(true);
-    expect(rawText(reply)).toContain("Invalid key in record");
-    expect(rawText(reply)).toContain('"invalid_key"');
     expect(sent.filter((r) => r.url.includes("/api/unprivileged_tools"))).toEqual([]);
   });
 
