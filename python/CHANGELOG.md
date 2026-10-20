@@ -34,11 +34,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `get_page` answers with `content_hash`, Galaxy's hash of the editable source.
+- `get_page` answers with `content_hash`, the hash Galaxy's page assistant uses over the
+  editable source. Galaxy neither returns nor checks it; it is computed from the page as
+  Galaxy sent it.
 - `update_page` takes `section_heading` and `section_content` to replace one section by
   its heading line, as Galaxy's page editor does, and `expect_hash` to refuse a write
-  when the page changed since it was read. The answer carries the page's new
-  `content_hash`.
+  when the page changed since it was read -- a read then the write, not one atomic
+  request. The answer carries the page's new `content_hash`.
+
+### Changed
+
+- `update_page` refuses, before anything is sent, content whose directives name an
+  object by something other than an encoded id (a hid, a name). Galaxy already refuses
+  those with a 400 when the page is stored, so what changes is the message. A section
+  edit on a page authored as HTML is refused the same way.
 
 ### Fixed
 

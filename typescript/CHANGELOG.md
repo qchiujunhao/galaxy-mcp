@@ -46,17 +46,19 @@ goes out with `hid-asc` behind it, since Galaxy sorts by exactly the keys it is 
 a sort on a key rows share would otherwise put the same item on two pages.
 ### `get_page` answers with a content hash (#155)
 
-The answer carries `content_hash`, Galaxy's hash of the editable source. galaxy-ops
-exports `contentHash`.
+The answer carries `content_hash`, the hash Galaxy's page assistant uses over the editable
+source; Galaxy neither returns nor checks it. galaxy-ops exports `contentHash`.
 
 ### `update_page` replaces one section and refuses a stale write (#155)
 
 `update_page` takes `section_heading` and `section_content` to replace one section by
 its heading line, as Galaxy's page editor does, and `expect_hash` to refuse a write when
-the page changed since it was read. The answer carries the page's new `content_hash`.
-Breaking: it refuses content whose directives name an object by something other than
-an encoded id (a hid, a name), which Galaxy cannot resolve, and a section edit on a page
-authored as HTML. galaxy-ops exports `malformedObjectIds`.
+the page changed since it was read -- a read then the write, not one atomic request. The
+answer carries the page's new `content_hash`. It refuses, before anything is sent, content
+whose directives name an object by something other than an encoded id (a hid, a name);
+Galaxy already refuses those with a 400 when the page is stored, so what changes is the
+message. A section edit on a page authored as HTML is refused the same way. galaxy-ops
+exports `malformedObjectIds`.
 
 ## 0.4.0 (2026-10-19)
 

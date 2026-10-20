@@ -1815,7 +1815,7 @@
               }
             ],
             "default": null,
-            "description": "content_hash from when the page was read; refused if it changed."
+            "description": "content_hash from when the page was read; refused if it changed\n(a read then the write, not atomic)."
           }
         },
         "required": [

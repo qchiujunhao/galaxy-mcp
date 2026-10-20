@@ -5615,7 +5615,9 @@ def _strip_rendered(page: dict[str, Any], include_rendered: bool) -> dict[str, A
 
 
 def _content_hash(page: dict[str, Any]) -> str:
-    """Galaxy's page hash of the editable source, so a caller can tell whether a page changed.
+    """The hash Galaxy's page assistant uses over the editable source, so a caller can tell
+    whether a page changed. Galaxy neither returns nor checks it: it is computed here from the
+    page as Galaxy sent it.
 
     The source is ``content_editor``, or ``content`` for an HTML page, which Galaxy fills on
     the markdown path only. The hash is ``_djb2_hash`` in lib/galaxy/agents/page_assistant.py:
@@ -5804,8 +5806,8 @@ def get_page(page_id: str, include_rendered: bool = False) -> GalaxyResult:
     Returns `content_editor`: the editable Galaxy-flavored markdown, with
     ENCODED ids in directives (e.g. `history_dataset_id=<encoded-dataset-id>`).
     This is the form to edit and pass back to update_page. Also returns
-    `content_hash`, Galaxy's page hash of that source: read the page again and
-    compare it to tell whether anyone changed the page since.
+    `content_hash`, the hash Galaxy's page assistant uses over that source: read the
+    page again and compare it to tell whether anyone changed the page since.
 
     Args:
         page_id: Encoded id of the page (from list_pages / create_page).
@@ -5930,7 +5932,9 @@ def update_page(
     section with that heading line is replaced, as Galaxy's page editor does.
     Markdown pages only. Pass the
     content_hash get_page returned as expect_hash and the write is refused if the
-    page changed since you read it.
+    page changed since you read it. That check is a read followed by the write, not
+    one atomic request: it catches a page that moved before this call, not a write
+    that lands between the two.
 
     Content is Galaxy-flavored markdown using ENCODED ids in directives
     (e.g. `history_dataset_id=<encoded-dataset-id>`) -- never raw integer ids or
@@ -5947,7 +5951,8 @@ def update_page(
             pages only; every section with that heading line is replaced). "" is the
             text before the first heading.
         section_content: That section's new text, heading line included.
-        expect_hash: content_hash from when the page was read; refused if it changed.
+        expect_hash: content_hash from when the page was read; refused if it changed
+            (a read then the write, not atomic).
 
     Returns:
         GalaxyResult with the updated page details including content_editor and its new
@@ -5983,9 +5988,8 @@ def update_page(
     if malformed:
         raise ValueError(
             "These directive arguments name a Galaxy object by something that is not its "
-            f"encoded id: {', '.join(malformed)}. Galaxy cannot resolve them, so the embed "
-            "would render nothing. Use the encoded id a tool returned, e.g. from "
-            "get_history_contents."
+            f"encoded id: {', '.join(malformed)}. Galaxy refuses them with a 400 when the page "
+            "is stored. Use the encoded id a tool returned, e.g. from get_history_contents."
         )
 
     # A section edit and an expected hash both need the page as it is now. Galaxy's PUT has

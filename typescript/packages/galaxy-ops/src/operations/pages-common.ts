@@ -61,11 +61,13 @@ export interface PageDetail extends PageSummary {
   generate_version?: string | null;
 }
 
-/** A page as get_page answers: the editable source and Galaxy's hash of it. */
+/** A page as get_page answers: the editable source and the page assistant's hash of it. */
 export type HashedPage = PageDetail & { content_hash: string };
 
 /**
- * Galaxy's page hash of the editable source, so a caller can tell whether a page changed.
+ * The hash Galaxy's page assistant uses over the editable source, so a caller can tell whether
+ * a page changed. Galaxy neither returns nor checks it: it is computed here from the page as
+ * Galaxy sent it.
  *
  * The source is `content_editor`, or `content` for an HTML page, which Galaxy fills on the
  * markdown path only. The hash is `_djb2_hash` in lib/galaxy/agents/page_assistant.py: djb2
@@ -145,7 +147,7 @@ const DIRECTIVES = /^```[ \t]*galaxy[^\n]*\n[\s\S]*?^```|\$\{galaxy\s[^}]*\}/gm;
 /**
  * Directive arguments that name a Galaxy object by something that is not an encoded id -- a
  * hid, a name, a decoded integer -- spelled `name=value`. Galaxy decodes these when it stores a
- * page, so such a value is one it cannot resolve. Prose outside directives is not read.
+ * page, so such a value is refused with a 400. Prose outside directives is not read.
  */
 export function malformedObjectIds(content: string | null | undefined): string[] {
   const found: string[] = [];

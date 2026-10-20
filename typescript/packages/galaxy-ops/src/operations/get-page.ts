@@ -29,8 +29,8 @@ export const getPageOp: Operation<typeof input, HashedPage> = {
   domain: "pages",
   summary:
     "Get a page and the latest revision's `content_editor` -- the editable Galaxy-flavored " +
-    "markdown to pass back to update_page -- and `content_hash`, Galaxy's page hash of that " +
-    "source, to tell on a later read whether anyone changed the page since.",
+    "markdown to pass back to update_page -- and `content_hash`, the hash Galaxy's page " +
+    "assistant uses over that source, to tell on a later read whether anyone changed the page since.",
   input,
   run,
   // server.py, get_page: the id that was asked for. The title is in data.

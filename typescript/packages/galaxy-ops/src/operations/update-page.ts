@@ -34,7 +34,10 @@ const input = {
   expectHash: z
     .string()
     .nullish()
-    .describe("content_hash from when the page was read; the write is refused if the page changed since"),
+    .describe(
+      "content_hash from when the page was read; the write is refused if the page changed since " +
+        "(a read then the write, not atomic)",
+    ),
 };
 type In = {
   pageId: string;
@@ -72,7 +75,7 @@ function refusal(i: In): string | undefined {
   if (malformed.length) {
     return (
       "These directive arguments name a Galaxy object by something that is not its encoded id: " +
-      `${malformed.join(", ")}. Galaxy cannot resolve them, so the embed would render nothing. ` +
+      `${malformed.join(", ")}. Galaxy refuses them with a 400 when the page is stored. ` +
       "Use the encoded id a tool returned, e.g. from get_history_contents."
     );
   }
@@ -142,7 +145,8 @@ export const updatePageOp: Operation<typeof input, HashedPage> = {
   domain: "pages",
   summary:
     "Update a page's content or title, or replace one section by its heading line. Pass the " +
-    "content_hash get_page returned as expectHash to refuse the write if the page changed since. " +
+    "content_hash get_page returned as expectHash to refuse the write if the page changed since " +
+    "(a read then the write, not one atomic request). " +
     "New content creates a revision tagged edit_source=agent; a title-only change does not. The " +
     "page keeps its content_format, so sending markdown to a page authored as HTML stores it " +
     "under the wrong format. Answers with the page and its new content_hash.",
