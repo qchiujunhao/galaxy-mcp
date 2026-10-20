@@ -1,0 +1,71 @@
+{
+  "data": {
+    "history_id": "h0000",
+    "contents": [
+      {
+        "id": "d0000",
+        "hid": 1,
+        "name": "dataset 0",
+        "state": "ok",
+        "deleted": false,
+        "visible": true,
+        "history_content_type": "dataset",
+        "extension": "txt"
+      },
+      {
+        "id": "d0001",
+        "hid": 2,
+        "name": "dataset 1",
+        "state": "ok",
+        "deleted": false,
+        "visible": true,
+        "history_content_type": "dataset",
+        "extension": "txt"
+      },
+      {
+        "id": "d0010",
+        "hid": 11,
+        "name": "dataset 10",
+        "state": "ok",
+        "deleted": false,
+        "visible": true,
+        "history_content_type": "dataset",
+        "extension": "txt"
+      },
+      {
+        "id": "d0011",
+        "hid": 12,
+        "name": "dataset 11",
+        "state": "ok",
+        "deleted": false,
+        "visible": true,
+        "history_content_type": "dataset",
+        "extension": "txt"
+      },
+      {
+        "id": "d0012",
+        "hid": 13,
+        "name": "dataset 12",
+        "state": "ok",
+        "deleted": false,
+        "visible": true,
+        "history_content_type": "dataset",
+        "extension": "txt"
+      }
+    ]
+  },
+  "success": true,
+  "message": "Retrieved 5 items from history",
+  "count": 5,
+  "pagination": {
+    "total_items": 25,
+    "returned_items": 5,
+    "limit": 5,
+    "offset": 0,
+    "has_next": true,
+    "has_previous": false,
+    "next_offset": 5,
+    "previous_offset": null,
+    "helper_text": "Showing 5 of 25 items (offset 0). Use offset=5 for the next page."
+  }
+}

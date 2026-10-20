@@ -2838,7 +2838,10 @@ def get_history_contents(
             "v": "dev",
             "limit": limit,
             "offset": offset,
-            "order": order,
+            # Galaxy sorts by exactly the keys it is given (build_order_by splits on
+            # commas), so a sort on a key many rows share, like name, needs hid behind
+            # it or the same item can land on two pages.
+            "order": order if order.startswith("hid-") else f"{order},hid-asc",
             "q": [field for field, _ in filters],
             "qv": [value for _, value in filters],
         }

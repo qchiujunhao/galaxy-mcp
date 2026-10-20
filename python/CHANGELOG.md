@@ -25,7 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `get_history_contents` asks Galaxy for one filtered, sorted window and the count it
   matched, instead of fetching the whole history; a page over the output budget is cut,
   and its `pagination` names where to continue. A failure quotes the contents URL with
-  its query.
+  its query. Any `order` other than `hid` goes out with `hid-asc` behind it, since Galaxy
+  sorts by exactly the keys it is given and a sort on a key rows share would otherwise
+  put the same item on two pages.
 
 ### Fixed
 

@@ -58,9 +58,12 @@ const serving = (rows: ReturnType<typeof item>[], asked: any[] = []) =>
       let matching = rows.filter(
         (row) => !(where.deleted === "False" && row.deleted) && !(where.visible === "True" && !row.visible),
       );
-      const [field, direction] = query.order.split("-") as [keyof typeof matching[0], string];
-      matching = [...matching].sort((a, b) => (a[field]! < b[field]! ? -1 : a[field]! > b[field]! ? 1 : 0));
-      if (direction === "dsc") matching.reverse();
+      // Galaxy's build_order_by: one sort per comma-separated key, in that order.
+      for (const key of (query.order as string).split(",").reverse()) {
+        const [field, direction] = key.split("-") as [keyof (typeof matching)[0], string];
+        matching = [...matching].sort((a, b) => (a[field]! < b[field]! ? -1 : a[field]! > b[field]! ? 1 : 0));
+        if (direction === "dsc") matching.reverse();
+      }
       return {
         data: {
           contents: matching.slice(query.offset, query.offset + query.limit),
@@ -95,6 +98,19 @@ describe("get_history_contents", () => {
     );
     expect(asked).toEqual([]);
     expect(getHistoryContentsOp.input.order.safeParse("nonsense-asc").success).toBe(false);
+  });
+
+  it.each([
+    ["hid-asc", "hid-asc"],
+    ["hid-dsc", "hid-dsc"],
+    ["name-asc", "name-asc,hid-asc"],
+    ["create_time-dsc", "create_time-dsc,hid-asc"],
+  ])("sends %s as %s, so a sort on a shared key keeps every page stable", async (order, sent) => {
+    const asked: any[] = [];
+    const rows = [item(2, { name: "same" }), item(1, { name: "same" })];
+    const out = await getHistoryContents({ historyId: "h1", order: order as never }, ctxWith(serving(rows, asked)));
+    expect(asked[0].query.order).toBe(sent);
+    if (order.endsWith("-asc")) expect(out.items.map((row) => row.hid)).toEqual([1, 2]);
   });
 
   it("says what each item is when Galaxy did not", async () => {

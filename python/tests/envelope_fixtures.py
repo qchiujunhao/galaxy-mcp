@@ -878,6 +878,23 @@ def cases() -> list[Case]:  # noqa: PLR0915 -- a flat table reads better than he
     )
     # Galaxy sends each item's Dataset id beside its own; the rows leave it out.
     with_dataset_ids = [{**row, "dataset_id": f"x{i:04d}"} for i, row in enumerate(content_rows(3))]
+    # name is a key many rows share, so hid goes out behind it: the route's query is the
+    # wire, and the rows come back the way Galaxy would sort them.
+    add(
+        "get_history_contents",
+        "by_name",
+        "a sort on a key rows can share, sent with hid behind it so pages stay put",
+        {"history_id": "h0000", "limit": 5, "offset": 0, "order": "name-asc"},
+        lambda: get_history_contents_fn("h0000", limit=5, offset=0, order="name-asc"),
+        [
+            contents_page(
+                sorted(contents_25, key=lambda row: (row["name"], row["hid"])),
+                limit=5,
+                offset=0,
+                order="name-asc,hid-asc",
+            )
+        ],
+    )
     add(
         "get_history_contents",
         "without_dataset_id",

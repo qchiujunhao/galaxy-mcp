@@ -38,8 +38,10 @@ def galaxy_contents(rows):
             if not (where.get("deleted") == "False" and row.get("deleted", False))
             and not (where.get("visible") == "True" and not row.get("visible", True))
         ]
-        field, _, direction = params["order"].partition("-")
-        matching = sorted(matching, key=lambda row: row[field], reverse=direction == "dsc")
+        # Galaxy's build_order_by: one sort per comma-separated key, in that order.
+        for key in reversed(params["order"].split(",")):
+            field, _, direction = key.partition("-")
+            matching = sorted(matching, key=lambda row: row[field], reverse=direction == "dsc")
         offset, limit = params["offset"], params["limit"]
         response = Mock()
         response.status_code = 200
@@ -248,7 +250,7 @@ class TestHistoryOperations:
 
             # Galaxy sorted and cut the page, from one request.
             assert len(asked) == 1
-            assert asked[0]["params"]["order"] == "create_time-dsc"
+            assert asked[0]["params"]["order"] == "create_time-dsc,hid-asc"
             assert asked[0]["params"]["limit"] == 2
 
     def test_update_history_name(self, mock_galaxy_instance):
@@ -836,6 +838,33 @@ class TestBothHistoryListingsKeepTheirNumbers:
 
 class TestGetHistoryContentsAsGalaxyPagesIt:
     """Galaxy filters, sorts, windows and counts; the tool shapes and budgets the page."""
+
+    @pytest.mark.parametrize(
+        ("order", "sent"),
+        [
+            ("hid-asc", "hid-asc"),
+            ("hid-dsc", "hid-dsc"),
+            ("name-asc", "name-asc,hid-asc"),
+            ("create_time-dsc", "create_time-dsc,hid-asc"),
+        ],
+    )
+    def test_a_sort_on_a_shared_key_goes_out_with_hid_behind_it(
+        self, mock_galaxy_instance, order, sent
+    ):
+        """Galaxy orders by exactly the keys named, so a sort on name alone can put the
+        same item on two pages; hid behind it makes every page stable."""
+        rows = [
+            {"id": "a", "hid": 2, "name": "same", "create_time": "t", "visible": True},
+            {"id": "b", "hid": 1, "name": "same", "create_time": "t", "visible": True},
+        ]
+        with (
+            patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}),
+            galaxy_contents(rows) as asked,
+        ):
+            result = get_history_contents_fn("test_history_1", order=order)
+        assert asked[0]["params"]["order"] == sent
+        if order.endswith("-asc"):
+            assert [row["id"] for row in result.data["contents"]] == ["b", "a"]
 
     def test_an_order_outside_the_documented_ones_is_refused_before_anything_is_sent(
         self, mock_galaxy_instance

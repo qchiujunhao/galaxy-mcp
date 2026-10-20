@@ -132,7 +132,10 @@ async function run(i: In, ctx: GalaxyContext): Promise<HistoryContents> {
         v: "dev",
         limit,
         offset,
-        order,
+        // Galaxy sorts by exactly the keys it is given (build_order_by splits on commas),
+        // so a sort on a key many rows share, like name, needs hid behind it or the same
+        // item can land on two pages.
+        order: order.startsWith("hid-") ? order : `${order},hid-asc`,
         q: filters.map(([field]) => field),
         qv: filters.map(([, value]) => value),
       },
