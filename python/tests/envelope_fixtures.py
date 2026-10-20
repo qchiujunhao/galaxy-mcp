@@ -4533,6 +4533,18 @@ def more_http_failure_cases(add: AddFailure) -> None:
     )
     add(
         "update_page",
+        "content_and_a_section",
+        "the whole content and one section in the same call, refused before anything is sent",
+        {
+            "page_id": "pg000001",
+            "content": "# Reads QC\n\nrewritten\n",
+            "section_heading": "## Methods",
+            "section_content": "## Methods\n\nnew\n",
+        },
+        [VERSION_ROUTE],
+    )
+    add(
+        "update_page",
         "read_not_found",
         "the read a section edit needs, on a page that is not there",
         {

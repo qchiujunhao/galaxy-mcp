@@ -1,8 +1,8 @@
 {
   "$comment": "Generated golden envelopes from the Python MCP server -- do not edit by hand. Regenerate with `uv run python -m tests.envelope_fixtures`. `input` is spelled in the server's own parameter names, which is what the MCP wire takes. A case whose `outcome` is \"failure\" pins the tool result a failed call answers with instead of an envelope.",
   "source": "python/src/galaxy_mcp/server.py",
-  "caseCount": 286,
-  "failureCaseCount": 98,
+  "caseCount": 287,
+  "failureCaseCount": 99,
   "cases": [
     {
       "tool": "search_tools_by_name",
@@ -2890,6 +2890,20 @@
         "section_content": "## Methods\n\nnew\n"
       },
       "envelope": "update_page/section_heading_indented.json",
+      "replies": "update_page/directive_id_not_encoded.galaxy.json"
+    },
+    {
+      "tool": "update_page",
+      "case": "content_and_a_section",
+      "note": "the whole content and one section in the same call, refused before anything is sent",
+      "outcome": "failure",
+      "input": {
+        "page_id": "pg000001",
+        "content": "# Reads QC\n\nrewritten\n",
+        "section_heading": "## Methods",
+        "section_content": "## Methods\n\nnew\n"
+      },
+      "envelope": "update_page/content_and_a_section.json",
       "replies": "update_page/directive_id_not_encoded.galaxy.json"
     },
     {
