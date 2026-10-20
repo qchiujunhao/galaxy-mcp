@@ -4,9 +4,9 @@
 `@galaxyproject/galaxy-mcp` share a version and are published together, so one
 entry covers all three; where something only affects one surface, it says which.
 
-## Unreleased
+## 0.5.0 (2026-10-20)
 
-### galaxy-mcp on `@modelcontextprotocol/sdk` 1.32
+### galaxy-mcp on `@modelcontextprotocol/sdk` 1.32 (#190)
 
 The MCP server's SDK range moves from `^1.29.0` to `^1.32.1`, which is what a fresh install
 was already resolving to. Two things the newer SDK does differently reach a caller. A refused
@@ -19,32 +19,32 @@ with no arguments rather than being refused, as the SDK itself reads it. A symbo
 object-valued parameter is still refused, but the SDK's formatter cannot print its path, so
 the text is a TypeError's rather than the record's.
 
-### `update_history` is marked destructive (#155)
+### `update_history` is marked destructive (#155, #184)
 
 It sets MCP's `destructiveHint`, since it deletes the history when `deleted` is true.
 
-### `search_tools_by_name` matches every word of a query (#155)
+### `search_tools_by_name` matches every word of a query (#155, #185)
 
 After its substring matches, it also returns the tools whose name, ID and description
 hold every word of the query between them. A phrase that is no substring of any one of
 them, such as `count occurrences` for Count ("occurrences of each record"), found nothing.
 Punctuation around a word is ignored; a query with a single-character word finds no more.
 
-### One list of settled job states (#155)
+### One list of settled job states (#155, #186)
 
 galaxy-ops keeps one list of the job states that will not change again, read off Galaxy's
 `JobState`, and `isJobTerminal` reads it. Breaking for the library: `waitForJob` ends on a
 skipped or stopped job with `JobFailedError` instead of polling until the timeout. The state
 lists stay internal; `isJobTerminal` and `isJobSuccess` are still the exported reads.
 
-### `get_invocations` says what one invocation amounted to (#155)
+### `get_invocations` says what one invocation amounted to (#155, #187)
 
 Given an invocation id, the answer adds `job_states` and `outcome` (`failing`, `failed`,
 `cancelled`, `completed`), read from its jobs summary with one more request: Galaxy's
 `state` describes scheduling and reports `completed` for a run whose jobs failed.
 Listings are unchanged. galaxy-ops exports `invocationOutcome`.
 
-### `get_history_contents` pages with Galaxy's real total (#155)
+### `get_history_contents` pages with Galaxy's real total (#155, #188)
 
 It asks Galaxy for one filtered, sorted window and the count it matched, instead of
 fetching the whole history; a page over the output budget is cut, and its `pagination`
@@ -59,12 +59,12 @@ lose `model_class`, `populated` and `column_definitions`. Any `order` other than
 goes out with `hid-asc` behind it, since Galaxy sorts by exactly the keys it is given and
 a sort on a key rows share would otherwise put the same item on two pages.
 
-### `get_page` answers with a content hash (#155)
+### `get_page` answers with a content hash (#155, #189)
 
 The answer carries `content_hash`, the hash Galaxy's page assistant uses over the editable
 source; Galaxy neither returns nor checks it. galaxy-ops exports `contentHash`.
 
-### `update_page` replaces one section and refuses a stale write (#155)
+### `update_page` replaces one section and refuses a stale write (#155, #189)
 
 `update_page` takes `section_heading` and `section_content` to replace one section by
 its heading line, as Galaxy's page editor does, and `expect_hash` to refuse a write when
