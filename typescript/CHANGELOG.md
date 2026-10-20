@@ -19,9 +19,10 @@ Punctuation around a word is ignored; a query with a single-character word finds
 
 ### One list of settled job states (#155)
 
-galaxy-ops exports Galaxy's job, dataset and invocation state lists. Breaking for the
-library: `waitForJob` ends on a skipped or stopped job with `JobFailedError` instead
-of polling until the timeout.
+galaxy-ops keeps one list of the job states that will not change again, read off Galaxy's
+`JobState`, and `isJobTerminal` reads it. Breaking for the library: `waitForJob` ends on a
+skipped or stopped job with `JobFailedError` instead of polling until the timeout. The state
+lists stay internal; `isJobTerminal` and `isJobSuccess` are still the exported reads.
 
 ## 0.4.0 (2026-10-19)
 
