@@ -3879,6 +3879,26 @@ def upload_file_from_url(
         ) from e
 
 
+def _job_states(gi: GalaxyInstance, invocation_id: str) -> dict[str, int] | None:
+    """How many of an invocation's jobs are in each state, or None when the summary cannot
+    be read: the invocation is still worth answering with, just without its jobs."""
+    try:
+        summary = gi.invocations.get_invocation_summary(invocation_id)
+    except Exception:
+        return None
+    states = summary.get("states") if isinstance(summary, dict) else None
+    if not isinstance(states, dict):
+        return None
+    return {s: n for s, n in states.items() if isinstance(s, str) and isinstance(n, int)}
+
+
+def _with_job_states(invocation: Any, job_states: dict[str, int] | None) -> Any:
+    """The invocation with its jobs' states; as Galaxy sent it when they could not be read."""
+    if job_states is None or not isinstance(invocation, dict):
+        return invocation
+    return {**invocation, "job_states": job_states}
+
+
 @mcp.tool(tags={"workflows", "read", "extended"})
 def get_invocations(
     invocation_id: str | None = None,
@@ -3921,6 +3941,11 @@ def get_invocations(
                           failed or cancelled -- are listed. False keeps only the
                           ones still in flight (default: True)
 
+    Galaxy's `state` describes scheduling only -- it says completed for a run whose
+    jobs failed. One invocation by id also carries `job_states`, how many of its jobs
+    are in each state, read from its jobs summary with one more request; it is left
+    out when that summary cannot be read. A listing carries Galaxy's state only.
+
     Returns:
         GalaxyResult with workflow invocation information in data field
     """
@@ -3959,7 +3984,7 @@ def get_invocations(
             if not _is_this_record(invocation, invocation_id):
                 raise ValueError(_not_that_record("invocation", invocation_id))
             return GalaxyResult(
-                data=invocation,
+                data=_with_job_states(invocation, _job_states(gi, invocation_id)),
                 success=True,
                 message=f"Retrieved invocation '{invocation_id}'",
             )

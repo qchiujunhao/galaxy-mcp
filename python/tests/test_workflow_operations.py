@@ -102,6 +102,7 @@ class TestGetInvocationsRefusesAnErrorBody:
 
         assert result.success is True
         assert result.count == 2
+        # A listing comes back as Galaxy sent it; the jobs are read for one invocation by id only.
         assert result.data == invocations
 
     def test_a_dict_that_is_not_an_error_is_untouched(self, mock_galaxy_instance):
@@ -1138,3 +1139,41 @@ class TestCoerceOptionalJsonDict:
     def test_invalid_json_raises_named_error(self):
         with pytest.raises(ValueError, match="inputs must be a JSON object"):
             _coerce_optional_json_dict("{not valid json", "inputs")
+
+
+class TestInvocationJobStates:
+    """get_invocations by id reads the invocation's jobs; Galaxy's state is scheduling only."""
+
+    def test_one_invocation_carries_its_jobs_states(self, mock_galaxy_instance):
+        mock_galaxy_instance.invocations.show_invocation.return_value = {
+            "id": "1e1d0c0b0a090807",
+            "state": "completed",
+        }
+        mock_galaxy_instance.invocations.get_invocation_summary.return_value = {
+            "id": "1e1d0c0b0a090807",
+            "states": {"ok": 3, "error": 1},
+        }
+        with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
+            data = get_invocations_fn(invocation_id="1e1d0c0b0a090807").data
+        assert data == {
+            "id": "1e1d0c0b0a090807",
+            "state": "completed",
+            "job_states": {"ok": 3, "error": 1},
+        }
+
+    def test_an_unreadable_summary_leaves_the_invocation_as_sent(self, mock_galaxy_instance):
+        mock_galaxy_instance.invocations.show_invocation.return_value = {
+            "id": "1e1d0c0b0a090807",
+            "state": "completed",
+        }
+        mock_galaxy_instance.invocations.get_invocation_summary.side_effect = RuntimeError("500")
+        with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
+            data = get_invocations_fn(invocation_id="1e1d0c0b0a090807").data
+        assert data == {"id": "1e1d0c0b0a090807", "state": "completed"}
+
+    def test_a_listing_sends_no_request_per_row(self, mock_galaxy_instance):
+        listed = [{"id": f"i{n}", "state": "scheduled"} for n in range(25)]
+        mock_galaxy_instance.invocations._get.return_value = listed
+        with patch.dict(galaxy_state, {"connected": True, "gi": mock_galaxy_instance}):
+            assert get_invocations_fn().data == listed
+        mock_galaxy_instance.invocations.get_invocation_summary.assert_not_called()

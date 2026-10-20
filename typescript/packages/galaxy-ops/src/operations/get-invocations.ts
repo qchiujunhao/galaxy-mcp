@@ -125,6 +125,29 @@ function refuseErrorBody(data: unknown, status: number): void {
   }
 }
 
+/** How many of an invocation's jobs are in each state, as jobs_summary counts them. */
+type JobStates = Record<string, number>;
+
+/**
+ * How many of an invocation's jobs are in each state, or undefined when the summary cannot be
+ * read: the invocation is still worth answering with, just without its jobs.
+ */
+async function jobStates(ctx: GalaxyContext, invocationId: string): Promise<JobStates | undefined> {
+  let states: unknown;
+  try {
+    const { data } = await ctx.client.GET("/api/invocations/{invocation_id}/jobs_summary", {
+      params: { path: { invocation_id: invocationId } },
+    });
+    states = (data as { states?: unknown } | undefined)?.states;
+  } catch {
+    return undefined;
+  }
+  if (!states || typeof states !== "object" || Array.isArray(states)) return undefined;
+  return Object.fromEntries(
+    Object.entries(states).filter(([, n]) => typeof n === "number" && Number.isInteger(n)),
+  ) as JobStates;
+}
+
 async function run(i: In, ctx: GalaxyContext): Promise<GetInvocationsResult> {
   if (i.invocationId) {
     // Not an id, not a request: see encoded-id.ts for what a stray "." would turn into.
@@ -160,7 +183,8 @@ async function run(i: In, ctx: GalaxyContext): Promise<GetInvocationsResult> {
     if (!isThisRecord(data, i.invocationId)) {
       throw new GalaxyConnectionError(notThatRecord("invocation", i.invocationId), response.status);
     }
-    return data as InvocationDetail;
+    const states = await jobStates(ctx, i.invocationId);
+    return (states ? { ...(data as object), job_states: states } : data) as InvocationDetail;
   }
 
   // server.py, get_invocations: the window is checked before anything is sent. Galaxy's
@@ -208,7 +232,9 @@ async function run(i: In, ctx: GalaxyContext): Promise<GetInvocationsResult> {
 
   // Whatever the index sends back for the window it was asked for. Trimming the page here
   // would be a bound Python does not apply, and an agent comparing the two surfaces would
-  // have no way to see where the missing rows went.
+  // have no way to see where the missing rows went. A listing carries Galaxy's scheduling
+  // state only: the jobs are one more request per invocation, so they are read for one
+  // invocation by id rather than for every row of a page.
   return data as InvocationSummary[];
 }
 
@@ -216,7 +242,10 @@ export const getInvocationsOp: Operation<typeof input, GetInvocationsResult> = {
   name: "get_invocations", // parity: Python server get_invocations
   domain: "invocations",
   summary:
-    "View one workflow invocation by id, or list invocations, optionally filtered by workflow or history.",
+    "View one workflow invocation by id, or list invocations, optionally filtered by workflow or " +
+    "history. Galaxy's `state` describes scheduling only, not what the jobs did. One invocation " +
+    "by id also carries `job_states`, how many of its jobs are in each state, read from its jobs " +
+    "summary with one more request; it is left out when that summary cannot be read.",
   input,
   run,
   project: (result, i) => {
