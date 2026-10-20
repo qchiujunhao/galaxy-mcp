@@ -180,6 +180,91 @@
       ]
     },
     {
+      "id": "pages.hash.expect_hash",
+      "note": "get_page carries content_hash, the djb2 Galaxy's page assistant computes over the editable source, so a known body has a known hash. A write that offers that hash goes through and answers with the new one; the same hash offered again is stale, so the write is refused before anything is sent, and the page keeps the first rewrite.",
+      "fixtures": [
+        {"as": "p", "page": {"title": "${run.tag} hashed", "content": "# Live page\n\nintro\n\n## Methods\n\nold methods\n\n## Results\n\nfindings\n"}}
+      ],
+      "steps": [
+        {
+          "call": "get_page",
+          "args": {"page_id": "${p.id}"},
+          "expect": [
+            {"path": "data.content_editor", "equals": "# Live page\n\nintro\n\n## Methods\n\nold methods\n\n## Results\n\nfindings\n"},
+            {"path": "data.content_hash", "equals": "c0414be6"}
+          ],
+          "save": {"hash": "data.content_hash"}
+        },
+        {
+          "call": "update_page",
+          "args": {"page_id": "${p.id}", "content": "# Live page\n\nrewritten\n", "expect_hash": "${hash}"},
+          "expect": [
+            {"path": "data.content_editor", "equals": "# Live page\n\nrewritten\n"},
+            {"path": "data.content_hash", "equals": "d5bd3497"},
+            {"path": "data.revision_ids", "length": {"eq": 2}},
+            {"path": "message", "equals": "Updated page '${p.id}'"}
+          ]
+        },
+        {
+          "call": "update_page",
+          "args": {"page_id": "${p.id}", "content": "# Live page\n\nlost\n", "expect_hash": "${hash}"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "changed since it was read: its content_hash is now d5bd3497, not c0414be6"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "verify": {"page": "${p.id}"},
+          "expect": [
+            {"path": "content_editor", "equals": "# Live page\n\nrewritten\n"},
+            {"path": "revision_ids", "length": {"eq": 2}}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pages.section.replace_by_heading",
+      "note": "A section edit replaces only the section under that heading line and leaves the rest byte for byte, the way Galaxy's page editor applies its own section patches: a heading in the middle, then the preamble through the empty heading, then a heading the page lacks, which is appended. Each write is checked against the content_editor Galaxy stored.",
+      "fixtures": [
+        {"as": "p", "page": {"title": "${run.tag} sectioned", "content": "intro\n\n# Live page\n\n## Methods\n\nold methods\n\n## Results\n\nfindings\n"}}
+      ],
+      "steps": [
+        {
+          "call": "update_page",
+          "args": {"page_id": "${p.id}", "section_heading": "## Methods", "section_content": "## Methods\n\nnew methods\n"},
+          "expect": [
+            {"path": "data.content_editor", "equals": "intro\n\n# Live page\n\n## Methods\n\nnew methods\n\n## Results\n\nfindings\n"},
+            {"path": "data.revision_ids", "length": {"eq": 2}}
+          ]
+        },
+        {
+          "call": "update_page",
+          "args": {"page_id": "${p.id}", "section_heading": "", "section_content": "a new intro\n"},
+          "expect": [
+            {"path": "data.content_editor", "equals": "a new intro\n\n# Live page\n\n## Methods\n\nnew methods\n\n## Results\n\nfindings\n"},
+            {"path": "data.revision_ids", "length": {"eq": 3}}
+          ]
+        },
+        {
+          "call": "update_page",
+          "args": {"page_id": "${p.id}", "section_heading": "## Discussion", "section_content": "## Discussion\n\nappended\n"},
+          "expect": [
+            {"path": "data.content_editor", "equals": "a new intro\n\n# Live page\n\n## Methods\n\nnew methods\n\n## Results\n\nfindings\n\n## Discussion\n\nappended\n"},
+            {"path": "data.revision_ids", "length": {"eq": 4}}
+          ]
+        },
+        {
+          "verify": {"page": "${p.id}"},
+          "expect": [
+            {"path": "content_editor", "equals": "a new intro\n\n# Live page\n\n## Methods\n\nnew methods\n\n## Results\n\nfindings\n\n## Discussion\n\nappended\n"},
+            {"path": "revision_ids", "length": {"eq": 4}}
+          ]
+        }
+      ]
+    },
+    {
       "id": "pages.update.title_only",
       "note": "A title-only update renames the page without writing a revision -- Galaxy only adds one when content changes -- and the page keeps its content.",
       "fixtures": [{"as": "p", "page": {"title": "${run.tag} before", "content": "unchanged body\n"}}],
