@@ -1,0 +1,958 @@
+{
+  "$comment": "Pack D: Galaxy pages (reports and history notebooks, with their revisions), dataset collections, and user-defined tools. No legacy ports: test_real_integration.py never covered these tools. Format in python/tests/live/model.py, schema in scenario.schema.json.",
+  "pack": "pages-collections-user-tools",
+  "tools": [
+    "create_page",
+    "list_pages",
+    "get_page",
+    "update_page",
+    "list_page_revisions",
+    "get_page_revision",
+    "revert_page_revision",
+    "get_collection_details",
+    "create_user_tool",
+    "list_user_tools",
+    "delete_user_tool",
+    "get_user_tool",
+    "run_user_tool"
+  ],
+  "uncovered": [
+    {
+      "tool": "run_user_tool",
+      "reason": "Running one needs a Galaxy with enable_beta_tool_formats on, a user holding the user_tool_execute role, and a container runtime on the job runner; the test Galaxy has none of the three, and a refusal-only scenario would claim the tool without ever running one."
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "pages.report.lifecycle",
+      "note": "The full page lifecycle on a standalone report: create, find it by search, read it, edit it as the agent, walk its revisions, read the first one back and revert to it. Each write is checked against Galaxy's own page record, not only the tool's report of it.",
+      "steps": [
+        {
+          "call": "create_page",
+          "args": {
+            "title": "${run.tag} report",
+            "slug": "${run.tag}",
+            "content": "# First draft\n\nwritten by the live suite\n",
+            "annotation": "live suite report"
+          },
+          "creates": {"page": "data.id"},
+          "expect": [
+            {"path": "data.id", "matches": "^[0-9a-f]{16}$"},
+            {"path": "data.title", "equals": "${run.tag} report"},
+            {"path": "data.slug", "equals": "${run.tag}"},
+            {"path": "data.content_format", "equals": "markdown"},
+            {"path": "data.content_editor", "equals": "# First draft\n\nwritten by the live suite\n"},
+            {"path": "data.annotation", "equals": "live suite report"},
+            {"path": "data", "keys_exclude": ["content"]},
+            {"path": "data.revision_ids", "length": {"eq": 1}},
+            {"path": "message", "matches": "^Created page '[0-9a-f]{16}'$"}
+          ],
+          "save": {"page": "data.id", "first_revision": "data.latest_revision_id"}
+        },
+        {
+          "verify": {"page": "${page}"},
+          "expect": [
+            {"path": "title", "equals": "${run.tag} report"},
+            {"path": "content_editor", "equals": "# First draft\n\nwritten by the live suite\n"},
+            {"path": "deleted", "equals": false}
+          ]
+        },
+        {
+          "call": "list_pages",
+          "args": {"search": "${run.tag}"},
+          "expect": [
+            {"path": "count", "equals": 1},
+            {"path": "data.0.id", "equals": "${page}"},
+            {"path": "data.0.title", "equals": "${run.tag} report"},
+            {"path": "pagination.total_items", "equals": 1},
+            {"path": "pagination.has_next", "equals": false},
+            {"path": "message", "equals": "Retrieved 1 pages"}
+          ]
+        },
+        {
+          "call": "get_page",
+          "args": {"page_id": "${page}"},
+          "expect": [
+            {"path": "data.id", "equals": "${page}"},
+            {"path": "data.content_editor", "equals": "# First draft\n\nwritten by the live suite\n"},
+            {"path": "data", "keys_exclude": ["content"]},
+            {"path": "message", "equals": "Retrieved page '${page}'"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "get_page",
+          "args": {"page_id": "${page}", "include_rendered": true},
+          "expect": [
+            {"path": "data", "keys_include": ["content", "content_editor"]},
+            {"path": "data.content", "contains": "First draft"}
+          ]
+        },
+        {
+          "call": "update_page",
+          "args": {
+            "page_id": "${page}",
+            "content": "# Second draft\n\nedited by the live suite\n",
+            "title": "${run.tag} report v2"
+          },
+          "expect": [
+            {"path": "data.id", "equals": "${page}"},
+            {"path": "data.title", "equals": "${run.tag} report v2"},
+            {"path": "data.content_editor", "equals": "# Second draft\n\nedited by the live suite\n"},
+            {"path": "data.edit_source", "equals": "agent"},
+            {"path": "data.revision_ids", "length": {"eq": 2}},
+            {"path": "data", "keys_exclude": ["content"]},
+            {"path": "message", "equals": "Updated page '${page}'"}
+          ]
+        },
+        {
+          "verify": {"page": "${page}"},
+          "expect": [
+            {"path": "title", "equals": "${run.tag} report v2"},
+            {"path": "content_editor", "equals": "# Second draft\n\nedited by the live suite\n"},
+            {"path": "edit_source", "equals": "agent"}
+          ]
+        },
+        {
+          "call": "list_page_revisions",
+          "args": {"page_id": "${page}"},
+          "expect": [
+            {"path": "count", "equals": 2},
+            {"path": "data.0.id", "equals": "${first_revision}"},
+            {"path": "data.1.edit_source", "equals": "agent"},
+            {"path": "data", "each": [{"path": "page_id", "equals": "${page}"}]},
+            {"path": "message", "equals": "Retrieved 2 revisions for page '${page}'"}
+          ],
+          "save": {"second_revision": "data.1.id"}
+        },
+        {
+          "call": "list_page_revisions",
+          "args": {"page_id": "${page}", "sort_desc": true},
+          "expect": [
+            {"path": "count", "equals": 2},
+            {"path": "data.0.id", "equals": "${second_revision}"},
+            {"path": "data.1.id", "equals": "${first_revision}"}
+          ]
+        },
+        {
+          "call": "get_page_revision",
+          "args": {"page_id": "${page}", "revision_id": "${first_revision}"},
+          "expect": [
+            {"path": "data.id", "equals": "${first_revision}"},
+            {"path": "data.page_id", "equals": "${page}"},
+            {"path": "data.content_editor", "equals": "# First draft\n\nwritten by the live suite\n"},
+            {"path": "data.content_editor_source", "equals": "server"},
+            {"path": "message", "equals": "Retrieved revision '${first_revision}' of page '${page}'"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "revert_page_revision",
+          "args": {"page_id": "${page}", "revision_id": "${first_revision}"},
+          "expect": [
+            {"path": "data.id", "matches": "^[0-9a-f]{16}$"},
+            {"path": "data.id", "not_equals": "${first_revision}"},
+            {"path": "data.page_id", "equals": "${page}"},
+            {"path": "data.edit_source", "equals": "restore"},
+            {"path": "data.content_editor", "equals": "# First draft\n\nwritten by the live suite\n"},
+            {"path": "message", "equals": "Reverted page '${page}' to revision '${first_revision}'"}
+          ],
+          "save": {"restored_revision": "data.id"}
+        },
+        {
+          "verify": {"page": "${page}"},
+          "expect": [
+            {"path": "content_editor", "equals": "# First draft\n\nwritten by the live suite\n"},
+            {"path": "latest_revision_id", "equals": "${restored_revision}"},
+            {"path": "edit_source", "equals": "restore"},
+            {"path": "revision_ids", "length": {"eq": 3}}
+          ]
+        },
+        {
+          "call": "list_page_revisions",
+          "args": {"page_id": "${page}"},
+          "expect": [
+            {"path": "count", "equals": 3},
+            {"path": "data.2.id", "equals": "${restored_revision}"},
+            {"path": "data.2.edit_source", "equals": "restore"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pages.update.title_only",
+      "note": "A title-only update renames the page without writing a revision -- Galaxy only adds one when content changes -- and the page keeps its content.",
+      "fixtures": [{"as": "p", "page": {"title": "${run.tag} before", "content": "unchanged body\n"}}],
+      "steps": [
+        {
+          "call": "update_page",
+          "args": {"page_id": "${p.id}", "title": "${run.tag} after"},
+          "expect": [
+            {"path": "data.title", "equals": "${run.tag} after"},
+            {"path": "data.content_editor", "equals": "unchanged body\n"},
+            {"path": "data.revision_ids", "length": {"eq": 1}},
+            {"path": "message", "equals": "Updated page '${p.id}'"}
+          ]
+        },
+        {
+          "verify": {"page": "${p.id}"},
+          "expect": [
+            {"path": "title", "equals": "${run.tag} after"},
+            {"path": "revision_ids", "length": {"eq": 1}}
+          ]
+        },
+        {
+          "call": "list_page_revisions",
+          "args": {"page_id": "${p.id}"},
+          "expect": [{"path": "count", "equals": 1}]
+        }
+      ]
+    },
+    {
+      "id": "pages.notebook.history",
+      "note": "A page made with a history_id is that history's notebook, and list_pages by history_id returns only the notebooks of that history -- not one attached to another history, nor a standalone report.",
+      "fixtures": [
+        {"as": "h", "history": {}},
+        {"as": "other", "history": {}},
+        {"as": "elsewhere", "page": {"content": "another history's notebook\n", "history": "${other.id}"}},
+        {"as": "report", "page": {"title": "${run.tag} standalone", "content": "a standalone report\n"}}
+      ],
+      "steps": [
+        {
+          "call": "create_page",
+          "args": {"history_id": "${h.id}", "title": "${run.tag} notebook", "content": "notes on ${h.name}\n"},
+          "creates": {"page": "data.id"},
+          "expect": [
+            {"path": "data.history_id", "equals": "${h.id}"},
+            {"path": "data.title", "equals": "${run.tag} notebook"},
+            {"path": "data.content_editor", "equals": "notes on ${h.name}\n"},
+            {"path": "data.content_format", "equals": "markdown"}
+          ],
+          "save": {"notebook": "data.id"}
+        },
+        {
+          "verify": {"page": "${notebook}"},
+          "expect": [
+            {"path": "history_id", "equals": "${h.id}"},
+            {"path": "title", "equals": "${run.tag} notebook"}
+          ]
+        },
+        {
+          "call": "list_pages",
+          "args": {"history_id": "${h.id}"},
+          "expect": [
+            {"path": "count", "equals": 1},
+            {"path": "data.0.id", "equals": "${notebook}"},
+            {"path": "data.0.history_id", "equals": "${h.id}"},
+            {"path": "pagination.total_items", "equals": 1}
+          ]
+        },
+        {
+          "call": "list_pages",
+          "args": {"history_id": "${other.id}"},
+          "expect": [{"path": "count", "equals": 1}, {"path": "data.0.id", "equals": "${elsewhere.id}"}]
+        }
+      ]
+    },
+    {
+      "id": "pages.notebook.untitled",
+      "note": "A notebook made without a title is still made, with Galaxy choosing the title; both servers send the same payload, so they must report the same title.",
+      "fixtures": [{"as": "h", "history": {}}],
+      "steps": [
+        {
+          "call": "create_page",
+          "args": {"history_id": "${h.id}"},
+          "creates": {"page": "data.id"},
+          "expect": [
+            {"path": "data.history_id", "equals": "${h.id}"},
+            {"path": "data.title", "matches": "\\S"},
+            {"path": "data.content_format", "equals": "markdown"}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "pages.list.pagination",
+      "note": "list_pages windows server-side and reads its total from Galaxy's total_matches header: a limit below the match count reports has_next and the offset to the rest, and the second window holds the other page.",
+      "fixtures": [
+        {"as": "p1", "page": {"title": "${run.tag} one", "content": "one\n"}},
+        {"as": "p2", "page": {"title": "${run.tag} two", "content": "two\n"}}
+      ],
+      "steps": [
+        {
+          "call": "list_pages",
+          "args": {"search": "${run.tag}", "limit": 1},
+          "expect": [
+            {"path": "count", "equals": 1},
+            {"path": "pagination.total_items", "equals": 2},
+            {"path": "pagination.returned_items", "equals": 1},
+            {"path": "pagination.has_next", "equals": true},
+            {"path": "pagination.next_offset", "equals": 1},
+            {"path": "data.0.id", "in": ["${p1.id}", "${p2.id}"]}
+          ],
+          "save": {"first": "data.0.id"}
+        },
+        {
+          "call": "list_pages",
+          "args": {"search": "${run.tag}", "limit": 1, "offset": 1},
+          "expect": [
+            {"path": "count", "equals": 1},
+            {"path": "pagination.has_next", "equals": false},
+            {"path": "pagination.has_previous", "equals": true},
+            {"path": "data.0.id", "not_equals": "${first}"},
+            {"path": "data.0.id", "in": ["${p1.id}", "${p2.id}"]}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pages.create.report_without_slug",
+      "note": "A standalone report needs a slug. Neither server pre-checks it, so the refusal is Galaxy's own, in the same sentence from both.",
+      "steps": [
+        {
+          "call": "create_page",
+          "args": {"title": "${run.tag} no slug", "content": "x\n"},
+          "outcome": "failure",
+          "creates": {"page": "data.id"},
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "Create page failed"},
+            {"path": "failure.sentence", "contains": "slug is required for non-history pages"}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "pages.create.duplicate_slug",
+      "note": "A report slug is unique per user, so reusing one is refused rather than silently making a second page.",
+      "fixtures": [{"as": "p", "page": {"title": "${run.tag} taken", "content": "first\n"}}],
+      "steps": [
+        {
+          "call": "create_page",
+          "args": {"title": "${run.tag} again", "slug": "${p.slug}", "content": "second\n"},
+          "outcome": "failure",
+          "creates": {"page": "data.id"},
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "Create page failed"},
+            {"path": "failure.sentence", "contains": "Page identifier must be unique"}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "pages.failure.malformed_ids",
+      "note": "Every page tool refuses an id Galaxy cannot decode, with the same sentence from both servers -- the raw-GET tools quote requests' 400 line with the URL, the writes quote Galaxy's err_msg -- and a malformed history id makes no notebook.",
+      "steps": [
+        {
+          "call": "get_page",
+          "args": {"page_id": "0123456789abcdef"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "Get page failed: 400 Client Error"},
+            {"path": "failure.sentence", "contains": "Context: page_id=0123456789abcdef"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "update_page",
+          "args": {"page_id": "0123456789abcdef", "content": "nothing\n"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "Update page failed"},
+            {"path": "failure.sentence", "contains": "unable to decode"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "list_page_revisions",
+          "args": {"page_id": "0123456789abcdef"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "List page revisions failed: 400 Client Error"},
+            {"path": "failure.sentence", "contains": "/revisions?sort_desc=false"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "list_pages",
+          "args": {"history_id": "0123456789abcdef"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "List pages failed: 400 Client Error"},
+            {"path": "failure.sentence", "contains": "history_id=0123456789abcdef"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "create_page",
+          "args": {"history_id": "0123456789abcdef"},
+          "outcome": "failure",
+          "creates": {"page": "data.id"},
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "Create page failed"},
+            {"path": "failure.sentence", "contains": "unable to decode"},
+            {"path": "failure.sentence", "contains": "Context: history_id=0123456789abcdef"}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "pages.failure.malformed_revision_id",
+      "note": "A revision id Galaxy cannot decode is refused by both the reader and the revert, and the revert writes no revision.",
+      "fixtures": [{"as": "p", "page": {"title": "${run.tag} page", "content": "only revision\n"}}],
+      "steps": [
+        {
+          "call": "get_page_revision",
+          "args": {"page_id": "${p.id}", "revision_id": "0123456789abcdef"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "Get page revision failed: 400 Client Error"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "revert_page_revision",
+          "args": {"page_id": "${p.id}", "revision_id": "0123456789abcdef"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "Revert page revision failed"},
+            {"path": "failure.sentence", "contains": "unable to decode"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "verify": {"page": "${p.id}"},
+          "expect": [
+            {"path": "revision_ids", "length": {"eq": 1}},
+            {"path": "content_editor", "equals": "only revision\n"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pages.failure.bad_argument",
+      "note": "A page id of the wrong type never reaches Galaxy. Only the failure kind is comparable across servers (live.normalization.argumentValidationText).",
+      "steps": [
+        {
+          "call": "get_page",
+          "args": {"page_id": 12345},
+          "outcome": "failure",
+          "expect": [{"path": "failure.kind", "equals": "arguments"}]
+        }
+      ]
+    },
+    {
+      "id": "collections.list.truncated",
+      "note": "A list of three with max_elements 2 returns the first two elements flattened, says it was cut, and still reports the collection's real element_count. Element extension and collection state are asserted in collections.list.element_metadata instead, where both servers' shared bug is recorded; exact parity here pins that they still agree.",
+      "fixtures": [
+        {"as": "h", "history": {}},
+        {
+          "as": "c",
+          "collection": {
+            "history": "${h.id}",
+            "type": "list",
+            "name": "three",
+            "elements": [
+              {"name": "alpha", "content": "a\n"},
+              {"name": "beta", "content": "bb\n"},
+              {"name": "gamma", "content": "ccc\n", "ext": "tabular"}
+            ]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "call": "get_collection_details",
+          "args": {"collection_id": "${c.id}", "max_elements": 2},
+          "expect": [
+            {"path": "count", "equals": 2},
+            {"path": "data.collection_id", "equals": "${c.id}"},
+            {"path": "data.history_content_type", "equals": "dataset_collection"},
+            {"path": "data.collection.id", "equals": "${c.id}"},
+            {"path": "data.collection.name", "equals": "three"},
+            {"path": "data.collection.collection_type", "equals": "list"},
+            {"path": "data.collection.element_count", "equals": 3},
+            {"path": "data.collection.populated", "equals": true},
+            {"path": "data.elements_truncated", "equals": true},
+            {"path": "data.elements", "length": {"eq": 2}},
+            {"path": "data.elements.0.element_index", "equals": 0},
+            {"path": "data.elements.0.element_identifier", "equals": "alpha"},
+            {"path": "data.elements.1.element_index", "equals": 1},
+            {"path": "data.elements.1.element_identifier", "equals": "beta"},
+            {"path": "data.elements.1.file_size", "equals": 3},
+            {
+              "path": "data.elements",
+              "each": [
+                {"path": "element_type", "equals": "hda"},
+                {"path": "object_id", "matches": "^[0-9a-f]{16}$"},
+                {"path": "state", "equals": "ok"}
+              ]
+            },
+            {"path": "data.note", "contains": "get_dataset_details(object_id)"},
+            {"path": "message", "equals": "Retrieved collection 'three'"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "get_collection_details",
+          "args": {"collection_id": "${c.id}"},
+          "expect": [
+            {"path": "count", "equals": 3},
+            {"path": "data.elements_truncated", "equals": false},
+            {"path": "data.elements.2.element_identifier", "equals": "gamma"},
+            {"path": "data.elements.2.file_size", "equals": 4}
+          ],
+          "save": {"gamma": "data.elements.2.object_id"},
+          "parity": "exact"
+        },
+        {"verify": {"dataset_text": "${gamma}"}, "expect": [{"path": "content", "equals": "ccc\n"}]}
+      ]
+    },
+    {
+      "id": "collections.list.element_metadata",
+      "note": "Each element reports its datatype. Galaxy 26.2 sends it as file_ext on the element object, which both servers read since #170. The collection's state is checked on its own in collections.list.state.",
+      "fixtures": [
+        {"as": "h", "history": {}},
+        {"as": "c", "collection": {"history": "${h.id}", "type": "list", "name": "typed", "elements": [{"name": "plain", "content": "a\n"}, {"name": "table", "content": "x\ty\n", "ext": "tabular"}]}}
+      ],
+      "steps": [
+        {
+          "call": "get_collection_details",
+          "args": {"collection_id": "${c.id}"},
+          "expect": [
+            {"path": "data.elements.0.extension", "equals": "txt"},
+            {"path": "data.elements.1.extension", "equals": "tabular"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "collections.list.state",
+      "note": "A populated collection of ok datasets reports state ok. Galaxy 26.2 sends it as populated_state, which both servers read since #170.",
+      "fixtures": [
+        {"as": "h", "history": {}},
+        {"as": "c", "collection": {"history": "${h.id}", "type": "list", "name": "stated", "elements": [{"name": "one", "content": "a\n"}]}}
+      ],
+      "steps": [
+        {
+          "call": "get_collection_details",
+          "args": {"collection_id": "${c.id}"},
+          "expect": [{"path": "data.collection.state", "equals": "ok"}]
+        }
+      ]
+    },
+    {
+      "id": "collections.list_paired.nested",
+      "note": "A nested collection's elements are themselves collections: the element type says so and the dataset-only fields come back empty rather than being recursed into, on both servers.",
+      "fixtures": [
+        {"as": "h", "history": {}},
+        {
+          "as": "c",
+          "collection": {
+            "history": "${h.id}",
+            "type": "list:paired",
+            "name": "pairs",
+            "elements": [
+              {
+                "name": "sample1",
+                "elements": [{"name": "forward", "content": "f1\n"}, {"name": "reverse", "content": "r1\n"}]
+              },
+              {
+                "name": "sample2",
+                "elements": [{"name": "forward", "content": "f2\n"}, {"name": "reverse", "content": "r2\n"}]
+              }
+            ]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "call": "get_collection_details",
+          "args": {"collection_id": "${c.id}"},
+          "expect": [
+            {"path": "count", "equals": 2},
+            {"path": "data.collection.collection_type", "equals": "list:paired"},
+            {"path": "data.collection.element_count", "equals": 2},
+            {"path": "data.elements_truncated", "equals": false},
+            {"path": "data.elements.0.element_identifier", "equals": "sample1"},
+            {"path": "data.elements.1.element_identifier", "equals": "sample2"},
+            {
+              "path": "data.elements",
+              "each": [
+                {"path": "element_type", "equals": "dataset_collection"},
+                {"path": "object_id", "matches": "^[0-9a-f]{16}$"}
+              ]
+            }
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "collections.failure.malformed_id",
+      "note": "A collection id Galaxy cannot decode is a 400, not a 404, so it gets the generic bioblend sentence rather than the tool's not-found one -- word for word on both servers. (A decodable id that names nothing cannot be made deterministically on a shared Galaxy; the golden envelopes cover the 404 sentence.)",
+      "steps": [
+        {
+          "call": "get_collection_details",
+          "args": {"collection_id": "0123456789abcdef"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "Get collection details failed"},
+            {"path": "failure.sentence", "contains": "unable to decode"},
+            {"path": "failure.sentence", "contains": "Context: collection_id=0123456789abcdef"}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "collections.failure.bad_argument",
+      "note": "max_elements must be an integer; the schema rejects anything else before Galaxy is asked.",
+      "steps": [
+        {
+          "call": "get_collection_details",
+          "args": {"collection_id": "0123456789abcdef", "max_elements": "two"},
+          "outcome": "failure",
+          "expect": [{"path": "failure.kind", "equals": "arguments"}]
+        }
+      ]
+    },
+    {
+      "id": "user_tools.create.invalid_representation",
+      "note": "Both servers check the representation before Galaxy sees it, so these refusals hold whatever the user's permissions: a missing required field, the wrong class, and a container given as a dict.",
+      "steps": [
+        {
+          "call": "create_user_tool",
+          "args": {
+            "representation": {
+              "class": "GalaxyUserTool",
+              "id": "mcp_live_missing_container",
+              "version": "0.1.0",
+              "name": "missing container",
+              "shell_command": "echo hi > out.txt"
+            }
+          },
+          "outcome": "failure",
+          "creates": {"user_tool": "data.uuid"},
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "representation is missing required field: 'container'"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "create_user_tool",
+          "args": {
+            "representation": {
+              "class": "GalaxyTool",
+              "id": "mcp_live_wrong_class",
+              "version": "0.1.0",
+              "name": "wrong class",
+              "shell_command": "echo hi > out.txt",
+              "container": "busybox"
+            }
+          },
+          "outcome": "failure",
+          "creates": {"user_tool": "data.uuid"},
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "class must be 'GalaxyUserTool', got 'GalaxyTool'"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "create_user_tool",
+          "args": {
+            "representation": {
+              "class": "GalaxyUserTool",
+              "id": "mcp_live_dict_container",
+              "version": "0.1.0",
+              "name": "dict container",
+              "shell_command": "echo hi > out.txt",
+              "container": {"docker": "busybox"}
+            }
+          },
+          "outcome": "failure",
+          "creates": {"user_tool": "data.uuid"},
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "container must be a string"}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "user_tools.list.limit_too_large",
+      "note": "list_user_tools caps a page at 100; both servers refuse a larger window before asking Galaxy, so this holds with or without the permission.",
+      "steps": [
+        {
+          "call": "list_user_tools",
+          "args": {"limit": 101},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "limit must be at most 100 (got 101)"}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "user_tools.refused.create_unavailable",
+      "note": "Where this user cannot create user tools Galaxy refuses create (403004 when enable_beta_tool_formats is off, 403005 without the user_tool_execute role), and both servers pass Galaxy's refusal through.",
+      "requires": {"capabilities": ["!unprivileged-tools"]},
+      "steps": [
+        {
+          "call": "create_user_tool",
+          "args": {
+            "representation": {
+              "class": "GalaxyUserTool",
+              "id": "mcp_live_refused",
+              "version": "0.1.0",
+              "name": "${run.tag} refused",
+              "container": "busybox",
+              "shell_command": "cat '$(inputs.input.path)' > output.txt",
+              "inputs": [{"type": "data", "name": "input", "format": "txt"}],
+              "outputs": [{"type": "data", "name": "output", "format": "txt", "from_work_dir": "output.txt"}]
+            }
+          },
+          "outcome": "failure",
+          "creates": {"user_tool": "data.uuid"},
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "Create user tool failed"},
+            {"path": "failure.sentence", "contains": "403"},
+            {
+              "path": "failure.sentence",
+              "matches": "User is not allowed to run unprivileged tools|enable_beta_tool_formats"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "user_tools.refused.no_role",
+      "note": "Without the user_tool_execute role Galaxy refuses list and delete (403005) whatever enable_beta_tool_formats says, and both servers pass the refusal through rather than reporting success -- delete_user_tool used to report a refused DELETE as a deactivation. With the role, listing works even where creating does not, so this is gated on the role, not on unprivileged-tools.",
+      "requires": {"capabilities": ["!user-tool-role"]},
+      "steps": [
+        {
+          "call": "list_user_tools",
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "List user tools failed"},
+            {"path": "failure.sentence", "contains": "403"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "delete_user_tool",
+          "args": {"uuid": "00000000-0000-4000-8000-000000000000"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "Delete user tool failed"},
+            {"path": "failure.sentence", "contains": "403 Client Error"}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "user_tools.lifecycle",
+      "note": "With user tools enabled (enable_beta_tool_formats and the user_tool_execute role), a tool the server creates is listed as active and, once delete_user_tool deactivates it, no longer listed. Not asserted: that it then shows under active=false -- Galaxy 26.2 deactivates only the user association, and that listing also requires the tool row itself to be inactive.",
+      "requires": {"capabilities": ["unprivileged-tools"]},
+      "steps": [
+        {
+          "call": "create_user_tool",
+          "args": {
+            "representation": {
+              "class": "GalaxyUserTool",
+              "id": "${run.tag}",
+              "version": "0.1.0",
+              "name": "${run.tag} cat",
+              "container": "busybox",
+              "shell_command": "cat '$(inputs.input.path)' > output.txt",
+              "inputs": [{"type": "data", "name": "input", "format": "txt"}],
+              "outputs": [{"type": "data", "name": "output", "format": "txt", "from_work_dir": "output.txt"}]
+            }
+          },
+          "creates": {"user_tool": "data.uuid"},
+          "expect": [
+            {"path": "data.uuid", "matches": "^[0-9a-f-]{36}$"},
+            {"path": "data.active", "equals": true},
+            {"path": "data.representation.name", "equals": "${run.tag} cat"},
+            {"path": "message", "equals": "Created user-defined tool '${run.tag} cat'"}
+          ],
+          "save": {"tool": "data.uuid"}
+        },
+        {
+          "call": "list_user_tools",
+          "args": {"limit": 100},
+          "expect": [
+            {"path": "data", "has_item": {"uuid": "${tool}", "active": true, "tool_id": "${run.tag}"}},
+            {"path": "pagination.total_items", "gte": 1}
+          ]
+        },
+        {
+          "call": "delete_user_tool",
+          "args": {"uuid": "${tool}"},
+          "expect": [
+            {"path": "data.uuid", "equals": "${tool}"},
+            {"path": "data.deactivated", "equals": true},
+            {"path": "message", "equals": "Deactivated user-defined tool '${tool}'"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "list_user_tools",
+          "args": {"limit": 100},
+          "expect": [{"path": "data", "each": [{"path": "uuid", "not_equals": "${tool}"}]}]
+        }
+      ]
+    },
+    {
+      "id": "user_tools.delete.unknown_uuid",
+      "note": "With the role, deleting a uuid the user does not own is Galaxy's 404, reported as a failure rather than as a deactivation.",
+      "requires": {"capabilities": ["unprivileged-tools"]},
+      "steps": [
+        {
+          "call": "delete_user_tool",
+          "args": {"uuid": "00000000-0000-4000-8000-000000000000"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "Delete user tool failed"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "user_tools.get.not_a_uuid",
+      "note": "get_user_tool refuses a value Galaxy's own uuid check would refuse before anything is sent, so this holds whatever the user's permissions, and with the same sentence from both servers.",
+      "steps": [
+        {
+          "call": "get_user_tool",
+          "args": {"uuid": "not-a-uuid"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "equals": "No user-defined tool found with UUID 'not-a-uuid': that is not a UUID. A user tool's UUID is 32 hex digits, as list_user_tools() reports it (hyphenated, bare, braced or urn:uuid: spellings all name the same tool). Nothing was sent to Galaxy."}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "get_user_tool",
+          "args": {"uuid": "00000000-0000-4000-8000-00000000000"},
+          "outcome": "failure",
+          "expect": [{"path": "failure.sentence", "contains": "that is not a UUID"}],
+          "parity": "exact"
+        },
+        {
+          "call": "get_user_tool",
+          "args": {},
+          "outcome": "failure",
+          "expect": [{"path": "failure.kind", "equals": "arguments"}]
+        }
+      ]
+    },
+    {
+      "id": "user_tools.refused.get_no_role",
+      "note": "Without the user_tool_execute role Galaxy refuses the single-tool read (403005) as it does list and delete, and both servers pass the refusal through. The braced spelling passes the uuid check and reaches Galaxy the same way.",
+      "requires": {"capabilities": ["!user-tool-role"]},
+      "steps": [
+        {
+          "call": "get_user_tool",
+          "args": {"uuid": "00000000-0000-4000-8000-000000000000"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "Get user tool failed: 403 Client Error"},
+            {"path": "failure.sentence", "contains": "(Permission denied - check your account permissions)"},
+            {"path": "failure.sentence", "contains": "Context: uuid=00000000-0000-4000-8000-000000000000"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "get_user_tool",
+          "args": {"uuid": "{00000000-0000-4000-8000-000000000000}"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.sentence", "contains": "Get user tool failed: 403 Client Error"},
+            {"path": "failure.sentence", "contains": "Context: uuid={00000000-0000-4000-8000-000000000000}"}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "user_tools.get.by_uuid",
+      "note": "With user tools enabled, a tool made through the bookkeeping client reads back by its uuid as Galaxy's record, representation included, with the tool id in the message; the braced spelling of the same uuid finds the same tool.",
+      "requires": {"capabilities": ["unprivileged-tools"]},
+      "fixtures": [
+        {"as": "ut", "user_tool": {"representation": {
+          "class": "GalaxyUserTool",
+          "id": "${run.tag}",
+          "version": "0.1.0",
+          "name": "${run.tag} cat",
+          "container": "busybox",
+          "shell_command": "cat '$(inputs.input.path)' > output.txt",
+          "inputs": [{"type": "data", "name": "input", "format": "txt"}],
+          "outputs": [{"type": "data", "name": "output", "format": "txt", "from_work_dir": "output.txt"}]
+        }}}
+      ],
+      "steps": [
+        {
+          "call": "get_user_tool",
+          "args": {"uuid": "${ut.uuid}"},
+          "expect": [
+            {"path": "data.uuid", "equals": "${ut.uuid}"},
+            {"path": "data.tool_id", "equals": "${run.tag}"},
+            {"path": "data.active", "equals": true},
+            {"path": "data.representation.name", "equals": "${run.tag} cat"},
+            {"path": "data.representation.container", "equals": "busybox"},
+            {"path": "message", "equals": "Retrieved user-defined tool '${run.tag}' (UUID: ${ut.uuid})"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "get_user_tool",
+          "args": {"uuid": "{${ut.uuid}}"},
+          "expect": [{"path": "data.uuid", "equals": "${ut.uuid}"}]
+        }
+      ]
+    },
+    {
+      "id": "user_tools.get.unknown_uuid",
+      "note": "With the role, a well-formed uuid the user has no tool for is Galaxy's 404, reported as a failure.",
+      "requires": {"capabilities": ["user-tool-role"]},
+      "steps": [
+        {
+          "call": "get_user_tool",
+          "args": {"uuid": "00000000-0000-4000-8000-000000000000"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "Get user tool failed: 404 Client Error"},
+            {"path": "failure.sentence", "contains": "Context: uuid=00000000-0000-4000-8000-000000000000"}
+          ],
+          "parity": "exact"
+        }
+      ]
+    }
+  ]
+}

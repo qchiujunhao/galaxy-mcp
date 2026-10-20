@@ -1,0 +1,113 @@
+{
+  "$comment": "Harness smoke pack: proves the live pipe end to end on both servers -- fixtures, call/verify steps, references, a cited registry adapter, tool and argument failures, cleanup. It owns no tools; the four real packs own the surface. Format in python/tests/live/model.py, schema in scenario.schema.json.",
+  "pack": "smoke",
+  "tools": [],
+  "uncovered": [],
+  "scenarios": [
+    {
+      "id": "smoke.server.info",
+      "note": "The server reports the Galaxy it was started against. Python adds a trailing slash to the URL, which the cited rows rewrite away, so exact parity holds on the rest.",
+      "steps": [
+        {
+          "call": "get_server_info",
+          "expect": [
+            {"path": "data.url", "equals": "${galaxy.url}"},
+            {"path": "message", "equals": "Retrieved server info for ${galaxy.url}"},
+            {"path": "data.version.version_major", "type": "string"},
+            {"path": "data", "keys_include": ["url", "version", "config", "version_known", "unsupported_tools"]}
+          ],
+          "parity": "exact",
+          "divergences": [
+            "live/get_server_info :: data.url :: value-mismatch",
+            "live/get_server_info :: message :: value-mismatch"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "smoke.user.current",
+      "note": "Both servers connect from GALAXY_URL / GALAXY_API_KEY at startup and answer as that user, without a connect call.",
+      "steps": [
+        {
+          "call": "get_user",
+          "expect": [
+            {"path": "data.id", "equals": "${galaxy.user.id}"},
+            {"path": "data.email", "equals": "${galaxy.user.email}"},
+            {"path": "message", "equals": "Retrieved user info for '${galaxy.user.username}'"}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "smoke.history.lifecycle",
+      "note": "A history the tool creates is the one Galaxy holds and the one the details tool reads back; a fixture dataset shows up in its count. Exercises fixtures, save, creates and verify.",
+      "fixtures": [
+        {"as": "h", "history": {}},
+        {"as": "d", "dataset": {"history": "${h.id}", "content": "smoke line 1\nsmoke line 2\n", "name": "smoke.txt"}}
+      ],
+      "steps": [
+        {
+          "call": "create_history",
+          "args": {"history_name": "${run.tag}-made"},
+          "creates": {"history": "data.id"},
+          "expect": [
+            {"path": "data.name", "equals": "${run.tag}-made"},
+            {"path": "data.id", "matches": "^[0-9a-f]{16}$"}
+          ],
+          "save": {"made": "data.id"}
+        },
+        {
+          "verify": {"history": "${made}"},
+          "expect": [
+            {"path": "name", "equals": "${run.tag}-made"},
+            {"path": "deleted", "equals": false}
+          ]
+        },
+        {
+          "call": "get_history_details",
+          "args": {"history_id": "${h.id}"},
+          "expect": [
+            {"path": "data.history.id", "equals": "${h.id}"},
+            {"path": "data.history.name", "equals": "${h.name}"},
+            {"path": "data.contents_summary.total_items", "equals": 1}
+          ]
+        },
+        {
+          "verify": {"dataset_text": "${d.id}"},
+          "expect": [
+            {"path": "content", "equals": "smoke line 1\nsmoke line 2\n"},
+            {"path": "size", "equals": 26}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "smoke.failure.bogus_history_id",
+      "note": "A Galaxy refusal comes back as a tool failure with the same sentence from both servers.",
+      "steps": [
+        {
+          "call": "get_history_details",
+          "args": {"history_id": "0123456789abcdef"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "Get history details failed"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "smoke.failure.bad_argument",
+      "note": "A call the input schema rejects never reaches the tool. Only the kind is comparable across servers (live.normalization.argumentValidationText).",
+      "steps": [
+        {
+          "call": "get_histories",
+          "args": {"limit": "abc"},
+          "outcome": "failure",
+          "expect": [{"path": "failure.kind", "equals": "arguments"}]
+        }
+      ]
+    }
+  ]
+}

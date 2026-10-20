@@ -1,0 +1,1060 @@
+{
+  "$comment": "Pack C: stored workflows, invocations and the IWC catalogue. Workflow fixtures are the .ga files under data/workflows/ (cat1.ga runs one dataset through cat1; cat1-pause.ga puts a pause step ahead of cat1 so an invocation waits and can be cancelled deterministically). Inputs are keyed by step index, the way get_workflow_input_template says; Galaxy refuses label keys on both servers. Every IWC scenario reads live catalogue data, so it needs network and asserts structure and lower bounds rather than exact entries -- except the default get_iwc_workflows page, which is 20 with has_next. Workflows imported from IWC keep IWC's own name (the tool gives no say in it), so they are found by id, never by count.",
+  "pack": "workflows",
+  "tools": [
+    "list_workflows",
+    "get_workflow_details",
+    "get_workflow_input_template",
+    "invoke_workflow",
+    "get_invocations",
+    "cancel_workflow_invocation",
+    "get_iwc_workflows",
+    "search_iwc_workflows",
+    "get_iwc_workflow_details",
+    "import_workflow_from_iwc",
+    "recommend_iwc_workflows"
+  ],
+  "uncovered": [],
+  "scenarios": [
+    {
+      "id": "workflows.list.by_name_paged",
+      "note": "list_workflows filters by exact name and windows the result itself (bioblend's listing has no window). Two workflows imported under the same run-tagged name page one at a time, and the pause workflow's name finds only it. Filtering by the run tag keeps other runs' workflows out of every count.",
+      "fixtures": [
+        {"as": "wf", "workflow": {"file": "cat1.ga"}},
+        {"as": "wf2", "workflow": {"file": "cat1.ga"}},
+        {"as": "wfp", "workflow": {"file": "cat1-pause.ga"}}
+      ],
+      "steps": [
+        {
+          "call": "list_workflows",
+          "args": {"name": "${wf.name}"},
+          "expect": [
+            {"path": "count", "equals": 2},
+            {"path": "data", "length": {"eq": 2}},
+            {"path": "data", "each": [{"path": "name", "equals": "${wf.name}"}, {"path": "deleted", "equals": false}]},
+            {"path": "data", "has_item": {"id": "${wf.id}"}},
+            {"path": "data", "has_item": {"id": "${wf2.id}"}},
+            {"path": "data.0", "keys_include": ["id", "name", "number_of_steps", "latest_workflow_uuid", "owner"]},
+            {"path": "data.0.number_of_steps", "equals": 2},
+            {"path": "pagination.total_items", "equals": 2},
+            {"path": "pagination.has_next", "equals": false},
+            {"path": "message", "equals": "Found 2 workflows, returning 2"}
+          ]
+        },
+        {
+          "call": "list_workflows",
+          "args": {"name": "${wf.name}", "limit": 1},
+          "expect": [
+            {"path": "count", "equals": 1},
+            {"path": "pagination.total_items", "equals": 2},
+            {"path": "pagination.has_next", "equals": true},
+            {"path": "pagination.next_offset", "equals": 1},
+            {"path": "message", "equals": "Found 2 workflows, returning 1"}
+          ],
+          "save": {"first_page_id": "data.0.id"}
+        },
+        {
+          "call": "list_workflows",
+          "args": {"name": "${wf.name}", "limit": 1, "offset": 1},
+          "expect": [
+            {"path": "count", "equals": 1},
+            {"path": "data.0.id", "not_equals": "${first_page_id}"},
+            {"path": "data.0.id", "in": ["${wf.id}", "${wf2.id}"]},
+            {"path": "pagination.has_next", "equals": false},
+            {"path": "pagination.has_previous", "equals": true},
+            {"path": "pagination.previous_offset", "equals": 0}
+          ]
+        },
+        {
+          "call": "list_workflows",
+          "args": {"name": "${wfp.name}"},
+          "expect": [
+            {"path": "count", "equals": 1},
+            {"path": "data.0.id", "equals": "${wfp.id}"},
+            {"path": "data.0.number_of_steps", "equals": 3}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workflows.list.limit_out_of_range",
+      "note": "The page window is checked before Galaxy is asked, with the same sentence on both servers.",
+      "steps": [
+        {
+          "call": "list_workflows",
+          "args": {"limit": 0},
+          "outcome": "failure",
+          "expect": [{"path": "failure.sentence", "equals": "limit must be at least 1 (got 0)"}]
+        },
+        {
+          "call": "list_workflows",
+          "args": {"limit": 201},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.sentence", "equals": "limit must be at most 200 (got 201); request 200 or fewer and use offset to page through the rest"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workflows.details.cat1",
+      "note": "get_workflow_details returns Galaxy's stored-workflow record: the cat1 step wired to the labelled input. A version that exists answers the same record; one that does not is refused by Galaxy, with the version in the context.",
+      "fixtures": [{"as": "wf", "workflow": {"file": "cat1.ga"}}],
+      "steps": [
+        {
+          "call": "get_workflow_details",
+          "args": {"workflow_id": "${wf.id}"},
+          "expect": [
+            {"path": "data.id", "equals": "${wf.id}"},
+            {"path": "data.name", "equals": "${wf.name}"},
+            {"path": "data.deleted", "equals": false},
+            {"path": "data.version", "equals": 0},
+            {"path": "data.steps", "keys_equal": ["0", "1"]},
+            {"path": "data.steps.0.type", "equals": "data_input"},
+            {"path": "data.steps.1.tool_id", "equals": "cat1"},
+            {"path": "data.steps.1.input_steps.input1.source_step", "equals": 0},
+            {"path": "data.inputs.0.label", "equals": "text input"},
+            {"path": "message", "equals": "Retrieved details for workflow '${wf.name}'"}
+          ]
+        },
+        {
+          "call": "get_workflow_details",
+          "args": {"workflow_id": "${wf.id}", "version": 0},
+          "expect": [
+            {"path": "data.id", "equals": "${wf.id}"},
+            {"path": "data.version", "equals": 0}
+          ]
+        },
+        {
+          "call": "get_workflow_details",
+          "args": {"workflow_id": "${wf.id}", "version": 7},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "Get workflow details failed"},
+            {"path": "failure.sentence", "contains": "Version does not exist"},
+            {"path": "failure.sentence", "contains": "Context: workflow_id=${wf.id}, version=7"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workflows.input_template.cat1",
+      "note": "The template keys inputs by step index and names the slot the way invoke_workflow's preflight reads it. Without a history the slot list can come from the .ga fallback; with one Galaxy resolves the run model. Which source is Galaxy's business, so the message is matched on either, but both servers must pick the same one.",
+      "fixtures": [
+        {"as": "h", "history": {}},
+        {"as": "wf", "workflow": {"file": "cat1.ga"}}
+      ],
+      "steps": [
+        {
+          "call": "get_workflow_input_template",
+          "args": {"workflow_id": "${wf.id}"},
+          "expect": [
+            {"path": "data.inputs_template", "equals": {"0": {"src": "hda", "id": "<dataset_id>"}}},
+            {"path": "data.slots", "length": {"eq": 1}},
+            {"path": "data.slots.0.step_index", "equals": 0},
+            {"path": "data.slots.0.label", "equals": "text input"},
+            {"path": "data.slots.0.input_type", "equals": "data"},
+            {"path": "data.slots.0.src", "equals": "hda"},
+            {"path": "data.slots.0.accepted_formats", "equals": ["txt"]},
+            {"path": "data.slots.0.optional", "equals": false},
+            {"path": "data.inputs_by", "equals": "step_index|step_uuid"},
+            {"path": "data.warnings", "length": {"eq": 0}},
+            {"path": "data.guide.annotation", "contains": "concatenated by cat1"},
+            {"path": "count", "equals": 1},
+            {"path": "message", "matches": "^Built an input template for workflow '${wf.id}' \\(1 slot\\(s\\), source: (style=run|ga-fallback)\\)\\. "}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "get_workflow_input_template",
+          "args": {"workflow_id": "${wf.id}", "history_id": "${h.id}"},
+          "expect": [
+            {"path": "data.inputs_template", "equals": {"0": {"src": "hda", "id": "<dataset_id>"}}},
+            {"path": "data.slots.0.label", "equals": "text input"},
+            {"path": "data.slots.0.accepted_formats", "equals": ["txt"]},
+            {"path": "count", "equals": 1},
+            {"path": "message", "contains": "(1 slot(s), source: "}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "workflows.input_template.version",
+      "note": "version pins every read the template makes to one stored version, counted from 0 as get_workflow_details counts them: version 0 of a freshly imported workflow is its only version and templates the same slot. A version Galaxy does not have is its own 400, with the version in the context; a negative one is refused before anything is sent.",
+      "fixtures": [{"as": "wf", "workflow": {"file": "cat1.ga"}}],
+      "steps": [
+        {
+          "call": "get_workflow_input_template",
+          "args": {"workflow_id": "${wf.id}", "version": 0},
+          "expect": [
+            {"path": "data.inputs_template", "equals": {"0": {"src": "hda", "id": "<dataset_id>"}}},
+            {"path": "data.slots", "length": {"eq": 1}},
+            {"path": "data.slots.0.label", "equals": "text input"},
+            {"path": "data.slots.0.accepted_formats", "equals": ["txt"]},
+            {"path": "data.guide.annotation", "contains": "concatenated by cat1"},
+            {"path": "count", "equals": 1},
+            {"path": "message", "matches": "^Built an input template for workflow '${wf.id}' \\(1 slot\\(s\\), source: (style=run|ga-fallback)\\)\\. "}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "get_workflow_input_template",
+          "args": {"workflow_id": "${wf.id}", "version": 3},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "Get workflow input template failed: "},
+            {"path": "failure.sentence", "contains": "Version does not exist"},
+            {"path": "failure.sentence", "contains": "Context: workflow_id=${wf.id}, version=3"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "get_workflow_input_template",
+          "args": {"workflow_id": "${wf.id}", "version": -1},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "equals": "version must be 0 or greater (got -1); 0 is the oldest stored version and get_workflow_details counts up from there"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workflows.invoke.cat1_end_to_end",
+      "note": "A workflow invoked through the tool runs: Galaxy schedules it, get_invocations reads it back by id (with and without step details), by workflow and by history, and the output dataset holds what cat1 wrote. The output is checked through the bookkeeping client, not the tool's report.",
+      "requires": {"tools": ["cat1"]},
+      "fixtures": [
+        {"as": "h", "history": {}},
+        {"as": "d", "dataset": {"history": "${h.id}", "content": "alpha\nbeta\n", "name": "workflows-in.txt"}},
+        {"as": "wf", "workflow": {"file": "cat1.ga"}}
+      ],
+      "steps": [
+        {
+          "call": "invoke_workflow",
+          "args": {"workflow_id": "${wf.id}", "history_id": "${h.id}", "inputs": {"0": {"src": "hda", "id": "${d.id}"}}},
+          "creates": {"invocation": "data.id"},
+          "expect": [
+            {"path": "data.id", "matches": "^[0-9a-f]{16}$"},
+            {"path": "data.history_id", "equals": "${h.id}"},
+            {"path": "data.model_class", "equals": "WorkflowInvocation"},
+            {"path": "data.state", "in": ["new", "ready", "scheduled"]},
+            {"path": "message", "equals": "Invoked workflow '${wf.id}'"}
+          ],
+          "save": {"inv": "data.id"}
+        },
+        {"wait": {"invocation": "${inv}", "state": ["scheduled", "completed"], "timeout": 180}},
+        {
+          "call": "get_invocations",
+          "args": {"invocation_id": "${inv}"},
+          "expect": [
+            {"path": "data.id", "equals": "${inv}"},
+            {"path": "data.state", "in": ["scheduled", "completed"]},
+            {"path": "data.history_id", "equals": "${h.id}"},
+            {"path": "data.inputs.0.id", "equals": "${d.id}"},
+            {"path": "data.inputs.0.src", "equals": "hda"},
+            {"path": "data.inputs.0.label", "equals": "text input"},
+            {"path": "data.outputs.concatenated.src", "equals": "hda"},
+            {"path": "data.steps", "length": {"eq": 2}},
+            {"path": "count", "equals": null},
+            {"path": "message", "equals": "Retrieved invocation '${inv}'"}
+          ],
+          "save": {"out": "data.outputs.concatenated.id"}
+        },
+        {
+          "call": "get_invocations",
+          "args": {"invocation_id": "${inv}", "step_details": true},
+          "expect": [
+            {"path": "data.steps", "sorted": {"key": "order_index"}},
+            {"path": "data.steps.0.jobs", "length": {"eq": 0}},
+            {"path": "data.steps.1.jobs", "length": {"eq": 1}},
+            {"path": "data.steps.1.workflow_step_label", "equals": "concatenate"}
+          ]
+        },
+        {
+          "call": "get_invocations",
+          "args": {"workflow_id": "${wf.id}"},
+          "expect": [
+            {"path": "count", "equals": 1},
+            {"path": "data.0.id", "equals": "${inv}"},
+            {"path": "data.0", "keys_exclude": ["steps"]},
+            {"path": "message", "equals": "Retrieved 1 workflow invocations"}
+          ]
+        },
+        {
+          "call": "get_invocations",
+          "args": {"workflow_id": "${wf.id}", "include_terminal": false},
+          "expect": [
+            {"path": "data", "equals": []},
+            {"path": "count", "equals": 0}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "get_invocations",
+          "args": {"history_id": "${h.id}", "limit": 5},
+          "expect": [
+            {"path": "data", "has_item": {"id": "${inv}", "history_id": "${h.id}"}},
+            {"path": "count", "lte": 5}
+          ]
+        },
+        {
+          "call": "get_invocations",
+          "args": {"workflow_id": "${wf.id}", "view": "element", "step_details": true},
+          "expect": [
+            {"path": "count", "equals": 1},
+            {"path": "data.0", "keys_include": ["steps", "inputs", "outputs", "output_collections"]},
+            {"path": "data.0.steps", "length": {"eq": 2}}
+          ]
+        },
+        {"wait": {"dataset": "${out}", "state": "ok", "timeout": 180}},
+        {
+          "verify": {"dataset_text": "${out}"},
+          "expect": [{"path": "content", "equals": "alpha\nbeta\n"}]
+        },
+        {
+          "verify": {"invocation": "${inv}"},
+          "expect": [
+            {"path": "state", "in": ["scheduled", "completed"]},
+            {"path": "history_id", "equals": "${h.id}"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workflows.invoke.into_new_history",
+      "note": "history_name makes Galaxy create the history the run goes to; the tool returns it as data.history_id, so the step declares it for cleanup alongside the invocation, and the new history carries the requested name.",
+      "requires": {"tools": ["cat1"]},
+      "fixtures": [
+        {"as": "h", "history": {}},
+        {"as": "d", "dataset": {"history": "${h.id}", "content": "gamma\n", "name": "workflows-in.txt"}},
+        {"as": "wf", "workflow": {"file": "cat1.ga"}}
+      ],
+      "steps": [
+        {
+          "call": "invoke_workflow",
+          "args": {"workflow_id": "${wf.id}", "history_name": "${run.tag}-out", "inputs": {"0": {"src": "hda", "id": "${d.id}"}}},
+          "creates": {"invocation": "data.id", "history": "data.history_id"},
+          "expect": [
+            {"path": "data.history_id", "matches": "^[0-9a-f]{16}$"},
+            {"path": "data.history_id", "not_equals": "${h.id}"},
+            {"path": "message", "equals": "Invoked workflow '${wf.id}'"}
+          ],
+          "save": {"inv": "data.id", "new_history": "data.history_id"}
+        },
+        {
+          "verify": {"history": "${new_history}"},
+          "expect": [
+            {"path": "name", "equals": "${run.tag}-out"},
+            {"path": "deleted", "equals": false}
+          ]
+        },
+        {"wait": {"invocation": "${inv}", "state": ["scheduled", "completed"], "timeout": 180}},
+        {
+          "verify": {"invocation": "${inv}"},
+          "expect": [{"path": "history_id", "equals": "${new_history}"}]
+        }
+      ]
+    },
+    {
+      "id": "workflows.invocations.paging_and_sort",
+      "note": "Two invocations of a workflow that pauses stay in flight (new or ready), so the listing holds still while it is read. sort_by create_time orders them oldest or newest first by sort_desc, offset walks a one-invocation window, include_terminal false still lists both, and an offset past the end is an empty page. A limit above Galaxy's cap of 100, a negative offset and a value that is not an id are refused before anything is sent; a sort key Galaxy does not know is its 400.",
+      "requires": {"tools": ["cat1"]},
+      "fixtures": [
+        {"as": "h", "history": {}},
+        {"as": "d", "dataset": {"history": "${h.id}", "content": "epsilon\n", "name": "workflows-in.txt"}},
+        {"as": "wfp", "workflow": {"file": "cat1-pause.ga"}}
+      ],
+      "steps": [
+        {
+          "call": "invoke_workflow",
+          "args": {"workflow_id": "${wfp.id}", "history_id": "${h.id}", "inputs": {"0": {"src": "hda", "id": "${d.id}"}}},
+          "creates": {"invocation": "data.id"},
+          "save": {"first": "data.id"}
+        },
+        {
+          "call": "get_invocations",
+          "args": {"invocation_id": "${first}"},
+          "until": {"expect": [{"path": "data.state", "equals": "ready"}], "timeout": 120, "interval": 2},
+          "expect": [{"path": "data.state", "equals": "ready"}]
+        },
+        {
+          "call": "invoke_workflow",
+          "args": {"workflow_id": "${wfp.id}", "history_id": "${h.id}", "inputs": {"0": {"src": "hda", "id": "${d.id}"}}},
+          "creates": {"invocation": "data.id"},
+          "save": {"second": "data.id"}
+        },
+        {
+          "call": "get_invocations",
+          "args": {"workflow_id": "${wfp.id}", "sort_by": "create_time", "sort_desc": false},
+          "expect": [
+            {"path": "count", "equals": 2},
+            {"path": "data.0.id", "equals": "${first}"},
+            {"path": "data.1.id", "equals": "${second}"},
+            {"path": "data", "sorted": {"key": "create_time", "order": "asc"}},
+            {"path": "message", "equals": "Retrieved 2 workflow invocations"}
+          ]
+        },
+        {
+          "call": "get_invocations",
+          "args": {"workflow_id": "${wfp.id}", "sort_by": "create_time", "sort_desc": true},
+          "expect": [
+            {"path": "data.0.id", "equals": "${second}"},
+            {"path": "data.1.id", "equals": "${first}"},
+            {"path": "data", "sorted": {"key": "create_time", "order": "desc"}}
+          ]
+        },
+        {
+          "call": "get_invocations",
+          "args": {"workflow_id": "${wfp.id}", "sort_by": "create_time", "sort_desc": false, "limit": 1, "offset": 1},
+          "expect": [
+            {"path": "count", "equals": 1},
+            {"path": "data.0.id", "equals": "${second}"},
+            {"path": "message", "equals": "Retrieved 1 workflow invocations"}
+          ]
+        },
+        {
+          "call": "get_invocations",
+          "args": {"workflow_id": "${wfp.id}", "include_terminal": false},
+          "expect": [
+            {"path": "count", "equals": 2},
+            {"path": "data", "has_item": {"id": "${first}"}},
+            {"path": "data", "has_item": {"id": "${second}"}},
+            {"path": "data", "each": [{"path": "state", "in": ["new", "ready"]}]}
+          ]
+        },
+        {
+          "call": "get_invocations",
+          "args": {"workflow_id": "${wfp.id}", "offset": 2},
+          "expect": [
+            {"path": "data", "equals": []},
+            {"path": "count", "equals": 0},
+            {"path": "message", "equals": "Retrieved 0 workflow invocations"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "get_invocations",
+          "args": {"workflow_id": "${wfp.id}", "limit": 101},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "equals": "limit must be at most 100 (got 101); request 100 or fewer and use offset to page through the rest"}
+          ]
+        },
+        {
+          "call": "get_invocations",
+          "args": {"workflow_id": "${wfp.id}", "offset": -1},
+          "outcome": "failure",
+          "expect": [{"path": "failure.sentence", "equals": "offset must be 0 or greater (got -1)"}]
+        },
+        {
+          "call": "get_invocations",
+          "args": {"invocation_id": "../histories"},
+          "outcome": "failure",
+          "expect": [{"path": "failure.sentence", "equals": "Invocation ID '../histories' not found: that is not a Galaxy id. Galaxy's ids are hex strings, as get_invocations() reports them. Nothing was sent to Galaxy."}]
+        },
+        {
+          "call": "get_invocations",
+          "args": {"workflow_id": "${wfp.id}", "sort_by": "mcp_live_no_such_key"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.sentence", "contains": "Failed to get workflow invocations: "},
+            {"path": "failure.sentence", "contains": "sort_by"}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "workflows.invoke.json_string_inputs_paused",
+      "note": "Some MCP clients send nested arguments as a JSON string; invoke_workflow accepts inputs that way, with inputs_by step_index|step_uuid as the template recommends. The pause step holds the invocation in state ready with the cat1 step still new, which get_invocations shows on both servers.",
+      "requires": {"tools": ["cat1"]},
+      "fixtures": [
+        {"as": "h", "history": {}},
+        {"as": "d", "dataset": {"history": "${h.id}", "content": "delta\n", "name": "workflows-in.txt"}},
+        {"as": "wfp", "workflow": {"file": "cat1-pause.ga"}}
+      ],
+      "steps": [
+        {
+          "call": "invoke_workflow",
+          "args": {
+            "workflow_id": "${wfp.id}",
+            "history_id": "${h.id}",
+            "inputs": "{\"0\": {\"src\": \"hda\", \"id\": \"${d.id}\"}}",
+            "inputs_by": "step_index|step_uuid"
+          },
+          "creates": {"invocation": "data.id"},
+          "expect": [
+            {"path": "data.history_id", "equals": "${h.id}"},
+            {"path": "message", "equals": "Invoked workflow '${wfp.id}'"}
+          ],
+          "save": {"inv": "data.id"}
+        },
+        {
+          "call": "get_invocations",
+          "args": {"invocation_id": "${inv}"},
+          "until": {
+            "expect": [
+              {"path": "data.state", "equals": "ready"},
+              {"path": "data.steps", "length": {"eq": 3}}
+            ],
+            "timeout": 120,
+            "interval": 2
+          },
+          "expect": [
+            {"path": "data.state", "equals": "ready"},
+            {"path": "data.inputs.0.id", "equals": "${d.id}"},
+            {"path": "data.steps", "sorted": {"key": "order_index"}},
+            {"path": "data.steps.1.workflow_step_label", "equals": "review"},
+            {"path": "data.steps.2.state", "equals": "new"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workflows.invoke.refused_by_galaxy",
+      "note": "Inputs keyed by label (not step index) pass the preflight, which only checks slots it can match, and Galaxy refuses the run because the required input is missing. The tool failure names the workflow, history and inputs_by. Galaxy's sentence carries the input step's database id, which differs per import, so parity masks it. Nothing was invoked.",
+      "fixtures": [
+        {"as": "h", "history": {}},
+        {"as": "d", "dataset": {"history": "${h.id}", "content": "alpha\n", "name": "workflows-in.txt"}},
+        {"as": "wf", "workflow": {"file": "cat1.ga"}}
+      ],
+      "steps": [
+        {
+          "call": "invoke_workflow",
+          "args": {"workflow_id": "${wf.id}", "history_id": "${h.id}", "inputs": {"text input": {"src": "hda", "id": "${d.id}"}}},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "Invoke workflow failed: Unexpected HTTP status code: 400"},
+            {"path": "failure.sentence", "contains": "(text input) is not optional and no input provided"},
+            {"path": "failure.sentence", "contains": "Context: workflow_id=${wf.id}, history_id=${h.id}, history_name=None, inputs_by=step_index"}
+          ],
+          "mask": [{"path": "failure.sentence", "pattern": "input step '\\d+'"}],
+          "divergences": ["live/invoke_workflow :: failure.sentence :: failure-text-mismatch"]
+        },
+        {
+          "call": "get_invocations",
+          "args": {"workflow_id": "${wf.id}"},
+          "expect": [{"path": "count", "equals": 0}]
+        }
+      ]
+    },
+    {
+      "id": "workflows.invoke.preflight_rejects_datatype",
+      "note": "The preflight resolves the supplied dataset's datatype and refuses a png for a txt slot before anything reaches Galaxy, quoting the slots to retry with. Same sentence on both servers. Nothing was invoked.",
+      "fixtures": [
+        {"as": "h", "history": {}},
+        {"as": "png", "dataset": {"history": "${h.id}", "content": "not really a png\n", "ext": "png", "name": "workflows-in.png"}},
+        {"as": "wf", "workflow": {"file": "cat1.ga"}}
+      ],
+      "steps": [
+        {
+          "call": "invoke_workflow",
+          "args": {"workflow_id": "${wf.id}", "history_id": "${h.id}", "inputs": {"0": {"src": "hda", "id": "${png.id}"}}},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "Workflow inputs failed validation; not submitting:\n  - step 0 (text input): Dataset datatype 'png' is not accepted here (expects: txt)."},
+            {"path": "failure.sentence", "contains": "Expected input slots (fill and retry with inputs_by='step_index|step_uuid'):"},
+            {"path": "failure.sentence", "contains": "\"accepted_formats\": [\n      \"txt\"\n    ]"}
+          ]
+        },
+        {
+          "call": "get_invocations",
+          "args": {"workflow_id": "${wf.id}"},
+          "expect": [{"path": "count", "equals": 0}]
+        }
+      ]
+    },
+    {
+      "id": "workflows.invoke.preflight_rejects_collection",
+      "note": "A collection handed to a single-dataset slot is refused by the preflight before submitting. Both servers refuse; the reason is worded differently (Python's validator names every accepted src and explains the map-over it declines, TS's names hda only).",
+      "fixtures": [
+        {"as": "h", "history": {}},
+        {"as": "c", "collection": {"history": "${h.id}", "type": "list", "elements": [{"name": "one", "content": "alpha\n"}]}},
+        {"as": "wf", "workflow": {"file": "cat1.ga"}}
+      ],
+      "steps": [
+        {
+          "call": "invoke_workflow",
+          "args": {"workflow_id": "${wf.id}", "history_id": "${h.id}", "inputs": {"0": {"src": "hdca", "id": "${c.id}"}}},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "contains": "Workflow inputs failed validation; not submitting:\n  - step 0 (text input): Slot expects a single dataset ("},
+            {"path": "failure.sentence", "contains": "collection (hdca)."},
+            {"path": "failure.sentence", "contains": "Expected input slots (fill and retry with inputs_by='step_index|step_uuid'):"}
+          ],
+          "divergences": ["live/invoke_workflow :: failure.sentence[preflight-src] :: failure-text-mismatch"]
+        },
+        {
+          "call": "get_invocations",
+          "args": {"workflow_id": "${wf.id}"},
+          "expect": [{"path": "count", "equals": 0}]
+        }
+      ]
+    },
+    {
+      "id": "workflows.invoke.inputs_not_an_object",
+      "note": "inputs given as a string must parse to a JSON object; both servers refuse other strings, naming the field, before anything reaches Galaxy. The JSON parser's own complaint is each runtime's and is masked for parity; the rest of the wording differs and is registered. A list (not a string) is refused by the input schema instead.",
+      "fixtures": [{"as": "wf", "workflow": {"file": "cat1.ga"}}],
+      "steps": [
+        {
+          "call": "invoke_workflow",
+          "args": {"workflow_id": "${wf.id}", "inputs": "not json"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "matches": "^inputs must be a JSON object string or an? (dict|object), but got invalid JSON: "}
+          ],
+          "mask": [{"path": "failure.sentence", "pattern": "invalid JSON: .*$"}],
+          "divergences": ["live/invoke_workflow :: failure.sentence[json-string-inputs] :: failure-text-mismatch"]
+        },
+        {
+          "call": "invoke_workflow",
+          "args": {"workflow_id": "${wf.id}", "inputs": "[1, 2]"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.kind", "equals": "tool"},
+            {"path": "failure.sentence", "matches": "^inputs must be a JSON object \\(a mapping\\), but the string parsed to (list|an array)\\.$"}
+          ],
+          "divergences": ["live/invoke_workflow :: failure.sentence[json-string-inputs] :: failure-text-mismatch"]
+        },
+        {
+          "call": "invoke_workflow",
+          "args": {"workflow_id": "${wf.id}", "inputs": [1, 2]},
+          "outcome": "failure",
+          "expect": [{"path": "failure.kind", "equals": "arguments"}]
+        },
+        {
+          "call": "get_invocations",
+          "args": {"workflow_id": "${wf.id}"},
+          "expect": [{"path": "count", "equals": 0}]
+        }
+      ]
+    },
+    {
+      "id": "workflows.cancel.paused_invocation",
+      "note": "An invocation held at a pause step (made through the bookkeeping client, so only the cancel tool is under test) is cancelled by the tool: it answers with the invocation as Galaxy returned it, already cancelling or cancelled, and Galaxy then settles on cancelled. Cancelling again is accepted and reports cancelled.",
+      "fixtures": [
+        {"as": "h", "history": {}},
+        {"as": "d", "dataset": {"history": "${h.id}", "content": "epsilon\n", "name": "workflows-in.txt"}},
+        {"as": "wfp", "workflow": {"file": "cat1-pause.ga"}},
+        {"as": "inv", "invocation": {"workflow": "${wfp.id}", "history": "${h.id}", "inputs": {"0": {"src": "hda", "id": "${d.id}"}}}}
+      ],
+      "steps": [
+        {"wait": {"invocation": "${inv.id}", "state": "ready", "timeout": 120}},
+        {
+          "call": "cancel_workflow_invocation",
+          "args": {"invocation_id": "${inv.id}"},
+          "expect": [
+            {"path": "data", "keys_equal": ["cancelled", "invocation"]},
+            {"path": "data.cancelled", "equals": true},
+            {"path": "data.invocation.id", "equals": "${inv.id}"},
+            {"path": "data.invocation.state", "in": ["cancelling", "cancelled"]},
+            {"path": "data.invocation.steps", "length": {"eq": 3}},
+            {"path": "message", "equals": "Cancelled workflow invocation '${inv.id}'"}
+          ]
+        },
+        {"wait": {"invocation": "${inv.id}", "state": "cancelled", "timeout": 120}},
+        {
+          "verify": {"invocation": "${inv.id}"},
+          "expect": [{"path": "state", "equals": "cancelled"}]
+        },
+        {
+          "call": "cancel_workflow_invocation",
+          "args": {"invocation_id": "${inv.id}"},
+          "expect": [
+            {"path": "data.cancelled", "equals": true},
+            {"path": "data.invocation.state", "equals": "cancelled"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workflows.failure.undecodable_ids",
+      "note": "An id Galaxy cannot decode is refused by Galaxy, and every workflow tool reports it in its own sentence -- identical on both servers.",
+      "steps": [
+        {
+          "call": "get_workflow_details",
+          "args": {"workflow_id": "0123456789abcdef"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.sentence", "contains": "Get workflow details failed"},
+            {"path": "failure.sentence", "contains": "unable to decode"},
+            {"path": "failure.sentence", "contains": "Context: workflow_id=0123456789abcdef, version=None"}
+          ]
+        },
+        {
+          "call": "get_workflow_input_template",
+          "args": {"workflow_id": "0123456789abcdef"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.sentence", "contains": "Get workflow input template failed"},
+            {"path": "failure.sentence", "contains": "unable to decode"}
+          ]
+        },
+        {
+          "call": "invoke_workflow",
+          "args": {"workflow_id": "0123456789abcdef"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.sentence", "contains": "Invoke workflow failed"},
+            {"path": "failure.sentence", "contains": "unable to decode"},
+            {"path": "failure.sentence", "contains": "Context: workflow_id=0123456789abcdef, history_id=None, history_name=None, inputs_by=step_index"}
+          ]
+        },
+        {
+          "call": "get_invocations",
+          "args": {"invocation_id": "0123456789abcdef"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.sentence", "contains": "Failed to get workflow invocations"},
+            {"path": "failure.sentence", "contains": "unable to decode"}
+          ]
+        },
+        {
+          "call": "cancel_workflow_invocation",
+          "args": {"invocation_id": "0123456789abcdef"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.sentence", "contains": "Cancel workflow invocation failed"},
+            {"path": "failure.sentence", "contains": "unable to decode"},
+            {"path": "failure.sentence", "contains": "Context: invocation_id=0123456789abcdef"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workflows.iwc.list.default_page",
+      "note": "The default IWC page is 20 projected summaries, never the raw manifest entries (one entry can be half a megabyte), with the catalogue total in pagination. The total is live data, so only a floor is asserted; both servers read the same manifest, so their pages are compared exactly.",
+      "ports": ["TestRealIWCOperations::test_get_iwc_workflows"],
+      "requires": {"capabilities": ["network"]},
+      "steps": [
+        {
+          "call": "get_iwc_workflows",
+          "expect": [
+            {"path": "count", "equals": 20},
+            {"path": "data", "length": {"eq": 20}},
+            {"path": "pagination.has_next", "equals": true},
+            {"path": "pagination.next_offset", "equals": 20},
+            {"path": "pagination.total_items", "gte": 50},
+            {"path": "data", "each": [
+              {"path": "", "keys_equal": ["trsID", "name", "description", "tags", "readme_summary", "step_count", "authors", "categories", "license", "tools_used"]},
+              {"path": "trsID", "matches": "^#workflow/github\\.com/iwc-workflows/"},
+              {"path": "step_count", "type": "integer"},
+              {"path": "authors", "type": "list"},
+              {"path": "tools_used", "type": "list"}
+            ]},
+            {"path": "message", "matches": "^Retrieved 20 of \\d+ workflows from IWC$"}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "workflows.iwc.list.paging",
+      "note": "A later IWC page reports where it sits; an offset past the end is an empty page that says so; a limit over the cap is refused before the manifest is read.",
+      "requires": {"capabilities": ["network"]},
+      "steps": [
+        {
+          "call": "get_iwc_workflows",
+          "args": {"limit": 5, "offset": 20},
+          "expect": [
+            {"path": "count", "equals": 5},
+            {"path": "pagination.offset", "equals": 20},
+            {"path": "pagination.has_previous", "equals": true},
+            {"path": "pagination.previous_offset", "equals": 15},
+            {"path": "pagination.next_offset", "equals": 25}
+          ]
+        },
+        {
+          "call": "get_iwc_workflows",
+          "args": {"offset": 100000},
+          "expect": [
+            {"path": "count", "equals": 0},
+            {"path": "data", "length": {"eq": 0}},
+            {"path": "pagination.has_next", "equals": false},
+            {"path": "pagination.helper_text", "contains": "offset 100000 is past the end of"}
+          ]
+        },
+        {
+          "call": "get_iwc_workflows",
+          "args": {"limit": 101},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.sentence", "equals": "limit must be at most 100 (got 101); request 100 or fewer and use offset to page through the rest"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workflows.iwc.search.rna",
+      "note": "A broad query matches many workflows: a page of enriched summaries, with the match total in pagination.",
+      "ports": ["TestRealIWCOperations::test_search_iwc_workflows_rna"],
+      "requires": {"capabilities": ["network"]},
+      "steps": [
+        {
+          "call": "search_iwc_workflows",
+          "args": {"query": "rna"},
+          "expect": [
+            {"path": "count", "gte": 1},
+            {"path": "pagination.total_items", "gte": {"path": "count"}},
+            {"path": "data", "each": [
+              {"path": "", "keys_include": ["trsID", "name", "readme_summary", "step_count", "authors", "categories", "tools_used"]},
+              {"path": "step_count", "type": "integer"},
+              {"path": "authors", "type": "list"},
+              {"path": "tools_used", "type": "list"}
+            ]},
+            {"path": "message", "matches": "^Found \\d+ IWC workflows matching 'rna', returning \\d+$"}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "workflows.iwc.search.assembly",
+      "note": "Assembly workflows exist in IWC; a small limit pages them.",
+      "ports": ["TestRealIWCOperations::test_search_iwc_workflows_assembly"],
+      "requires": {"capabilities": ["network"]},
+      "steps": [
+        {
+          "call": "search_iwc_workflows",
+          "args": {"query": "assembly", "limit": 3},
+          "expect": [
+            {"path": "count", "gte": 1},
+            {"path": "count", "lte": 3},
+            {"path": "pagination.limit", "equals": 3},
+            {"path": "pagination.total_items", "gte": {"path": "count"}},
+            {"path": "data.0.trsID", "matches": "^#workflow/"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workflows.iwc.search.no_results",
+      "note": "A query nothing matches is an empty page, not a failure.",
+      "ports": ["TestRealIWCOperations::test_search_iwc_workflows_no_results"],
+      "requires": {"capabilities": ["network"]},
+      "steps": [
+        {
+          "call": "search_iwc_workflows",
+          "args": {"query": "xyznonexistent123"},
+          "expect": [
+            {"path": "count", "equals": 0},
+            {"path": "data", "length": {"eq": 0}},
+            {"path": "pagination.total_items", "equals": 0},
+            {"path": "message", "equals": "Found 0 IWC workflows matching 'xyznonexistent123', returning 0"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "search_iwc_workflows",
+          "args": {"query": "rna", "limit": 0},
+          "outcome": "failure",
+          "expect": [{"path": "failure.sentence", "equals": "limit must be at least 1 (got 0)"}]
+        }
+      ]
+    },
+    {
+      "id": "workflows.iwc.details.from_search",
+      "note": "Details for a workflow found by search: the full readme alongside the summary, and the inputs and outputs read from its definition.",
+      "ports": ["TestRealIWCOperations::test_get_iwc_workflow_details"],
+      "requires": {"capabilities": ["network"]},
+      "steps": [
+        {
+          "call": "search_iwc_workflows",
+          "args": {"query": "quality", "limit": 1},
+          "expect": [{"path": "count", "equals": 1}],
+          "save": {"trs": "data.0.trsID", "iwc_name": "data.0.name"}
+        },
+        {
+          "call": "get_iwc_workflow_details",
+          "args": {"trs_id": "${trs}"},
+          "expect": [
+            {"path": "data.trsID", "equals": "${trs}"},
+            {"path": "data.name", "equals": "${iwc_name}"},
+            {"path": "data", "keys_equal": ["trsID", "name", "description", "tags", "readme", "readme_summary", "step_count", "authors", "categories", "license", "tools_used", "inputs", "outputs", "updated"]},
+            {"path": "data.readme", "type": "string"},
+            {"path": "data.inputs", "type": "list"},
+            {"path": "data.inputs", "each": [{"path": "", "keys_equal": ["name", "type", "annotation"]}]},
+            {"path": "data.outputs", "type": "list"},
+            {"path": "data.outputs", "each": [{"path": "", "keys_equal": ["name", "step"]}]},
+            {"path": "message", "equals": "Retrieved details for workflow '${iwc_name}'"}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "workflows.iwc.details.invalid_id",
+      "note": "An unknown trsID is a tool failure that points at search_iwc_workflows, worded identically on both servers.",
+      "ports": ["TestRealIWCOperations::test_get_iwc_workflow_details_invalid_id"],
+      "requires": {"capabilities": ["network"]},
+      "steps": [
+        {
+          "call": "get_iwc_workflow_details",
+          "args": {"trs_id": "nonexistent/workflow/id"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.sentence", "equals": "Failed to get IWC workflow details: Workflow with trsID 'nonexistent/workflow/id' not found in IWC manifest. Check the trsID format and use search_iwc_workflows() to find valid IDs."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workflows.iwc.import.from_search",
+      "note": "A workflow found by search imports into the user's Galaxy and is then listed. It keeps IWC's name, so the listing is checked for its id rather than counted.",
+      "ports": ["TestRealIWCOperations::test_import_workflow_from_iwc"],
+      "requires": {"capabilities": ["network"]},
+      "steps": [
+        {
+          "call": "search_iwc_workflows",
+          "args": {"query": "quality", "limit": 1},
+          "expect": [{"path": "count", "equals": 1}],
+          "save": {"trs": "data.0.trsID", "iwc_name": "data.0.name"}
+        },
+        {
+          "call": "import_workflow_from_iwc",
+          "args": {"trs_id": "${trs}"},
+          "creates": {"workflow": "data.id"},
+          "expect": [
+            {"path": "data.id", "matches": "^[0-9a-f]{16}$"},
+            {"path": "data.name", "equals": "${iwc_name}"},
+            {"path": "data.model_class", "equals": "StoredWorkflow"},
+            {"path": "data.deleted", "equals": false},
+            {"path": "data.number_of_steps", "gte": 1},
+            {"path": "message", "equals": "Successfully imported workflow '${trs}'"}
+          ],
+          "save": {"imported": "data.id"}
+        },
+        {
+          "verify": {"workflow": "${imported}"},
+          "expect": [
+            {"path": "name", "equals": "${iwc_name}"},
+            {"path": "deleted", "equals": false}
+          ]
+        },
+        {
+          "call": "list_workflows",
+          "args": {"name": "${iwc_name}", "limit": 200},
+          "expect": [{"path": "data", "has_item": {"id": "${imported}"}}]
+        }
+      ]
+    },
+    {
+      "id": "workflows.iwc.import.invalid_trs_id",
+      "note": "An unknown trsID is refused before anything reaches Galaxy, worded identically on both servers.",
+      "ports": ["TestRealIWCOperations::test_import_workflow_invalid_trs_id"],
+      "requires": {"capabilities": ["network"]},
+      "steps": [
+        {
+          "call": "import_workflow_from_iwc",
+          "args": {"trs_id": "nonexistent/workflow/id"},
+          "outcome": "failure",
+          "expect": [
+            {"path": "failure.sentence", "equals": "Failed to import workflow from IWC: Workflow with trsID 'nonexistent/workflow/id' not found in IWC manifest. Check the trsID format and that it exists in the IWC. You can search workflows using search_iwc_workflows() first."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workflows.iwc.recommend.rnaseq",
+      "note": "BM25 ranks the catalogue against a sentence: the default five, scored above zero and best first. Both servers rank the same manifest, so the rankings and scores are compared exactly -- the strongest live check that the two BM25 ports agree.",
+      "ports": ["TestRealIWCOperations::test_recommend_iwc_workflows_rnaseq"],
+      "requires": {"capabilities": ["network"]},
+      "steps": [
+        {
+          "call": "recommend_iwc_workflows",
+          "args": {"intent": "I have paired-end RNA-seq data and want to do differential expression analysis"},
+          "expect": [
+            {"path": "count", "gte": 1},
+            {"path": "count", "lte": 5},
+            {"path": "pagination", "equals": null},
+            {"path": "data", "each": [
+              {"path": "", "keys_include": ["trsID", "name", "readme_summary", "step_count", "match_score"]},
+              {"path": "match_score", "type": "number"},
+              {"path": "match_score", "gt": 0}
+            ]},
+            {"path": "data", "sorted": {"key": "match_score", "order": "desc"}},
+            {"path": "message", "matches": "^Found \\d+ workflows matching your intent$"}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "workflows.iwc.recommend.assembly",
+      "note": "A limit caps the recommendations, still best first.",
+      "ports": ["TestRealIWCOperations::test_recommend_iwc_workflows_assembly"],
+      "requires": {"capabilities": ["network"]},
+      "steps": [
+        {
+          "call": "recommend_iwc_workflows",
+          "args": {"intent": "assemble bacterial genome nanopore", "limit": 3},
+          "expect": [
+            {"path": "count", "gte": 1},
+            {"path": "count", "lte": 3},
+            {"path": "data", "sorted": {"key": "match_score", "order": "desc"}}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "workflows.iwc.recommend.no_matches",
+      "note": "An intent with no searchable tokens (the tokenizer keeps runs of two or more letters, so xyznonexistent123 is none) and one whose tokens match nothing both answer an empty list, with different messages.",
+      "ports": ["TestRealIWCOperations::test_recommend_iwc_workflows_no_matches"],
+      "requires": {"capabilities": ["network"]},
+      "steps": [
+        {
+          "call": "recommend_iwc_workflows",
+          "args": {"intent": "xyznonexistent123 abcfake456"},
+          "expect": [
+            {"path": "count", "equals": 0},
+            {"path": "data", "length": {"eq": 0}},
+            {"path": "message", "equals": "No searchable terms in query"}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "recommend_iwc_workflows",
+          "args": {"intent": "zzqqxx wwvvkk"},
+          "expect": [
+            {"path": "count", "equals": 0},
+            {"path": "data", "length": {"eq": 0}},
+            {"path": "message", "equals": "Found 0 workflows matching your intent"}
+          ],
+          "parity": "exact"
+        }
+      ]
+    },
+    {
+      "id": "workflows.iwc.recommend.with_limit",
+      "note": "limit is honoured, and one over the cap of 25 is refused before the manifest is read.",
+      "ports": ["TestRealIWCOperations::test_recommend_iwc_workflows_with_limit"],
+      "requires": {"capabilities": ["network"]},
+      "steps": [
+        {
+          "call": "recommend_iwc_workflows",
+          "args": {"intent": "sequencing", "limit": 2},
+          "expect": [
+            {"path": "data", "length": {"lte": 2}},
+            {"path": "count", "lte": 2}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "recommend_iwc_workflows",
+          "args": {"intent": "sequencing", "limit": 26},
+          "outcome": "failure",
+          "expect": [{"path": "failure.sentence", "equals": "limit must be at most 25 (got 26); request 25 or fewer"}]
+        }
+      ]
+    }
+  ]
+}

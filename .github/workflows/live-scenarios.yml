@@ -1,0 +1,127 @@
+name: Live Scenarios
+
+# Both MCP servers (python/ and typescript/packages/galaxy-mcp) against a real Galaxy,
+# driven by the scenario packs in contract/scenarios/ (#119).
+#
+# Manual only for now. The nightly schedule below stays commented out until there is a
+# test Galaxy to point it at and the repository has the secrets GALAXY_URL and
+# GALAXY_API_KEY for it. Never point this at a production Galaxy: the scenarios create and
+# purge histories, workflows and pages as that user. Once a Galaxy can run in CI this can
+# become a PR gate as well.
+on:
+  # schedule:
+  #   - cron: "17 6 * * *"
+  workflow_dispatch:
+    inputs:
+      packs:
+        description: "Space-separated pack names (contract/scenarios/<pack>.json); empty runs all"
+        required: false
+        default: ""
+      waive:
+        description: "Space-separated requirements to skip instead of fail (network, unprivileged-tools, user-tool-role, admin, galaxy-version, tools)"
+        required: false
+        default: ""
+
+concurrency:
+  # Runs share one Galaxy user; two at once only slow each other down.
+  group: live-scenarios
+  cancel-in-progress: false
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # The Galaxy secrets are set only on the steps that talk to Galaxy, never job-wide, so
+    # the pnpm and uv install steps (third-party install scripts) cannot read them.
+    env:
+      # Requirements the target Galaxy is known not to meet. A requirement that is not
+      # listed here and not met fails the run.
+      LIVE_WAIVE: ${{ github.event.inputs.waive || '' }}
+      LIVE_PACKS: ${{ github.event.inputs.packs || '' }}
+
+    steps:
+      - name: Require the Galaxy secrets
+        env:
+          GALAXY_URL: ${{ secrets.GALAXY_URL }}
+          GALAXY_API_KEY: ${{ secrets.GALAXY_API_KEY }}
+        run: |
+          missing=""
+          [ -n "$GALAXY_URL" ] || missing="$missing GALAXY_URL"
+          [ -n "$GALAXY_API_KEY" ] || missing="$missing GALAXY_API_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error::secrets not set:$missing -- the live suite needs a test Galaxy and will not skip without one"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: typescript/package.json
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: typescript/pnpm-lock.yaml
+
+      - name: Build the TypeScript server
+        working-directory: typescript
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm -r build
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install the Python server
+        working-directory: python
+        # --all-extras: recommend_biocontainer is only registered with its extra, and the
+        # surface check fails without it.
+        run: uv sync --all-extras
+
+      # The sweep refuses a usegalaxy.* URL (without GALAXY_LIVE_ALLOW_PRODUCTION=1) with the
+      # same check as the pytest preflight, so running first does not get it past the guard.
+      - name: Purge what earlier crashed runs left behind
+        working-directory: python
+        env:
+          GALAXY_URL: ${{ secrets.GALAXY_URL }}
+          GALAXY_API_KEY: ${{ secrets.GALAXY_API_KEY }}
+        run: uv run python -m tests.live.sweep --hours 6
+
+      - name: Run the live scenarios on both servers
+        working-directory: python
+        env:
+          GALAXY_URL: ${{ secrets.GALAXY_URL }}
+          GALAXY_API_KEY: ${{ secrets.GALAXY_API_KEY }}
+        run: |
+          args=()
+          for pack in $LIVE_PACKS; do args+=(--live-pack "$pack"); done
+          for need in $LIVE_WAIVE; do args+=(--live-waive "$need"); done
+          uv run pytest tests/live -m live --no-cov -rfEsxX \
+            --junitxml=live-results.xml "${args[@]}"
+
+      - name: Collect server logs
+        if: always()
+        run: |
+          mkdir -p live-logs
+          for dir in "${RUNNER_TEMP:-/tmp}"/mcp-live-logs-* /tmp/mcp-live-logs-*; do
+            [ -d "$dir" ] && cp -r "$dir" live-logs/ || true
+          done
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: live-scenarios
+          path: |
+            python/live-results.xml
+            live-logs/
+          if-no-files-found: ignore

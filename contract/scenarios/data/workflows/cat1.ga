@@ -1,0 +1,38 @@
+{
+  "a_galaxy_workflow": "true",
+  "annotation": "One dataset input concatenated by cat1; the live workflows pack runs it end to end.",
+  "format-version": "0.1",
+  "name": "workflows-cat1",
+  "tags": ["mcp-live"],
+  "steps": {
+    "0": {
+      "annotation": "Any text dataset",
+      "id": 0,
+      "input_connections": {},
+      "inputs": [{"description": "Any text dataset", "name": "text input"}],
+      "label": "text input",
+      "name": "Input dataset",
+      "outputs": [],
+      "position": {"left": 0, "top": 0},
+      "tool_id": null,
+      "tool_state": "{\"optional\": false, \"format\": [\"txt\"], \"tag\": null}",
+      "type": "data_input",
+      "workflow_outputs": []
+    },
+    "1": {
+      "annotation": "",
+      "id": 1,
+      "input_connections": {"input1": {"id": 0, "output_name": "output"}},
+      "inputs": [],
+      "label": "concatenate",
+      "name": "Concatenate datasets",
+      "outputs": [{"name": "out_file1", "type": "input"}],
+      "position": {"left": 250, "top": 0},
+      "tool_id": "cat1",
+      "tool_state": "{\"input1\": {\"__class__\": \"ConnectedValue\"}, \"queries\": [], \"__page__\": null, \"__rerun_remap_job_id__\": null}",
+      "tool_version": "1.0.0",
+      "type": "tool",
+      "workflow_outputs": [{"label": "concatenated", "output_name": "out_file1", "uuid": null}]
+    }
+  }
+}

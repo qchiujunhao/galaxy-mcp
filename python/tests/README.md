@@ -83,3 +83,28 @@ jobs:
             - run: pip install -r requirements.txt -r requirements-test.txt
             - run: pytest --cov=main
 ```
+
+## Live scenarios (both MCP servers against a real Galaxy)
+
+`tests/live/` runs the scenario packs in `contract/scenarios/` against the Python server
+(`python -m galaxy_mcp`) and the TypeScript one (`node typescript/packages/galaxy-mcp/dist/index.js`),
+each as a stdio subprocess, and compares the two. A plain `uv run pytest` deselects them.
+
+```bash
+export GALAXY_URL=http://localhost:8080 GALAXY_API_KEY=...   # GALAXY_TEST_* is an error now
+(cd ../typescript && pnpm -r build)
+uv run pytest tests/live -m live --no-cov --live-pack smoke                    # one pack, both servers
+uv run pytest tests/live -m live --no-cov --live-pack smoke --live-server python
+uv run pytest tests/live -m live --no-cov -k smoke.history                     # one scenario
+uv run pytest tests/live -m live --no-cov --live-waive unprivileged-tools      # skip what this Galaxy can't do
+uv run pytest tests/test_live_scenario_files.py tests/test_live_harness.py      # offline, no Galaxy
+make test-live LIVE_ARGS="--live-waive unprivileged-tools"                    # build TS, run everything
+```
+
+The nightly workflow (`.github/workflows/live-scenarios.yml`) runs the same command against
+a test Galaxy; it is manual-only until one exists.
+
+Once a live test is selected, a missing or unreachable Galaxy, a rejected key, or a stale
+TS build stops the run with exit code 4 rather than skipping. The scenario format, the
+fixture kinds and the rules for registry citations are in `tests/live/__init__.py`; the
+schema is `contract/scenarios/scenario.schema.json`.

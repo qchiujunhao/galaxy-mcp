@@ -1,0 +1,52 @@
+{
+  "a_galaxy_workflow": "true",
+  "annotation": "A pause step ahead of cat1, so an invocation waits for review and can be cancelled deterministically.",
+  "format-version": "0.1",
+  "name": "workflows-cat1-pause",
+  "tags": ["mcp-live"],
+  "steps": {
+    "0": {
+      "annotation": "",
+      "id": 0,
+      "input_connections": {},
+      "inputs": [{"description": "", "name": "text input"}],
+      "label": "text input",
+      "name": "Input dataset",
+      "outputs": [],
+      "position": {"left": 0, "top": 0},
+      "tool_id": null,
+      "tool_state": "{\"optional\": false, \"tag\": null}",
+      "type": "data_input",
+      "workflow_outputs": []
+    },
+    "1": {
+      "annotation": "",
+      "id": 1,
+      "input_connections": {"input": {"id": 0, "output_name": "output"}},
+      "inputs": [{"description": "", "name": "review"}],
+      "label": "review",
+      "name": "Pause for dataset review",
+      "outputs": [],
+      "position": {"left": 250, "top": 0},
+      "tool_id": null,
+      "tool_state": "{\"name\": \"review\"}",
+      "type": "pause",
+      "workflow_outputs": []
+    },
+    "2": {
+      "annotation": "",
+      "id": 2,
+      "input_connections": {"input1": {"id": 1, "output_name": "output"}},
+      "inputs": [],
+      "label": "concatenate",
+      "name": "Concatenate datasets",
+      "outputs": [{"name": "out_file1", "type": "input"}],
+      "position": {"left": 500, "top": 0},
+      "tool_id": "cat1",
+      "tool_state": "{\"input1\": {\"__class__\": \"ConnectedValue\"}, \"queries\": [], \"__page__\": null, \"__rerun_remap_job_id__\": null}",
+      "tool_version": "1.0.0",
+      "type": "tool",
+      "workflow_outputs": []
+    }
+  }
+}

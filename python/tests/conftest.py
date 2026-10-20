@@ -9,6 +9,20 @@ from unittest.mock import Mock, patch
 import pytest
 from bioblend.galaxy import GalaxyInstance
 
+from tests.live.options import add_live_options, deselect_unrequested_live, snapshot_live_env
+
+
+def pytest_addoption(parser):
+    add_live_options(parser)
+
+
+def pytest_configure(config):
+    snapshot_live_env(config)
+
+
+def pytest_collection_modifyitems(config, items):
+    deselect_unrequested_live(config, items)
+
 
 @pytest.fixture
 def mock_galaxy_instance():

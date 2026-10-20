@@ -1,4 +1,4 @@
-.PHONY: help install lint test clean build upload run dev update-deps check-deps
+.PHONY: help install lint test test-live clean build upload run dev update-deps check-deps
 
 # Default target
 help:
@@ -7,6 +7,7 @@ help:
 	@echo "  make install       Install all dependencies"
 	@echo "  make lint          Format code and run all checks"
 	@echo "  make test          Run tests with coverage"
+	@echo "  make test-live     Run the live scenarios on both servers (needs GALAXY_URL/GALAXY_API_KEY)"
 	@echo "  make clean         Clean build artifacts"
 	@echo "  make build         Build package"
 	@echo "  make run           Run the MCP server"
@@ -29,6 +30,12 @@ lint:
 test:
 	uv run mypy src/galaxy_mcp
 	uv run pytest --cov=galaxy_mcp --cov-report=html --cov-report=term-missing
+
+# Live scenarios against a real Galaxy, both MCP servers. Pass extra pytest flags with
+# LIVE_ARGS, e.g. LIVE_ARGS="--live-pack tools-jobs --live-waive unprivileged-tools".
+test-live:
+	cd ../typescript && pnpm install --frozen-lockfile && pnpm -r build
+	uv run pytest tests/live -m live --no-cov $(LIVE_ARGS)
 
 # Clean build artifacts
 clean:

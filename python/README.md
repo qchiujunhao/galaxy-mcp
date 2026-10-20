@@ -362,24 +362,35 @@ flags yourself, as CI does.
   call a tool directly and assert on the `GalaxyResult` it returns.
 - `test_job_operations.py` mocks at the HTTP layer with `responses` instead, where the
   code under test goes around BioBlend.
-- `tests/mcp_session.py` drives the tools through an in-memory FastMCP client. Only the
-  live suite uses it today. That path matters because a tool called without an MCP request
-  context has no session id, and the session-scoped connection store then has nowhere to
-  put the client -- which is what made the live suite look broken for months.
+- `tests/mcp_session.py` drives the tools through an in-memory FastMCP client; the
+  envelope and version-requirement tests use it. That path matters because a tool called
+  without an MCP request context has no session id, and the session-scoped connection
+  store then has nowhere to put the client -- which is what made the old live suite look
+  broken for months.
 
 ### The live suite
 
-`tests/test_real_integration.py` runs against a real Galaxy and is **skipped by default**.
-It needs `GALAXY_TEST_API_KEY` set to a valid key and `GALAXY_TEST_URL` (default
-`http://localhost:8080`) answering on `/api/version`; if either is missing the whole module
-is skipped. A green `pytest` run therefore says nothing about these tests -- check the skip
-count before reading it as coverage.
+`tests/live/` runs the language-neutral scenario packs in `../contract/scenarios/` against
+both MCP servers -- this one and the TypeScript one -- each started as a stdio subprocess,
+and compares their answers. It replaced `tests/test_real_integration.py`, which skipped
+whenever Galaxy was missing. The live tests are deselected by a plain `uv run pytest`;
+once you select them with `-m live`, a missing or unreachable Galaxy, a rejected key or a
+stale TypeScript build stops the run with an error instead of skipping.
+
+They read the same `GALAXY_URL` / `GALAXY_API_KEY` as the server. The old
+`GALAXY_TEST_URL` / `GALAXY_TEST_API_KEY` names are refused with a rename message. Point
+them at a test Galaxy, never a production one: the scenarios create and purge histories,
+workflows and pages.
 
 ```bash
-export GALAXY_TEST_URL="http://localhost:8080"
-export GALAXY_TEST_API_KEY="a-real-key"
-uv run pytest tests/test_real_integration.py
+export GALAXY_URL="http://localhost:8080"
+export GALAXY_API_KEY="a-real-key"
+make test-live                        # builds the TS server, runs every pack on both servers
+uv run pytest tests/live -m live --no-cov --live-pack tools-jobs --live-server python
 ```
+
+`tests/README.md` has the rest of the options, and `tests/live/__init__.py` the scenario
+format.
 
 ## Development
 
