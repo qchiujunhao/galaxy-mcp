@@ -577,7 +577,7 @@
     "$comment": "Differences only a live run can see: how each server answers the same call against a real Galaxy, as the live scenarios in contract/scenarios/ record them. Each row rewrites ONE server's answer (`server`) into the other's spelling, and only on the steps that cite it as live/<tool> :: <where> :: <kind>; that is a presentation choice, not a ruling on who is right -- the status and reason carry the ruling, with the same statuses as the rest of this file. An adapter that stops changing anything fails the live run as stale, and an {\"expect\": \"failure\"} row (a known server bug) fails it once the step starts passing, so a row cannot outlive what it describes. A bug both servers share is two rows under one key, one per server, and a single citation applies whichever is about the server under test. Format and runner: python/tests/live/.",
     "ratchet": {
       "$comment": "How many unreviewed-gap rows and rules this section holds, held in both directions by the offline check in python/tests/test_live_scenario_files.py, the same way the ratchet above works for the static rows.",
-      "unreviewedGaps": 30
+      "unreviewedGaps": 21
     },
     "normalization": {
       "argumentValidationText": {
@@ -714,30 +714,6 @@
       },
       {
         "tool": "download_dataset",
-        "where": "data.file_size",
-        "kind": "server-bug",
-        "server": "python",
-        "observed": "without file_path, for a 17-byte ok dataset: python reports file_size 0 and content_available true; typescript reports file_size 17",
-        "adapter": {
-          "expect": "failure"
-        },
-        "status": "unreviewed-gap",
-        "reason": "galaxy_mcp.client.GalaxyInstance.make_get_request forces allow_redirects=False on every GET. bioblend downloads through /api/histories/{h}/contents/{d}/download, which Galaxy answers with a same-origin 302 to /api/datasets/{d}/display; raise_for_status() lets the 3xx through, so the empty redirect body is what Python measures. Plain bioblend gets the bytes."
-      },
-      {
-        "tool": "download_dataset",
-        "where": "file",
-        "kind": "server-bug",
-        "server": "python",
-        "observed": "with file_path, for a 54-byte ok dataset: python writes a 0-byte file and reports success; typescript writes the 54 bytes",
-        "adapter": {
-          "expect": "failure"
-        },
-        "status": "unreviewed-gap",
-        "reason": "The same allow_redirects=False in galaxy_mcp.client.GalaxyInstance: bioblend streams the body of Galaxy's 302 from /api/histories/{h}/contents/{d}/download to the file, which is empty. The tool reports success with content_available true, so nothing tells the caller the file is empty."
-      },
-      {
-        "tool": "download_dataset",
         "where": "message",
         "kind": "value-mismatch",
         "server": "typescript",
@@ -794,18 +770,6 @@
         },
         "status": "unreviewed-gap",
         "reason": "upload_file_from_url has no golden failure case. Python runs Galaxy's refusal through format_error (action, status, body, and the call's arguments as context); TS's legacyPost throws Galaxy's err_msg with no tool sentence around it."
-      },
-      {
-        "tool": "upload_file_from_url",
-        "where": "failure.sentence",
-        "kind": "server-bug",
-        "server": "typescript",
-        "observed": "url http://127.0.0.1:9/...: Galaxy answers 403 {\"err_msg\": \"Access to this address in not permitted by server configuration\", \"err_code\": 403004}; python's sentence carries that err_msg, typescript's is only \"Unauthorized (403)\"",
-        "adapter": {
-          "expect": "failure"
-        },
-        "status": "unreviewed-gap",
-        "reason": "galaxy-ops classifyHttp (errors.ts) turns every 401/403 into 'Unauthorized (<status>)' and every 404 into 'Not found (404)', discarding Galaxy's err_msg, and upload_file_from_url has no `failure` spec to word it otherwise. A fetch refused by Galaxy's URL allowlist therefore reads as a rejected API key, and the reason Galaxy gave is lost. Python keeps the err_msg. The same mapping applies to the other ops without a failure spec (upload_file, download_dataset)."
       },
       {
         "tool": "upload_file_from_url",
@@ -936,30 +900,6 @@
         "reason": "server.py sets suggested_filename to None in its file_path branch; download-dataset.ts fills it in both branches. A client that names a saved copy from suggested_filename gets nothing from Python after a download to disk. Shape parity used to let a null match any value, which is how this went unrecorded."
       },
       {
-        "tool": "get_tool_citations",
-        "where": "data.citations",
-        "kind": "server-bug",
-        "server": "python",
-        "observed": "python: get_tool_citations(MAF_To_BED1) -> data.citations [] and count 0, while GET /api/tools/MAF_To_BED1/citations on the same Galaxy returns one bibtex entry",
-        "adapter": {
-          "expect": "failure"
-        },
-        "status": "unreviewed-gap",
-        "reason": "server.py get_tool_citations reads `citations` out of gi.tools.show_tool(tool_id), but Galaxy's tool show (GET /api/tools/{id}, with or without io_details/link_details) never carries a citations key -- citations are served only by GET /api/tools/{id}/citations. So every tool reports 0 citations whatever it declares. The typescript row under the same key is the same bug."
-      },
-      {
-        "tool": "get_tool_citations",
-        "where": "data.citations",
-        "kind": "server-bug",
-        "server": "typescript",
-        "observed": "typescript: get_tool_citations(MAF_To_BED1) -> data.citations [] and count 0, while GET /api/tools/MAF_To_BED1/citations on the same Galaxy returns one bibtex entry",
-        "adapter": {
-          "expect": "failure"
-        },
-        "status": "unreviewed-gap",
-        "reason": "galaxy-ops get-tool-citations.ts ports the Python read (`payload.citations ?? []` from GET /api/tools/{id}), which Galaxy's tool show never fills, so the bug is shared rather than a divergence and parity alone cannot see it."
-      },
-      {
         "tool": "run_tool",
         "where": "failure.sentence",
         "kind": "failure-text-mismatch",
@@ -999,54 +939,6 @@
         },
         "status": "unreviewed-gap",
         "reason": "recommend-biocontainer.ts declares packages with zod .min(1), so its advertised input schema rejects an empty list before the tool runs (its own in-tool refusal with the same sentence is unreachable over MCP); Python's schema has no minItems and the tool refuses. mcp-surface.json declares no minItems, so the TS schema is stricter than the contract and the static schema comparison does not see it."
-      },
-      {
-        "tool": "get_collection_details",
-        "where": "data.elements.extension",
-        "kind": "server-bug",
-        "server": "python",
-        "observed": "python reports extension '' for every element against Galaxy 26.2, whose element objects carry file_ext",
-        "adapter": {
-          "expect": "failure"
-        },
-        "status": "unreviewed-gap",
-        "reason": "server.py get_collection_details reads element.object.extension; Galaxy sends file_ext, so the field is always its default. The unit tests and the golden canned replies (contract/envelopes/get_collection_details/*.galaxy.json) mock a key Galaxy never sends, so only a live run sees it. The typescript row under the same key is the same bug; data.collection.state has the same cause and its own rows."
-      },
-      {
-        "tool": "get_collection_details",
-        "where": "data.elements.extension",
-        "kind": "server-bug",
-        "server": "typescript",
-        "observed": "typescript reports extension '' for every element against Galaxy 26.2",
-        "adapter": {
-          "expect": "failure"
-        },
-        "status": "unreviewed-gap",
-        "reason": "galaxy-ops get-collection-details.ts mirrors server.py: normalizeElement reads object.extension where Galaxy sends file_ext."
-      },
-      {
-        "tool": "get_collection_details",
-        "where": "data.collection.state",
-        "kind": "server-bug",
-        "server": "python",
-        "observed": "python reports collection.state 'unknown' for a populated, ok collection against Galaxy 26.2, whose HDCA carries populated_state",
-        "adapter": {
-          "expect": "failure"
-        },
-        "status": "unreviewed-gap",
-        "reason": "server.py get_collection_details reads collection.state; Galaxy sends populated_state, so the state is always 'unknown'. Mocked the same way as the extension rows, so only a live run sees it. Same bug on typescript, under the same key."
-      },
-      {
-        "tool": "get_collection_details",
-        "where": "data.collection.state",
-        "kind": "server-bug",
-        "server": "typescript",
-        "observed": "typescript reports collection.state 'unknown' for a populated, ok collection against Galaxy 26.2",
-        "adapter": {
-          "expect": "failure"
-        },
-        "status": "unreviewed-gap",
-        "reason": "galaxy-ops get-collection-details.ts reads record.state where Galaxy sends populated_state, mirroring server.py."
       }
     ]
   }

@@ -619,8 +619,7 @@
             {"path": "data.tool_name", "equals": "MAF to BED"},
             {"path": "data.citations", "length": {"gte": 1}}
           ],
-          "parity": "exact",
-          "divergences": ["live/get_tool_citations :: data.citations :: server-bug"]
+          "parity": "exact"
         }
       ]
     },

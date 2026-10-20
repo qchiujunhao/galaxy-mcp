@@ -482,7 +482,7 @@
     },
     {
       "id": "datasets.upload.round_trip",
-      "note": "A local file uploaded through the tool lands in Galaxy byte for byte, the details tool previews it, and download_dataset writes the same bytes back to disk. Python writes an empty file (live/download_dataset :: file :: server-bug), which the bytes-on-disk check is there to catch.",
+      "note": "A local file uploaded through the tool lands in Galaxy byte for byte, the details tool previews it, and download_dataset writes the same bytes back to disk. The bytes-on-disk check is what caught Python writing an empty file before #168 fixed the download.",
       "ports": ["TestRealDatasetOperations::test_upload_and_download_file"],
       "fixtures": [
         {"as": "h", "history": {}},
@@ -562,8 +562,7 @@
             {"path": "exists", "equals": true},
             {"path": "size", "equals": "${src.size}"},
             {"path": "content", "equals": "${src.content}"}
-          ],
-          "divergences": ["live/download_dataset :: file :: server-bug"]
+          ]
         }
       ]
     },
@@ -677,7 +676,7 @@
     },
     {
       "id": "datasets.upload.from_url_private_address",
-      "note": "Galaxy refuses to fetch from a private address unless fetch_url_allowlist names it (the default), with a 403 whose err_msg says why. TS reports only 'Unauthorized (403)', which reads as a bad API key (live/upload_file_from_url :: failure.sentence :: server-bug). No outbound network is needed: Galaxy refuses before fetching.",
+      "note": "Galaxy refuses to fetch from a private address unless fetch_url_allowlist names it (the default), with a 403 whose err_msg says why, and both servers carry that err_msg in the failure sentence (TS since #171). No outbound network is needed: Galaxy refuses before fetching.",
       "fixtures": [{"as": "h", "history": {}}],
       "steps": [
         {
@@ -688,7 +687,7 @@
             {"path": "failure.kind", "equals": "tool"},
             {"path": "failure.sentence", "contains": "not permitted by server configuration"}
           ],
-          "divergences": ["live/upload_file_from_url :: failure.sentence :: server-bug"]
+          "divergences": ["live/upload_file_from_url :: failure.sentence :: failure-text-mismatch"]
         }
       ]
     },
@@ -731,7 +730,7 @@
     },
     {
       "id": "datasets.download.memory",
-      "note": "Without file_path the content is fetched and measured, not returned. The first call checks what both servers agree on; the second checks the measured size, which Python reports as 0 (live/download_dataset :: data.file_size :: server-bug).",
+      "note": "Without file_path the content is fetched and measured, not returned. The first call checks what both servers agree on; the second checks the measured size.",
       "fixtures": [
         {"as": "h", "history": {}},
         {
@@ -767,8 +766,7 @@
           "divergences": [
             "live/download_dataset :: data.note :: shape-mismatch",
             "live/download_dataset :: data.file_path :: shape-mismatch",
-            "live/download_dataset :: message :: value-mismatch",
-            "live/download_dataset :: data.file_size :: server-bug"
+            "live/download_dataset :: message :: value-mismatch"
           ]
         }
       ]

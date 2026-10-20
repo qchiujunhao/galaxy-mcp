@@ -522,7 +522,7 @@
     },
     {
       "id": "collections.list.element_metadata",
-      "note": "Each element reports its datatype. Both servers read element.object.extension, which Galaxy 26.2 never sends (it sends file_ext), so both report '' -- one shared bug, recorded as a row per server under one key. The collection's state has the same cause and is in collections.list.state, so each expected failure explains only its own path.",
+      "note": "Each element reports its datatype. Galaxy 26.2 sends it as file_ext on the element object, which both servers read since #170. The collection's state is checked on its own in collections.list.state.",
       "fixtures": [
         {"as": "h", "history": {}},
         {"as": "c", "collection": {"history": "${h.id}", "type": "list", "name": "typed", "elements": [{"name": "plain", "content": "a\n"}, {"name": "table", "content": "x\ty\n", "ext": "tabular"}]}}
@@ -534,14 +534,13 @@
           "expect": [
             {"path": "data.elements.0.extension", "equals": "txt"},
             {"path": "data.elements.1.extension", "equals": "tabular"}
-          ],
-          "divergences": ["live/get_collection_details :: data.elements.extension :: server-bug"]
+          ]
         }
       ]
     },
     {
       "id": "collections.list.state",
-      "note": "A populated collection of ok datasets reports state ok. Both servers read collection.state, which Galaxy 26.2 never sends (it sends populated_state), so both report 'unknown'.",
+      "note": "A populated collection of ok datasets reports state ok. Galaxy 26.2 sends it as populated_state, which both servers read since #170.",
       "fixtures": [
         {"as": "h", "history": {}},
         {"as": "c", "collection": {"history": "${h.id}", "type": "list", "name": "stated", "elements": [{"name": "one", "content": "a\n"}]}}
@@ -550,8 +549,7 @@
         {
           "call": "get_collection_details",
           "args": {"collection_id": "${c.id}"},
-          "expect": [{"path": "data.collection.state", "equals": "ok"}],
-          "divergences": ["live/get_collection_details :: data.collection.state :: server-bug"]
+          "expect": [{"path": "data.collection.state", "equals": "ok"}]
         }
       ]
     },
