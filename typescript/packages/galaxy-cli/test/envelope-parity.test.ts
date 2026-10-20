@@ -257,6 +257,8 @@ const EXIT_CODES: Record<string, number> = {
   "update_history/nothing_to_update": 64,
   "update_page/directive_id_not_encoded": 64,
   "update_page/half_a_section_edit": 64,
+  "update_page/section_heading_spans_lines": 64,
+  "update_page/section_heading_indented": 64,
   "update_page/page_changed_since_read": 64,
   // EX_NOINPUT 66 -- not_found: a 404, or an id nothing answers to
   "cancel_workflow_invocation/not_found": 66,

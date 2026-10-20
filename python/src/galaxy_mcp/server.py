@@ -5965,6 +5965,18 @@ def update_page(
         raise ValueError(
             "section_heading and section_content go together: give both to replace one section."
         )
+    # Galaxy's page editor keys a section by its one heading line, so a heading that spans
+    # lines or starts indented would match nothing and be appended as a new section.
+    if section_heading is not None and ("\n" in section_heading or "\r" in section_heading):
+        raise ValueError(
+            "section_heading is one heading line, e.g. '## Methods': it cannot span lines. "
+            "The section's text goes in section_content."
+        )
+    if section_heading is not None and section_heading[:1] in (" ", "\t"):
+        raise ValueError(
+            "section_heading cannot start with whitespace: an indented line is not a heading "
+            "in Galaxy's page editor, so no section would match it."
+        )
     if section and content is not None:
         raise ValueError("Give either content or a section to replace, not both.")
     malformed = _malformed_object_ids(section_content if section else content)

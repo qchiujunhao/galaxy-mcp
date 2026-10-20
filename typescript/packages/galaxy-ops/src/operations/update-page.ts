@@ -51,6 +51,20 @@ function refusal(i: In): string | undefined {
   if (section && (i.sectionHeading == null || i.sectionContent == null)) {
     return "section_heading and section_content go together: give both to replace one section.";
   }
+  // Galaxy's page editor keys a section by its one heading line, so a heading that spans lines
+  // or starts indented would match nothing and be appended as a new section.
+  if (i.sectionHeading != null && /[\n\r]/.test(i.sectionHeading)) {
+    return (
+      "section_heading is one heading line, e.g. '## Methods': it cannot span lines. The " +
+      "section's text goes in section_content."
+    );
+  }
+  if (i.sectionHeading != null && /^[ \t]/.test(i.sectionHeading)) {
+    return (
+      "section_heading cannot start with whitespace: an indented line is not a heading in " +
+      "Galaxy's page editor, so no section would match it."
+    );
+  }
   if (section && i.content != null) {
     return "Give either content or a section to replace, not both.";
   }

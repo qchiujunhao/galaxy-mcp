@@ -4511,6 +4511,28 @@ def more_http_failure_cases(add: AddFailure) -> None:
     )
     add(
         "update_page",
+        "section_heading_spans_lines",
+        "a heading that runs onto a second line, refused before anything is sent",
+        {
+            "page_id": "pg000001",
+            "section_heading": "## Methods\nmore",
+            "section_content": "## Methods\n\nnew\n",
+        },
+        [VERSION_ROUTE],
+    )
+    add(
+        "update_page",
+        "section_heading_indented",
+        "a heading line that starts with whitespace, refused before anything is sent",
+        {
+            "page_id": "pg000001",
+            "section_heading": "  ## Methods",
+            "section_content": "## Methods\n\nnew\n",
+        },
+        [VERSION_ROUTE],
+    )
+    add(
+        "update_page",
         "read_not_found",
         "the read a section edit needs, on a page that is not there",
         {
