@@ -293,6 +293,44 @@ function withoutNull(schema: JsonSchema): JsonSchema {
 const quoted = (keyword: string): string => JSON.stringify(keyword);
 
 /**
+ * A `type` written as a list of names, read as the union it is. JSON Schema allows
+ * both spellings, and zod 4.6 started writing a nullable parameter as
+ * `type: ["string", "null"]` where 4.4 wrote `anyOf` -- the same contract, so the
+ * comparison reads it as the anyOf and models nothing new. One name in the list
+ * is that name. A list beside an anyOf, or one holding anything but type names,
+ * is left as written for the shape check to refuse.
+ */
+export function typeListsAsUnions(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(typeListsAsUnions);
+  if (!isPlainObject(node)) return node;
+  // Only schema positions are read into; a default or an enum member that happens
+  // to look like a schema is a value, and stays the value it is. Rebuilt through
+  // `fromEntries` so a parameter called `__proto__` stays a key rather than
+  // becoming the prototype.
+  const read = (keyword: string, value: unknown): unknown =>
+    keyword === "properties" && isPlainObject(value)
+      ? Object.fromEntries(
+          Object.entries(value).map(([name, each]) => [name, typeListsAsUnions(each)]),
+        )
+      : keyword === "anyOf" ||
+          keyword === "items" ||
+          keyword === "propertyNames" ||
+          keyword === "additionalProperties"
+        ? typeListsAsUnions(value)
+        : value;
+  const out = Object.fromEntries(
+    Object.entries(node).map(([keyword, value]) => [keyword, read(keyword, value)]),
+  );
+  const { type, ...rest } = out;
+  if (!Array.isArray(type) || type.length === 0 || Object.hasOwn(rest, "anyOf")) return out;
+  const isTypeName = (name: unknown): name is string =>
+    typeof name === "string" && TYPE_NAMES.has(name);
+  if (!type.every(isTypeName)) return out;
+  if (type.length === 1) return { ...rest, type: type[0] };
+  return { ...rest, anyOf: type.map((name) => ({ type: name })) };
+}
+
+/**
  * Keywords whose value is another schema. A `properties` entry is a parameter
  * NAME rather than a keyword, which is why it is spelled out here: a parameter
  * called `default` is still a parameter, and one called `$ref` is still a name.
@@ -719,7 +757,10 @@ export function normalizeParams(
   rules: Normalization,
   where: string,
 ): Map<string, NormalParam> {
-  const root = readInputSchema(schema, where) as unknown as Record<string, unknown>;
+  const root = readInputSchema(
+    typeListsAsUnions(schema) as JsonSchema,
+    where,
+  ) as unknown as Record<string, unknown>;
   const required = new Set((read(root, "required", "names", where) ?? []) as string[]);
   const out = new Map<string, NormalParam>();
   const declared = (read(root, "properties", "object", where) ?? {}) as Record<string, JsonSchema>;

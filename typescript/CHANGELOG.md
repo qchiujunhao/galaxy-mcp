@@ -4,6 +4,18 @@
 `@galaxyproject/galaxy-mcp` share a version and are published together, so one
 entry covers all three; where something only affects one surface, it says which.
 
+## Unreleased
+
+### zod 4.6
+
+All three packages move from `zod ^4.3.0` to `^4.6.7`. The one visible change is in the JSON
+Schema zod writes for a parameter that may be null: `type: ["string", "null"]` where it used to
+write `anyOf: [{ type: "string" }, { type: "null" }]`. Both are valid JSON Schema for the same
+contract, and every MCP client we know of reads both, but a consumer that pattern-matched on the
+old `anyOf` will see the new spelling in the input schemas `galaxy-mcp` advertises and in what
+`galaxy-ops` hands out. The parity comparison reads the list as the union it is, so the report
+against the Python server is unchanged.
+
 ## 0.5.0 (2026-10-20)
 
 ### galaxy-mcp on `@modelcontextprotocol/sdk` 1.32 (#190)
