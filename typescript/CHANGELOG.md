@@ -30,6 +30,20 @@ Given an invocation id, the answer adds `job_states` and `outcome` (`failing`, `
 `cancelled`, `completed`), read from its jobs summary with one more request: Galaxy's
 `state` describes scheduling and reports `completed` for a run whose jobs failed.
 Listings are unchanged. galaxy-ops exports `invocationOutcome`.
+### `get_history_contents` pages with Galaxy's real total (#155)
+
+It asks Galaxy for one filtered, sorted window and the count it matched, instead of
+fetching the whole history; a page over the output budget is cut, and its `pagination`
+names where to continue. Breaking: rows no longer carry `dataset_id`, the id of the
+Dataset under a history item rather than of the item, which no operation takes; use
+`id`. An `order` without a direction is refused, because a bare key was read as
+ascending here while Galaxy reads it as descending; `order` is one of Galaxy's sort keys
+for a history (`hid`, `create_time`, `update_time`, `name`, `extension`, `size`) with
+`-asc` or `-dsc`, e.g. `hid-asc`. Rows are the contents index's summary view: dataset
+rows are unchanged, and collection rows gain `type_id` and `store_times_summary` and
+lose `model_class`, `populated` and `column_definitions`. Any `order` other than `hid`
+goes out with `hid-asc` behind it, since Galaxy sorts by exactly the keys it is given and
+a sort on a key rows share would otherwise put the same item on two pages.
 
 ## 0.4.0 (2026-10-19)
 
