@@ -961,6 +961,63 @@ describe("text the surfaces choose themselves", () => {
   });
 });
 
+describe("a type written as a list of names", () => {
+  const tool = (
+    properties: Record<string, unknown>,
+    required: string[] = [],
+  ): Record<string, ToolContract> => ({
+    example: {
+      inputSchema: { type: "object", properties, required },
+      annotations: {},
+      tags: ["read"],
+    } as ToolContract,
+  });
+  const asList = { type: ["string", "null"] };
+  const asUnion = { anyOf: [{ type: "string" }, { type: "null" }] };
+
+  it("reads it as the union spelled with anyOf, optional or required", () => {
+    // zod 4.6 writes the list where 4.4 wrote the union; Python still writes the union.
+    expect(compare(tool({ a: asUnion }), tool({ a: asList }), RULES)).toEqual([]);
+    expect(compare(tool({ a: asUnion }, ["a"]), tool({ a: asList }, ["a"]), RULES)).toEqual([]);
+  });
+
+  it("reads one name in a list as that name", () => {
+    expect(compare(tool({ a: { type: "string" } }), tool({ a: { type: ["string"] } }), RULES)).toEqual(
+      [],
+    );
+  });
+
+  it("reads it wherever a schema sits", () => {
+    const list = { type: "array", items: asList };
+    const union = { type: "array", items: asUnion };
+    expect(compare(tool({ a: union }), tool({ a: list }), RULES)).toEqual([]);
+  });
+
+  it("still reports the difference a list spells out", () => {
+    expect(compare(tool({ a: { type: "string" } }, ["a"]), tool({ a: asList }, ["a"]), RULES)).toEqual([
+      {
+        tool: "example",
+        param: "a",
+        kind: "type-mismatch",
+        observed: "python=string typescript=anyOf<null|string>",
+      },
+    ]);
+  });
+
+  it("stops the run on a list holding something that is not a type name", () => {
+    expect(() => compare(tool({ a: { type: ["string", "text"] } }), {}, RULES)).toThrow(
+      /example \(python\) "a".*"type"/s,
+    );
+  });
+
+  it("leaves a list beside an anyOf as written, and refuses it", () => {
+    const both = { anyOf: [{ type: "integer" }], type: ["string", "null"] };
+    expect(() => compare(tool({ a: both }), {}, RULES)).toThrow(
+      /example \(python\) "a".*"type" is a list/s,
+    );
+  });
+});
+
 describe("names every JavaScript object already answers to", () => {
   // Legal names both surfaces could pick, and names an empty object reports having.
   const INHERITED = ["toString", "constructor", "hasOwnProperty", "valueOf", "__proto__"];
