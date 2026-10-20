@@ -21,11 +21,11 @@ const input = {
   title: z.string().min(1).nullish().describe("New title. Omit to leave unchanged"),
   sectionHeading: z
     .string()
-    .min(1)
     .nullish()
     .describe(
       "The exact heading line of the section to replace, e.g. '## Methods'; every section with " +
-        "that heading line is replaced, as Galaxy's page editor does. Markdown pages only",
+        "that heading line is replaced, as Galaxy's page editor does, and '' is the text before " +
+        "the first heading. Markdown pages only",
     ),
   sectionContent: z
     .string()

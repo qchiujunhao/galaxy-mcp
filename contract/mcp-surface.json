@@ -1791,7 +1791,7 @@
               }
             ],
             "default": null,
-            "description": "The exact heading line of the section to replace (markdown\npages only; every section with that heading line is replaced)."
+            "description": "The exact heading line of the section to replace (markdown\npages only; every section with that heading line is replaced). \"\" is the\ntext before the first heading."
           },
           "section_content": {
             "anyOf": [

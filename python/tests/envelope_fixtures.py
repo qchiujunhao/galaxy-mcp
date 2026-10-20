@@ -3231,6 +3231,29 @@ def page_cases(add: AddCase) -> None:
             ),
         ],
     )
+    # The text before the first heading is the section whose heading is "", on both
+    # servers, so the preamble can be replaced the same way as any section.
+    preambled = "intro\n\n# Reads QC\n\n## Methods\n\nold\n"
+    add(
+        "update_page",
+        "preamble_replaced",
+        "the text before the first heading, replaced by the empty heading",
+        {"page_id": "pg000001", "section_heading": "", "section_content": "a new intro\n"},
+        lambda: update_page_fn("pg000001", section_heading="", section_content="a new intro\n"),
+        [
+            VERSION_ROUTE,
+            route("/api/pages/pg000001", page_record(content_editor=preambled)),
+            route(
+                "/api/pages/pg000001",
+                page_record(
+                    content_editor="a new intro\n\n# Reads QC\n\n## Methods\n\nold\n",
+                    latest_revision_id="rev00003",
+                    revision_ids=["rev00001", "rev00002", "rev00003"],
+                ),
+                method="PUT",
+            ),
+        ],
+    )
     add(
         "update_page",
         "expected_hash_matches",

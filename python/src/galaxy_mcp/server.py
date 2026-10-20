@@ -5944,7 +5944,8 @@ def update_page(
         content: New markdown content. Omit to leave content unchanged.
         title: New title. Omit to leave unchanged.
         section_heading: The exact heading line of the section to replace (markdown
-            pages only; every section with that heading line is replaced).
+            pages only; every section with that heading line is replaced). "" is the
+            text before the first heading.
         section_content: That section's new text, heading line included.
         expect_hash: content_hash from when the page was read; refused if it changed.
 
