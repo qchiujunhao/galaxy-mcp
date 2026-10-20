@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of each record"), found nothing. Punctuation around a word is ignored; a query with a
   single-character word finds no more.
 
+### Added
+
+- `get_invocations` given an invocation id adds `job_states` and `outcome` (`failing`,
+  `failed`, `cancelled`, `completed`), read from its jobs summary with one more request:
+  Galaxy's `state` describes scheduling and reports `completed` for a run whose jobs
+  failed. Listings are unchanged.
+
 ## [1.12.0] - 2026-10-19
 
 ### Added

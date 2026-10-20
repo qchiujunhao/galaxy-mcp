@@ -24,6 +24,13 @@ galaxy-ops keeps one list of the job states that will not change again, read off
 skipped or stopped job with `JobFailedError` instead of polling until the timeout. The state
 lists stay internal; `isJobTerminal` and `isJobSuccess` are still the exported reads.
 
+### `get_invocations` says what one invocation amounted to (#155)
+
+Given an invocation id, the answer adds `job_states` and `outcome` (`failing`, `failed`,
+`cancelled`, `completed`), read from its jobs summary with one more request: Galaxy's
+`state` describes scheduling and reports `completed` for a run whose jobs failed.
+Listings are unchanged. galaxy-ops exports `invocationOutcome`.
+
 ## 0.4.0 (2026-10-19)
 
 ### `get_job_details` by job id (#167)

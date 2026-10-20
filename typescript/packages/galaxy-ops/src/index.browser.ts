@@ -11,6 +11,7 @@ export {
   type VersionRequirement,
 } from "./version";
 export { isJobTerminal, isJobSuccess } from "./terminal-states";
+export { invocationOutcome, type JobStates } from "./invocation-outcome";
 export type { Operation, OperationDomain, GalaxyResult, Pagination, InputOf, AnyOperation } from "./operations/types";
 export {
   allOperations,

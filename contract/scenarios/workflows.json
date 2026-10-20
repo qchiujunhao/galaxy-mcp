@@ -249,9 +249,11 @@
         {
           "call": "get_invocations",
           "args": {"invocation_id": "${inv}"},
+          "until": {"expect": [{"path": "data.outcome", "equals": "completed"}], "timeout": 180, "interval": 3},
           "expect": [
             {"path": "data.id", "equals": "${inv}"},
             {"path": "data.state", "in": ["scheduled", "completed"]},
+            {"path": "data.job_states", "equals": {"ok": 1}},
             {"path": "data.history_id", "equals": "${h.id}"},
             {"path": "data.inputs.0.id", "equals": "${d.id}"},
             {"path": "data.inputs.0.src", "equals": "hda"},
@@ -319,6 +321,121 @@
           "expect": [
             {"path": "state", "in": ["scheduled", "completed"]},
             {"path": "history_id", "equals": "${h.id}"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workflows.invocations.outcome_from_jobs",
+      "note": "Galaxy's invocation state describes scheduling only, so one invocation read by id also carries job_states, how many of its jobs are in each state, and outcome, what those jobs amount to. For a cat1 run that is one ok job and completed once the job settles; both come from the jobs summary, one more request, and a listing never pays it.",
+      "requires": {
+        "tools": [
+          "cat1"
+        ]
+      },
+      "fixtures": [
+        {
+          "as": "h",
+          "history": {}
+        },
+        {
+          "as": "d",
+          "dataset": {
+            "history": "${h.id}",
+            "content": "alpha\nbeta\n",
+            "name": "workflows-in.txt"
+          }
+        },
+        {
+          "as": "wf",
+          "workflow": {
+            "file": "cat1.ga"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "call": "invoke_workflow",
+          "args": {
+            "workflow_id": "${wf.id}",
+            "history_id": "${h.id}",
+            "inputs": {
+              "0": {
+                "src": "hda",
+                "id": "${d.id}"
+              }
+            }
+          },
+          "creates": {
+            "invocation": "data.id"
+          },
+          "expect": [
+            {
+              "path": "data.history_id",
+              "equals": "${h.id}"
+            }
+          ],
+          "save": {
+            "inv": "data.id"
+          }
+        },
+        {
+          "call": "get_invocations",
+          "args": {
+            "invocation_id": "${inv}"
+          },
+          "until": {
+            "expect": [
+              {
+                "path": "data.outcome",
+                "equals": "completed"
+              }
+            ],
+            "timeout": 180,
+            "interval": 3
+          },
+          "expect": [
+            {
+              "path": "data.id",
+              "equals": "${inv}"
+            },
+            {
+              "path": "data.state",
+              "in": [
+                "scheduled",
+                "completed"
+              ]
+            },
+            {
+              "path": "data.job_states.ok",
+              "equals": 1
+            },
+            {
+              "path": "data.outcome",
+              "equals": "completed"
+            }
+          ]
+        },
+        {
+          "call": "get_invocations",
+          "args": {
+            "history_id": "${h.id}"
+          },
+          "expect": [
+            {
+              "path": "data",
+              "has_item": {
+                "id": "${inv}",
+                "history_id": "${h.id}"
+              }
+            },
+            {
+              "path": "data.0",
+              "keys_exclude": [
+                "job_states",
+                "outcome"
+              ]
+            }
           ]
         }
       ]
