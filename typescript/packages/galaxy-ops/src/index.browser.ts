@@ -113,9 +113,11 @@ export { updatePageOp, updatePage } from "./operations/update-page";
 export { listPageRevisionsOp, listPageRevisions } from "./operations/list-page-revisions";
 export { getPageRevisionOp, getPageRevision } from "./operations/get-page-revision";
 export { revertPageRevisionOp, revertPageRevision } from "./operations/revert-page-revision";
+export { contentHash, malformedObjectIds } from "./operations/pages-common";
 export type {
   PageSummary,
   PageDetail,
+  HashedPage,
   PageRevisionSummary,
   PageRevisionDetails,
   ContentEditorSource,

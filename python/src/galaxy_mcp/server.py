@@ -5614,6 +5614,78 @@ def _strip_rendered(page: dict[str, Any], include_rendered: bool) -> dict[str, A
     return page
 
 
+def _content_hash(page: dict[str, Any]) -> str:
+    """The hash Galaxy's page assistant uses over the editable source, so a caller can tell
+    whether a page changed. Galaxy neither returns nor checks it: it is computed here from the
+    page as Galaxy sent it.
+
+    The source is ``content_editor``, or ``content`` for an HTML page, which Galaxy fills on
+    the markdown path only. The hash is ``_djb2_hash`` in lib/galaxy/agents/page_assistant.py:
+    djb2 over code points, eight hex digits. (Galaxy's client spells it over UTF-16 code units,
+    which differs only for characters outside the Basic Multilingual Plane.)
+    """
+    h = 5381
+    for c in page.get("content_editor") or page.get("content") or "":
+        h = ((h * 33) + ord(c)) & 0xFFFFFFFF
+    return format(h, "08x")
+
+
+# Galaxy's heading rule, client/src/components/PageEditor/sectionDiffUtils.ts.
+_HEADING = re.compile(r"^#{1,6}\s")
+
+# The directive arguments Galaxy decodes as encoded ids (lib/galaxy/managers/markdown_util.py),
+# and where it reads directives: fenced galaxy blocks and ``${galaxy ...}`` embeds.
+_ID_ARGUMENT = re.compile(
+    r"\b(history_id|workflow_id|history_dataset_id|history_dataset_collection_id|job_id"
+    r"|implicit_collection_jobs_id|invocation_id)\s*=\s*[\"']?([^\s,)\"']+)"
+)
+# An encoded id: Galaxy's cipher works in 8-byte blocks, so hex in runs of sixteen.
+_ENCODED_ID = re.compile(r"^(?:[0-9a-f]{16})+$")
+_DIRECTIVES = re.compile(r"^```[ \t]*galaxy[^\n]*\n[\s\S]*?^```|\$\{galaxy\s[^}]*\}", re.MULTILINE)
+
+
+def _markdown_sections(content: str) -> list[tuple[str, str]]:
+    """Markdown split at headings as Galaxy's page editor splits it (``markdownSections``).
+
+    The text before the first heading is a section whose heading is "", and each section's
+    text includes its heading line.
+    """
+    if not content:
+        return []
+    sections: list[tuple[str, str]] = []
+    heading = ""
+    current: list[str] = []
+    for i, line in enumerate(content.split("\n")):
+        if _HEADING.match(line) and i > 0:
+            sections.append((heading, "\n".join(current)))
+            heading, current = line, [line]
+        elif _HEADING.match(line):
+            heading, current = line, [line]
+        else:
+            current.append(line)
+    if current:
+        sections.append((heading, "\n".join(current)))
+    return sections
+
+
+def _apply_section_edit(original: str, heading: str, section: str) -> str:
+    """Replace the section under ``heading``, appending it when absent (``applySectionEdit``)."""
+    parts = [section if h == heading else text for h, text in _markdown_sections(original)]
+    if not any(h == heading for h, _ in _markdown_sections(original)):
+        parts.append(section)
+    return "\n".join(parts)
+
+
+def _malformed_object_ids(content: str | None) -> list[str]:
+    """Directive arguments naming a Galaxy object by something that is not its encoded id."""
+    found: list[str] = []
+    for directive in _DIRECTIVES.finditer(content or ""):
+        for name, value in _ID_ARGUMENT.findall(directive.group()):
+            if not _ENCODED_ID.match(value):
+                found.append(f"{name}={value}")
+    return found
+
+
 def _with_editable_content(revision: dict[str, Any]) -> dict[str, Any]:
     """Give a revision one field to edit whatever the server sent, and say which it was.
 
@@ -5733,7 +5805,9 @@ def get_page(page_id: str, include_rendered: bool = False) -> GalaxyResult:
 
     Returns `content_editor`: the editable Galaxy-flavored markdown, with
     ENCODED ids in directives (e.g. `history_dataset_id=<encoded-dataset-id>`).
-    This is the form to edit and pass back to update_page.
+    This is the form to edit and pass back to update_page. Also returns
+    `content_hash`, the hash Galaxy's page assistant uses over that source: read the
+    page again and compare it to tell whether anyone changed the page since.
 
     Args:
         page_id: Encoded id of the page (from list_pages / create_page).
@@ -5742,8 +5816,8 @@ def get_page(page_id: str, include_rendered: bool = False) -> GalaxyResult:
             large; omit unless you need the rendered output.
 
     Returns:
-        GalaxyResult with page details including `content_editor`, metadata, and
-        `edit_source` of the latest revision in data.
+        GalaxyResult with page details including `content_editor`, `content_hash`,
+        metadata, and `edit_source` of the latest revision in data.
 
     NEXT STEPS:
     - Edit it: update_page(page_id, content=...)
@@ -5755,7 +5829,11 @@ def get_page(page_id: str, include_rendered: bool = False) -> GalaxyResult:
     try:
         response = gi.make_get_request(f"{gi.url}/pages/{page_id}")
         response.raise_for_status()
-        page = _strip_rendered(response.json(), include_rendered)
+        raw = response.json()
+        # Hashed before the render is dropped: an HTML page's source is in `content`.
+        content_hash = _content_hash(raw)
+        page = _strip_rendered(raw, include_rendered)
+        page["content_hash"] = content_hash
         return GalaxyResult(
             data=page,
             success=True,
@@ -5842,8 +5920,21 @@ def update_page(
     page_id: str,
     content: str | None = None,
     title: str | None = None,
+    section_heading: str | None = None,
+    section_content: str | None = None,
+    expect_hash: str | None = None,
 ) -> GalaxyResult:
     """Update a page, creating a new revision when content changes.
+
+    Replace one section instead of the whole page by passing section_heading
+    (the exact heading line, e.g. '## Methods') with section_content (its new
+    text, heading line included); a heading the page lacks is appended, and every
+    section with that heading line is replaced, as Galaxy's page editor does.
+    Markdown pages only. Pass the
+    content_hash get_page returned as expect_hash and the write is refused if the
+    page changed since you read it. That check is a read followed by the write, not
+    one atomic request: it catches a page that moved before this call, not a write
+    that lands between the two.
 
     Content is Galaxy-flavored markdown using ENCODED ids in directives
     (e.g. `history_dataset_id=<encoded-dataset-id>`) -- never raw integer ids or
@@ -5856,9 +5947,16 @@ def update_page(
         page_id: Encoded id of the page.
         content: New markdown content. Omit to leave content unchanged.
         title: New title. Omit to leave unchanged.
+        section_heading: The exact heading line of the section to replace (markdown
+            pages only; every section with that heading line is replaced). "" is the
+            text before the first heading.
+        section_content: That section's new text, heading line included.
+        expect_hash: content_hash from when the page was read; refused if it changed
+            (a read then the write, not atomic).
 
     Returns:
-        GalaxyResult with the updated page details including content_editor in data.
+        GalaxyResult with the updated page details including content_editor and its new
+        content_hash in data.
 
     NEXT STEPS:
     - Inspect revisions: list_page_revisions(page_id)
@@ -5866,6 +5964,63 @@ def update_page(
     """
     state = ensure_connected()
     gi: GalaxyInstance = state["gi"]
+
+    section = section_heading is not None or section_content is not None
+    if section and (section_heading is None or section_content is None):
+        raise ValueError(
+            "section_heading and section_content go together: give both to replace one section."
+        )
+    # Galaxy's page editor keys a section by its one heading line, so a heading that spans
+    # lines or starts indented would match nothing and be appended as a new section.
+    if section_heading is not None and ("\n" in section_heading or "\r" in section_heading):
+        raise ValueError(
+            "section_heading is one heading line, e.g. '## Methods': it cannot span lines. "
+            "The section's text goes in section_content."
+        )
+    if section_heading is not None and section_heading[:1] in (" ", "\t"):
+        raise ValueError(
+            "section_heading cannot start with whitespace: an indented line is not a heading "
+            "in Galaxy's page editor, so no section would match it."
+        )
+    if section and content is not None:
+        raise ValueError("Give either content or a section to replace, not both.")
+    malformed = _malformed_object_ids(section_content if section else content)
+    if malformed:
+        raise ValueError(
+            "These directive arguments name a Galaxy object by something that is not its "
+            f"encoded id: {', '.join(malformed)}. Galaxy refuses them with a 400 when the page "
+            "is stored. Use the encoded id a tool returned, e.g. from get_history_contents."
+        )
+
+    # A section edit and an expected hash both need the page as it is now. Galaxy's PUT has
+    # no precondition of its own, so this read and the write are two requests, and a writer
+    # that lands between them is not seen.
+    if section_heading is not None or expect_hash is not None:
+        try:
+            response = gi.make_get_request(f"{gi.url}/pages/{page_id}")
+            response.raise_for_status()
+            current = response.json()
+        except Exception as e:
+            raise ValueError(format_error("Update page", e, {"page_id": page_id})) from e
+        actual = _content_hash(current)
+        if expect_hash is not None and expect_hash != actual:
+            raise ValueError(
+                f"Page '{page_id}' changed since it was read: its content_hash is now {actual}, "
+                f"not {expect_hash}. Read it again with get_page and make the edit against what "
+                "is there now."
+            )
+        if section_heading is not None:
+            if current.get("content_format") != "markdown":
+                raise ValueError(
+                    f"Page '{page_id}' is authored as {current.get('content_format')}; a "
+                    "section can be replaced only in a markdown page. Send the whole content "
+                    "instead."
+                )
+            content = _apply_section_edit(
+                current.get("content_editor") or current.get("content") or "",
+                section_heading,
+                section_content or "",
+            )
 
     try:
         # edit_source attributes the revision to the agent, not a human user.
@@ -5875,10 +6030,10 @@ def update_page(
         if title is not None:
             payload["title"] = title
 
-        page = _strip_rendered(
-            gi.make_put_request(f"{gi.url}/pages/{page_id}", payload=payload),
-            include_rendered=False,
-        )
+        written = gi.make_put_request(f"{gi.url}/pages/{page_id}", payload=payload)
+        content_hash = _content_hash(written)
+        page = _strip_rendered(written, include_rendered=False)
+        page["content_hash"] = content_hash
         return GalaxyResult(
             data=page,
             success=True,
