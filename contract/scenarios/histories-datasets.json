@@ -288,8 +288,7 @@
             {"path": "pagination.has_next", "equals": true},
             {"path": "pagination.next_offset", "equals": 2}
           ],
-          "parity": "exact",
-          "mask": [{"path": "data.contents.*.dataset_id", "pattern": "^<[a-z0-9_.]+>$"}]
+          "parity": "exact"
         },
         {
           "call": "get_history_contents",
@@ -302,8 +301,7 @@
             {"path": "pagination.next_offset", "equals": null},
             {"path": "pagination.previous_offset", "equals": 0}
           ],
-          "parity": "exact",
-          "mask": [{"path": "data.contents.*.dataset_id", "pattern": "^<[a-z0-9_.]+>$"}]
+          "parity": "exact"
         },
         {
           "call": "get_history_contents",
@@ -315,6 +313,54 @@
             {"path": "data.contents", "sorted": {"key": "hid", "order": "desc"}},
             {"path": "pagination.has_next", "equals": false}
           ]
+        }
+      ]
+    },
+    {
+      "id": "histories.contents.name_order",
+      "note": "A sort on name walks the datasets alphabetically one per page, whatever order they were added in, and every page counts the same total. Galaxy sorts by exactly the keys it is given, so both servers send hid-asc behind name-asc to keep equal names on one page each.",
+      "fixtures": [
+        {"as": "h", "history": {}},
+        {"as": "c", "dataset": {"history": "${h.id}", "content": "c\n", "name": "c.txt"}},
+        {"as": "a", "dataset": {"history": "${h.id}", "content": "a\n", "name": "a.txt"}},
+        {"as": "b", "dataset": {"history": "${h.id}", "content": "b\n", "name": "b.txt"}}
+      ],
+      "steps": [
+        {
+          "call": "get_history_contents",
+          "args": {"history_id": "${h.id}", "order": "name-asc", "limit": 1},
+          "expect": [
+            {"path": "data.contents", "length": {"eq": 1}},
+            {"path": "data.contents.0.id", "equals": "${a.id}"},
+            {"path": "data.contents.0.name", "equals": "a.txt"},
+            {"path": "pagination.total_items", "equals": 3},
+            {"path": "pagination.has_next", "equals": true},
+            {"path": "pagination.next_offset", "equals": 1}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "get_history_contents",
+          "args": {"history_id": "${h.id}", "order": "name-asc", "limit": 1, "offset": 1},
+          "expect": [
+            {"path": "data.contents.0.id", "equals": "${b.id}"},
+            {"path": "data.contents.0.name", "equals": "b.txt"},
+            {"path": "pagination.total_items", "equals": 3},
+            {"path": "pagination.next_offset", "equals": 2}
+          ],
+          "parity": "exact"
+        },
+        {
+          "call": "get_history_contents",
+          "args": {"history_id": "${h.id}", "order": "name-asc", "limit": 1, "offset": 2},
+          "expect": [
+            {"path": "data.contents.0.id", "equals": "${c.id}"},
+            {"path": "data.contents.0.name", "equals": "c.txt"},
+            {"path": "pagination.total_items", "equals": 3},
+            {"path": "pagination.has_next", "equals": false},
+            {"path": "pagination.next_offset", "equals": null}
+          ],
+          "parity": "exact"
         }
       ]
     },
