@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type { ZodRawShape } from "zod";
-import { allOperations, createGalaxyContext, describeOperation, runWithEnvelope } from "@galaxyproject/galaxy-ops";
+import { allOperations, describeOperation, runWithEnvelope, type GalaxyContext } from "@galaxyproject/galaxy-ops";
 import { LaxArgumentsTransport } from "./lax-transport.js";
 import { inWireNames, toOperationInput, wireShape } from "./wire-names.js";
 // The version a client is told, read from the package rather than written twice. tsup
@@ -67,9 +67,12 @@ export function toolResult(
   return { content: [{ type: "text", text: JSON.stringify(result) }], isError: false };
 }
 
-export function buildServer(conn: { baseUrl: string; apiKey: string }): McpServer {
+/**
+ * One MCP server over one Galaxy context. The context is passed in rather than built here so
+ * servers can share it, along with the Galaxy version it caches.
+ */
+export function buildServer(ctx: GalaxyContext): McpServer {
   const server = new McpServer({ name: "galaxy", version });
-  const ctx = createGalaxyContext(conn);
   const annotations = toolAnnotations();
   const shapes = new Map<string, ZodRawShape>();
   for (const op of allOperations) {

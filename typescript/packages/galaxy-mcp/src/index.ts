@@ -1,4 +1,5 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { createGalaxyContext } from "@galaxyproject/galaxy-ops";
 import { buildServer } from "./server.js";
 
 const baseUrl = process.env.GALAXY_URL;
@@ -8,6 +9,6 @@ if (!baseUrl || !apiKey) {
   process.exit(1);
 }
 
-const server = buildServer({ baseUrl, apiKey });
+const server = buildServer(createGalaxyContext({ baseUrl, apiKey }));
 await server.connect(new StdioServerTransport());
 console.error("galaxy-mcp: connected on stdio");
