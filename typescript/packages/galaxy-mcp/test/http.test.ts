@@ -1,4 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { request, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { createGalaxyContext } from "@galaxyproject/galaxy-ops";
 import {
   checkHttpStartup,
   hostAllowed,
@@ -6,7 +11,9 @@ import {
   HttpStartupError,
   isLoopbackHost,
   originAllowed,
+  startHttpServer,
 } from "../src/http";
+import { buildServer, toolNames } from "../src/server";
 
 describe("loopback hosts", () => {
   it.each(["127.0.0.1", "127.8.9.10", "localhost", "LOCALHOST.", "::1", "[::1]", "0:0:0:0:0:0:0:1"])(
@@ -90,5 +97,104 @@ describe("Host and Origin", () => {
     expect(originAllowed("https://client.example.org/", guards)).toBe(true);
     expect(originAllowed("https://evil.example", guards)).toBe(false);
     expect(originAllowed("https://evil.example", { ...guards, allowedOrigins: new Set(["*"]) })).toBe(true);
+  });
+});
+
+/** A raw request, so the test controls the Host header that fetch would not let it set. */
+function raw(
+  port: number,
+  { method = "POST", path = "/mcp", headers = {}, body }: { method?: string; path?: string; headers?: Record<string, string>; body?: string },
+): Promise<{ status: number; headers: Record<string, string | string[] | undefined>; body: string }> {
+  return new Promise((resolve, reject) => {
+    const req = request({ host: "127.0.0.1", port, method, path, headers }, (res) => {
+      let text = "";
+      res.setEncoding("utf8");
+      res.on("data", (chunk) => (text += chunk));
+      res.on("end", () => resolve({ status: res.statusCode ?? 0, headers: res.headers, body: text }));
+    });
+    req.on("error", reject);
+    req.end(body);
+  });
+}
+
+describe("the Streamable HTTP server", () => {
+  let server: Server;
+  let port: number;
+  const url = () => new URL(`http://127.0.0.1:${port}/mcp`);
+  const initialize = JSON.stringify({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "initialize",
+    params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "t", version: "0" } },
+  });
+  const mcpHeaders = { "content-type": "application/json", accept: "application/json, text/event-stream" };
+
+  beforeAll(async () => {
+    // Nothing here reaches Galaxy: a call that gets that far fails at this fetch.
+    const ctx = createGalaxyContext({
+      baseUrl: "http://galaxy.invalid",
+      apiKey: "k",
+      fetchImpl: async () => {
+        throw new Error("no Galaxy in this test");
+      },
+    });
+    server = await startHttpServer({
+      host: "127.0.0.1",
+      port: 0,
+      path: "/mcp",
+      allowedHosts: new Set(["mcp.example.org"]),
+      allowedOrigins: new Set(["https://client.example.org"]),
+      newServer: () => buildServer(ctx),
+    });
+    port = (server.address() as AddressInfo).port;
+  });
+  afterAll(() => new Promise<void>((done) => server.close(() => done())));
+
+  async function connect(): Promise<Client> {
+    const client = new Client({ name: "http-test", version: "0" });
+    await client.connect(new StreamableHTTPClientTransport(url()));
+    return client;
+  }
+
+  it("lists every operation, as stdio does", async () => {
+    const client = await connect();
+    const { tools } = await client.listTools();
+    expect(tools.map((t) => t.name).sort()).toEqual(toolNames().sort());
+    await client.close();
+  });
+
+  it("answers a Host it was told about and refuses any other", async () => {
+    const ok = await raw(port, { headers: { ...mcpHeaders, host: "mcp.example.org" }, body: initialize });
+    expect(ok.status).toBe(200);
+    const rebound = await raw(port, { headers: { ...mcpHeaders, host: "attacker.example" }, body: initialize });
+    expect(rebound).toMatchObject({ status: 421, body: "Invalid Host header" });
+  });
+
+  it("answers browser pages from this machine or the allowlist, with CORS", async () => {
+    for (const origin of ["http://localhost:6274", "https://client.example.org"]) {
+      const res = await raw(port, { headers: { ...mcpHeaders, origin }, body: initialize });
+      expect(res.status).toBe(200);
+      expect(res.headers["access-control-allow-origin"]).toBe(origin);
+    }
+    const hostile = await raw(port, { headers: { ...mcpHeaders, origin: "https://evil.example" }, body: initialize });
+    expect(hostile).toMatchObject({ status: 403, body: "Origin not allowed" });
+  });
+
+  it("answers a preflight before anything else", async () => {
+    const res = await raw(port, {
+      method: "OPTIONS",
+      headers: { origin: "http://127.0.0.1:6274", "access-control-request-method": "POST" },
+    });
+    expect(res.status).toBe(204);
+    expect(res.headers["access-control-allow-methods"]).toBe("POST");
+  });
+
+  it("serves only its path, and only POST", async () => {
+    expect((await raw(port, { path: "/other", headers: mcpHeaders, body: initialize })).status).toBe(404);
+    expect((await raw(port, { path: "//", headers: mcpHeaders, body: initialize })).status).toBe(404);
+    expect((await raw(port, { path: "/mcp?x=1", headers: mcpHeaders, body: initialize })).status).toBe(200);
+    const get = await raw(port, { method: "GET", headers: { accept: "text/event-stream" } });
+    expect(get.status).toBe(405);
+    expect(get.headers.allow).toBe("POST");
   });
 });
