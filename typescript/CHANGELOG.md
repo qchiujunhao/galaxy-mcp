@@ -15,7 +15,8 @@ guards: it binds to loopback unless `--allow-unauthenticated` is given, checks t
 `Origin` headers (`GALAXY_MCP_ALLOWED_HOSTS`, `GALAXY_MCP_ALLOWED_ORIGINS`), and refuses
 `upload_file` and `download_dataset(file_path=...)` with the Python server's sentence unless
 `GALAXY_MCP_ALLOW_LOCAL_FILES` is set. stdio is unchanged, and remains the default. Unknown
-command-line arguments are now refused rather than ignored.
+command-line arguments are now refused rather than ignored, and an address that cannot be
+listened on (a port in use, say) is reported in one line instead of a stack trace.
 
 ### zod 4.6
 

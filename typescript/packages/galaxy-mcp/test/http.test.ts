@@ -189,6 +189,20 @@ describe("the Streamable HTTP server", () => {
     expect(res.headers["access-control-allow-methods"]).toBe("POST");
   });
 
+  it("reports a port that is already taken rather than serving on it", async () => {
+    const attempt = startHttpServer({
+      host: "127.0.0.1",
+      port,
+      path: "/mcp",
+      allowedHosts: new Set(),
+      allowedOrigins: new Set(),
+      newServer: () => {
+        throw new Error("never reached");
+      },
+    });
+    await expect(attempt).rejects.toThrow(/EADDRINUSE/);
+  });
+
   it("serves only its path, and only POST", async () => {
     expect((await raw(port, { path: "/other", headers: mcpHeaders, body: initialize })).status).toBe(404);
     expect((await raw(port, { path: "//", headers: mcpHeaders, body: initialize })).status).toBe(404);
