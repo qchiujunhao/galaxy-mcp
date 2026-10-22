@@ -210,7 +210,7 @@ The project uses GitHub Actions for CI/CD:
 1. **Python Tests** (`python-tests.yml`)
 
     - Runs on push/PR to main branch
-    - Tests on Python 3.10, 3.11, 3.12
+    - Tests on Python 3.11, 3.12
     - Includes linting, type checking, and coverage
     - Uploads coverage to Codecov
 

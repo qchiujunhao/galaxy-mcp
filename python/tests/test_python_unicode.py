@@ -14,7 +14,7 @@ lowercase every code point in the space, in four contexts each, exactly the way 
 interpreter does. That is what lets the other runtime lowercase out of the tables
 instead of out of its own Unicode edition.
 
-CI runs this on 3.10 and 3.11 as well, which carry Unicode 13.0 and 14.0. There the
+CI runs this on 3.11 as well, which carries Unicode 14.0. There the
 tables would be a different set and the comparison would mean nothing, so the checks
 skip with the version they found -- the pinned tables belong to one interpreter, and
 saying so is the point of the file's name.
