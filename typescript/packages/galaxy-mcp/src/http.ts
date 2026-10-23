@@ -181,6 +181,10 @@ export function startHttpServer(options: HttpServerOptions & { host: string; por
   const httpServer = createServer(createHttpHandler(options));
   return new Promise((resolve, reject) => {
     httpServer.once("error", reject);
-    httpServer.listen(options.port, options.host, () => resolve(httpServer));
+    httpServer.listen(options.port, options.host, () => {
+      // Past startup a server error would reach a promise that has already settled and vanish.
+      httpServer.off("error", reject);
+      resolve(httpServer);
+    });
   });
 }
