@@ -82,7 +82,10 @@ export function httpConfig(flags: HttpFlags, env: NodeJS.ProcessEnv): HttpConfig
   const host = flags.host ?? env.GALAXY_MCP_HOST ?? DEFAULT_HTTP_HOST;
   const rawPort = flags.port ?? env.GALAXY_MCP_PORT;
   const port = rawPort === undefined ? DEFAULT_HTTP_PORT : Number(rawPort);
-  if (!Number.isInteger(port) || port < 0 || port > 65535) throw new HttpStartupError(`invalid port: ${rawPort}`);
+  // Number("") is 0, which would quietly bind a random port; Python refuses a blank one too.
+  if (rawPort?.trim() === "" || !Number.isInteger(port) || port < 0 || port > 65535) {
+    throw new HttpStartupError(`invalid port: ${rawPort}`);
+  }
   const path = flags.path ?? env.GALAXY_MCP_HTTP_PATH ?? DEFAULT_HTTP_PATH;
   checkHttpStartup(host, flags.allowUnauthenticated === true || envFlag(env[ALLOW_UNAUTHENTICATED_ENV]));
   return {

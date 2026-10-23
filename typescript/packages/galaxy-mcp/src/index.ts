@@ -1,3 +1,4 @@
+import type { AddressInfo } from "node:net";
 import { parseArgs } from "node:util";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createGalaxyContext } from "@galaxyproject/galaxy-ops";
@@ -50,14 +51,17 @@ if (transport === "stdio") {
   }
   // One context for every request, so the Galaxy version it probes is fetched once.
   const ctx = createGalaxyContext({ baseUrl, apiKey });
+  let httpServer;
   try {
-    await startHttpServer({ ...config, newServer: () => buildServer(ctx, { allowLocalFiles: config.allowLocalFiles }) });
+    httpServer = await startHttpServer({ ...config, newServer: () => buildServer(ctx, { allowLocalFiles: config.allowLocalFiles }) });
   } catch (error) {
     // A port in use, or an address this machine does not have: say so in one line.
     console.error(`galaxy-mcp: ${(error as Error).message}`);
     process.exit(1);
   }
-  const { host, port, path } = config;
+  // The bound port, not the configured one, so --port 0 reports where it actually listens.
+  const { port } = httpServer.address() as AddressInfo;
+  const { host, path } = config;
   console.error(`galaxy-mcp: listening on http://${host.includes(":") ? `[${host}]` : host}:${port}${path}`);
 } else {
   fail(`unsupported transport '${transport}'; choose stdio or streamable-http`);

@@ -76,6 +76,7 @@ describe("HTTP configuration", () => {
 
   it("refuses a port that is not one, and an unauthenticated routable address", () => {
     expect(() => httpConfig({ port: "80a" }, {})).toThrow("invalid port: 80a");
+    expect(() => httpConfig({}, { GALAXY_MCP_PORT: "" })).toThrow("invalid port: ");
     expect(() => httpConfig({ host: "0.0.0.0" }, {})).toThrow(HttpStartupError);
     expect(httpConfig({ host: "0.0.0.0", allowUnauthenticated: true }, {}).host).toBe("0.0.0.0");
   });
