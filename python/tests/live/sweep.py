@@ -15,7 +15,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from bioblend.galaxy import GalaxyInstance
@@ -36,12 +36,12 @@ def _old(item: dict[str, Any], cutoff: datetime) -> bool:
         return True
     when = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
     if when.tzinfo is None:
-        when = when.replace(tzinfo=timezone.utc)
+        when = when.replace(tzinfo=UTC)
     return when < cutoff
 
 
 def sweep(gi: GalaxyInstance, hours: float, dry_run: bool) -> list[str]:
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    cutoff = datetime.now(UTC) - timedelta(hours=hours)
     done: list[str] = []
 
     for h in gi.histories.get_histories(keys=["id", "name", "update_time"]):

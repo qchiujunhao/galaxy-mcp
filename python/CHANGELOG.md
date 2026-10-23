@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
+- Python 3.10 is no longer supported; galaxy-mcp now needs 3.11 or newer. 3.10 reached
+  end of life on 2026-10-01, and Pillow 13, which carries a long run of security fixes,
+  no longer installs on it.
 - `get_history_contents` rows no longer carry `dataset_id`. It is the id of the Dataset
   under a history item, not of the item itself: no tool takes it, and passed where
   `id` belongs it names whichever item has that number rather than this one. Use `id`.

@@ -16,7 +16,7 @@ This is the Python implementation of the Galaxy MCP server, providing a Model Co
 
 ## Requirements
 
-- Python 3.10+
+- Python 3.11+
 - FastMCP 3.1+
 
 ## Installation
@@ -396,7 +396,7 @@ format.
 
 ### Code Style Guidelines
 
-- Use Python 3.10+ features
+- Use Python 3.11+ features
 - Employ type hints where appropriate
 - Follow PEP 8 style guidelines
 - Use ruff for code formatting and linting

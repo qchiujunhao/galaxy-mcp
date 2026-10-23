@@ -43,8 +43,8 @@ import os
 import subprocess
 import sys
 from datetime import (
+    UTC,
     datetime,
-    timezone,
 )
 from pathlib import Path
 from typing import Any
@@ -121,7 +121,7 @@ def provenance(galaxy_root: Path) -> dict[str, Any]:
         "moduleBlob": _git(galaxy_root, "rev-parse", f"HEAD:{MODULE_PATH}"),
         # FastMCP writes the JSON Schema, so which one wrote it is part of the reading.
         "fastmcp": fastmcp.__version__,
-        "capturedOn": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "capturedOn": datetime.now(UTC).strftime("%Y-%m-%d"),
     }
 
 
