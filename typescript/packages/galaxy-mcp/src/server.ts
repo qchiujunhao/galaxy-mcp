@@ -2,6 +2,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type { ZodRawShape } from "zod";
 import { allOperations, describeOperation, runWithEnvelope, type GalaxyContext } from "@galaxyproject/galaxy-ops";
+import { registerCard, type CardSpec } from "./apps/card-page.js";
+import { historiesCard, historyCard } from "./apps/cards.js";
 import { LaxArgumentsTransport } from "./lax-transport.js";
 import { inWireNames, toOperationInput, wireShape } from "./wire-names.js";
 // The version a client is told, read from the package rather than written twice. tsup
@@ -98,37 +100,77 @@ function localFilesRefusal({ action, alternative }: { action: string; alternativ
 export interface ServerOptions {
   /** Whether tools may read or write paths on this machine. True over stdio. */
   allowLocalFiles?: boolean;
+  /** Whether to add the MCP Apps cards and the show_* tools that open them. Off by default. */
+  apps?: boolean;
 }
+
+/**
+ * Cards over a read. Each show_* tool runs an existing read and returns exactly what it returns;
+ * the difference is the card the host renders beside it. Reads stay card-free, so an agent can
+ * look things up without putting a card in front of the user each time.
+ */
+const readCards: { name: string; operation: string; card: CardSpec; guidance: string }[] = [
+  {
+    name: "show_histories",
+    operation: "get_histories",
+    card: historiesCard,
+    guidance:
+      "Show the user's histories as a card they can page through, with a small limit such as 5 to 20: " +
+      "without one, every history comes back at once. The card opens on five rows. Use a show_* tool only " +
+      "when the user wants to see something, and show at most one card per reply across all of them. For " +
+      "your own lookups and polling use get_histories, which shows nothing.",
+  },
+  {
+    name: "show_history",
+    operation: "get_history_contents",
+    card: historyCard,
+    guidance:
+      "Show one history's datasets and collections as a card the user can page through and open, with a " +
+      "small limit such as 5 to 20. The card opens on five rows. Use a show_* tool only when the user wants " +
+      "to see something, and show at most one card per reply across all of them. For your own lookups and " +
+      "polling use get_history_contents, which shows nothing. To show only some datasets, use show_datasets.",
+  },
+];
 
 /**
  * One MCP server over one Galaxy context. The context is passed in rather than built here so
  * servers can share it, along with the Galaxy version it caches.
  */
-export function buildServer(ctx: GalaxyContext, { allowLocalFiles = true }: ServerOptions = {}): McpServer {
+export function buildServer(ctx: GalaxyContext, { allowLocalFiles = true, apps = false }: ServerOptions = {}): McpServer {
   const server = new McpServer({ name: "galaxy", version });
   const annotations = toolAnnotations();
   const shapes = new Map<string, ZodRawShape>();
-  for (const op of allOperations) {
+  const register = (name: string, op: (typeof allOperations)[number], extra: { guidance?: string; _meta?: Record<string, unknown> } = {}) => {
     // Advertised, validated and decoded under the Python parameter names; the op is handed
     // back its own. See wire-names.ts for why the rename stops at the top level.
     const { shape, object, toInput } = wireShape(op);
-    shapes.set(op.name, shape);
+    shapes.set(name, shape);
+    const description = inWireNames(describeOperation(op), op.input);
     server.registerTool(
-      op.name,
+      name,
       {
-        description: inWireNames(describeOperation(op), op.input),
+        description: extra.guidance ? `${extra.guidance}\n\n${description}` : description,
         inputSchema: object,
         annotations: annotations[op.name],
+        ...(extra._meta && { _meta: extra._meta }),
       },
       async (args: unknown) => {
         const input = toOperationInput(args as Record<string, unknown>, toInput);
         const localFiles = localFileTools[op.name];
         if (!allowLocalFiles && localFiles?.uses(input as Record<string, unknown>)) {
-          return toolResult(op.name, { success: false, message: localFilesRefusal(localFiles) });
+          return toolResult(name, { success: false, message: localFilesRefusal(localFiles) });
         }
-        return toolResult(op.name, await runWithEnvelope(op as never, input as never, ctx));
+        return toolResult(name, await runWithEnvelope(op as never, input as never, ctx));
       },
     );
+  };
+  for (const op of allOperations) register(op.name, op);
+  if (apps) {
+    for (const { name, operation, card, guidance } of readCards) {
+      registerCard(server, name, card);
+      const op = allOperations.find((candidate) => candidate.name === operation)!;
+      register(name, op, { guidance, _meta: { ui: { resourceUri: card.uri } } });
+    }
   }
   // Arguments are decoded as a call arrives, under the same wire names they are validated
   // against; see LaxArgumentsTransport for why it is here and not in the handlers above.
