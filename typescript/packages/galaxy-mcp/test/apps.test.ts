@@ -3,7 +3,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createGalaxyContext } from "@galaxyproject/galaxy-ops";
 import { cardPage } from "../src/apps/card-page";
-import { HISTORIES_CARD_URI, HISTORY_CARD_URI, historiesCard, historyCard } from "../src/apps/cards";
+import { DATASETS_CARD_URI, HISTORIES_CARD_URI, HISTORY_CARD_URI, datasetsCard, historiesCard, historyCard } from "../src/apps/cards";
 import { buildServer, toolNames } from "../src/server";
 import { runCard } from "./card-host";
 
@@ -15,6 +15,10 @@ const contents = [
   { id: "d1", hid: 1, name: "reads.fastq", history_content_type: "dataset", extension: "fastqsanger", state: "ok" },
   { id: "c1", hid: 2, name: "samples", history_content_type: "dataset_collection", collection_type: "list", element_count: 3 },
 ];
+const detailed = [
+  { id: "d1", hid: 1, name: "reads.fastq", history_content_type: "dataset", extension: "fastqsanger", state: "ok", accessible: true, file_size: 2048 },
+  { id: "d2", hid: 5, name: "counts.tsv", history_content_type: "dataset", extension: "tabular", state: "ok", accessible: true, file_size: 4096 },
+];
 // A Galaxy that only knows its history list and one history's contents.
 const ctx = createGalaxyContext({
   baseUrl: "http://galaxy.invalid",
@@ -22,6 +26,11 @@ const ctx = createGalaxyContext({
   fetchImpl: async (request) => {
     const url = new URL(request instanceof Request ? request.url : String(request));
     if (url.pathname === "/api/histories") return Response.json(histories);
+    if (url.pathname === "/api/histories/h1/contents" && url.searchParams.get("q") === "type_id-in") {
+      // Only the asked-for items of this history, in Galaxy's own order.
+      const asked = url.searchParams.get("qv")!.split(",");
+      return Response.json(detailed.filter((item) => asked.includes(`dataset-${item.id}`)));
+    }
     if (url.pathname === "/api/histories/h1/contents") return Response.json({ contents, stats: { total_matches: contents.length } });
     return new Response("not found", { status: 404 });
   },
@@ -47,7 +56,7 @@ describe("MCP Apps cards", () => {
   it("add a show_* tool beside each read, pointing at its card, and change nothing else", async () => {
     const off = (await (await connect(false)).listTools()).tools;
     const { tools } = await (await connect(true)).listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual([...toolNames(), "show_histories", "show_history"].sort());
+    expect(tools.map((t) => t.name).sort()).toEqual([...toolNames(), "show_datasets", "show_histories", "show_history"].sort());
     expect(tools.filter((t) => !t.name.startsWith("show_"))).toEqual(off);
     for (const [show, read, uri] of [
       ["show_histories", "get_histories", HISTORIES_CARD_URI],
@@ -65,7 +74,7 @@ describe("MCP Apps cards", () => {
 
   it("serve each card as an MCP App", async () => {
     const client = await connect(true);
-    for (const card of [historiesCard, historyCard]) {
+    for (const card of [historiesCard, historyCard, datasetsCard]) {
       const { contents: served } = await client.readResource({ uri: card.uri });
       expect(served).toEqual([expect.objectContaining({ uri: card.uri, mimeType: "text/html;profile=mcp-app", text: cardPage(card) })]);
     }
@@ -84,10 +93,62 @@ describe("MCP Apps cards", () => {
   });
 
   it("each carry a script that parses", () => {
-    for (const card of [historiesCard, historyCard]) {
+    for (const card of [historiesCard, historyCard, datasetsCard]) {
       const script = cardPage(card).match(/<script>([\s\S]*)<\/script>/)![1]!;
       expect(() => new Function(script)).not.toThrow();
     }
+  });
+});
+
+describe("show_datasets", () => {
+  it("shows the chosen datasets in the order chosen, and says which did not come back", async () => {
+    const client = await connect(true);
+    const tool = (await client.listTools()).tools.find((t) => t.name === "show_datasets")!;
+    expect(tool._meta).toEqual({ ui: { resourceUri: DATASETS_CARD_URI } });
+    expect(tool.annotations).toEqual({ readOnlyHint: true, destructiveHint: false });
+
+    const shown = await client.callTool({
+      name: "show_datasets",
+      arguments: { history_id: "h1", dataset_ids: ["d2", "gone", "d1"], caption: "Inputs for the next step" },
+    });
+    const answer = JSON.parse((shown.content as { text: string }[])[0]!.text);
+    expect(answer).toMatchObject({ success: true, message: "Showing 2 of 3 selected datasets", count: 3 });
+    expect(answer.data.caption).toBe("Inputs for the next step");
+    expect(answer.data.selected.map((s: { id: string; status: string }) => [s.id, s.status])).toEqual([
+      ["d2", "available"],
+      ["gone", "unavailable"],
+      ["d1", "available"],
+    ]);
+  });
+
+  it("refuses an empty or oversized selection, and reports Galaxy's errors", async () => {
+    const client = await connect(true);
+    for (const dataset_ids of [[], Array.from({ length: 21 }, (_, i) => `d${i}`)]) {
+      const refused = await client.callTool({ name: "show_datasets", arguments: { history_id: "h1", dataset_ids } });
+      expect(refused.isError).toBe(true);
+    }
+    const missing = await client.callTool({ name: "show_datasets", arguments: { history_id: "nope", dataset_ids: ["d1"] } });
+    expect(missing.isError).toBe(true);
+    expect(JSON.stringify(missing.content)).toContain("Failed to show datasets");
+  });
+});
+
+describe("the datasets card", () => {
+  it("heads the selection with what came back, labels the caption as the assistant's, and fetches nothing more", async () => {
+    const card = runCard(cardPage(datasetsCard));
+    await card.initialize();
+    const selected = [
+      { id: "d2", status: "available", dataset: detailed[1] },
+      { id: "gone", status: "unavailable" },
+      { id: "d9", status: "inaccessible", dataset: { id: "d9", hid: 9, name: "private.bam" } },
+    ];
+    await card.open({ history_id: "h1" }, { history_id: "h1", selected, available: 1, caption: "Inputs for the next step" }, null);
+    expect(card.scope()).toBe("Chosen by the assistant \u00b7 2 unavailable \u00b7 Showing 3 of 3");
+    expect(card.root.text).toContain("Assistant noteInputs for the next step");
+    expect(card.rows()).toEqual(["5: counts.tsv", "gone", "9: private.bam"]);
+    expect(card.root.text).toContain("Not available in this history");
+    expect(card.root.text).toContain("You do not have access to this dataset");
+    expect(card.button("Show more")).toBeUndefined();
   });
 });
 

@@ -6,6 +6,7 @@ import type { CardSpec } from "./card-page.js";
 
 export const HISTORIES_CARD_URI = "ui://galaxy/histories.html";
 export const HISTORY_CARD_URI = "ui://galaxy/history.html";
+export const DATASETS_CARD_URI = "ui://galaxy/datasets.html";
 
 // A page of a paged read: its rows, Galaxy's total and where the next page starts.
 const paged = (items: string) => `(page) => ({
@@ -67,4 +68,30 @@ export const historyCard: CardSpec = {
         detail: ${datasetDetail},
       }`,
   empty: "Nothing in this history matches.",
+};
+
+export const datasetsCard: CardSpec = {
+  uri: DATASETS_CARD_URI,
+  title: "Selected datasets",
+  openTool: "show_datasets",
+  keep: [],
+  read: `(page) => {
+    const selected = page.data?.selected || [];
+    const missing = selected.length - (page.data?.available ?? 0);
+    return {
+      items: selected,
+      total: selected.length,
+      nextOffset: null,
+      caption: page.data?.caption || "",
+      scope: ["Chosen by the assistant", missing ? missing + " unavailable" : ""].filter(Boolean).join(" \\u00b7 "),
+    };
+  }`,
+  row: `(entry) => {
+    const item = entry.dataset || {};
+    const name = item.hid !== undefined ? item.hid + ": " + (item.name || "Unnamed dataset") : entry.id;
+    if (entry.status === "unavailable") return { name, meta: ["Not available in this history"], state: "" };
+    if (entry.status === "inaccessible") return { name, meta: ["You do not have access to this dataset"], state: "" };
+    return { name: name + (item.name_truncated ? "\\u2026" : ""), meta: [item.extension, bytes(item.file_size)], state: item.state, detail: ${datasetDetail} };
+  }`,
+  empty: "No datasets were selected.",
 };

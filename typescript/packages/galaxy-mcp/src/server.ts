@@ -1,9 +1,16 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import type { ZodRawShape } from "zod";
-import { allOperations, describeOperation, runWithEnvelope, type GalaxyContext } from "@galaxyproject/galaxy-ops";
+import { z, type ZodRawShape } from "zod";
+import {
+  allOperations,
+  describeOperation,
+  getSelectedDatasets,
+  MAX_SELECTED_DATASETS,
+  runWithEnvelope,
+  type GalaxyContext,
+} from "@galaxyproject/galaxy-ops";
 import { registerCard, type CardSpec } from "./apps/card-page.js";
-import { historiesCard, historyCard } from "./apps/cards.js";
+import { datasetsCard, historiesCard, historyCard } from "./apps/cards.js";
 import { LaxArgumentsTransport } from "./lax-transport.js";
 import { inWireNames, toOperationInput, wireShape } from "./wire-names.js";
 // The version a client is told, read from the package rather than written twice. tsup
@@ -97,6 +104,34 @@ function localFilesRefusal({ action, alternative }: { action: string; alternativ
   );
 }
 
+const MAX_CAPTION_LENGTH = 280;
+
+/** show_datasets: a chosen set, not a read, so it has its own shape and answer. */
+const showDatasetsShape = {
+  history_id: z.string().describe("Encoded id of the history the datasets are in"),
+  dataset_ids: z
+    .array(z.string())
+    .min(1)
+    .max(MAX_SELECTED_DATASETS)
+    .describe(
+      `The datasets to show, in this order: their id from get_history_contents (not hid), 1 to ${MAX_SELECTED_DATASETS}`,
+    ),
+  caption: z
+    .string()
+    .max(MAX_CAPTION_LENGTH)
+    .optional()
+    .describe("A short note on why these datasets, shown as yours rather than Galaxy's"),
+};
+
+const showDatasetsDescription =
+  "Show a chosen set of datasets from one history as a card: only these, in the order given. First read " +
+  "with get_history_contents and pick the entries the user asked for, datasets only (history_content_type " +
+  '"dataset"), passing their id, not their hid. For "the latest successful ones", for example, read with ' +
+  'order="create_time-dsc" and take the first entries whose state is "ok", paging on until you have enough ' +
+  "or saying how far you read. Galaxy supplies every name and state; an id that is not in this history, or " +
+  "that the user cannot access, is shown as such. The card opens on five rows. Use a show_* tool only when " +
+  "the user wants to see something, and show at most one card per reply across all of them.";
+
 export interface ServerOptions {
   /** Whether tools may read or write paths on this machine. True over stdio. */
   allowLocalFiles?: boolean;
@@ -171,6 +206,32 @@ export function buildServer(ctx: GalaxyContext, { allowLocalFiles = true, apps =
       const op = allOperations.find((candidate) => candidate.name === operation)!;
       register(name, op, { guidance, _meta: { ui: { resourceUri: card.uri } } });
     }
+    registerCard(server, "show_datasets", datasetsCard);
+    shapes.set("show_datasets", showDatasetsShape);
+    server.registerTool(
+      "show_datasets",
+      {
+        description: showDatasetsDescription,
+        inputSchema: z.object(showDatasetsShape).strict(),
+        annotations: annotationsFor({}),
+        _meta: { ui: { resourceUri: datasetsCard.uri } },
+      },
+      async ({ history_id, dataset_ids, caption }) => {
+        try {
+          const shown = await getSelectedDatasets({ historyId: history_id, datasetIds: dataset_ids }, ctx);
+          const count = shown.selected.length;
+          const answer = {
+            success: true,
+            data: { ...shown, ...(caption && { caption }) },
+            message: `Showing ${shown.available} of ${count} selected datasets`,
+            count,
+          };
+          return toolResult("show_datasets", answer);
+        } catch (error) {
+          return toolResult("show_datasets", { success: false, message: `Failed to show datasets: ${(error as Error).message}` });
+        }
+      },
+    );
   }
   // Arguments are decoded as a call arrives, under the same wire names they are validated
   // against; see LaxArgumentsTransport for why it is here and not in the handlers above.
